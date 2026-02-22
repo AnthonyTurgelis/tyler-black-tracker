@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tyler Black Card Collection Tracker</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚾</text></svg>" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class', theme: { extend: {} } };
+  </script>
+
+  <!-- React 18 -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel (transpiles JSX in browser) -->
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+
+  <!-- Supabase JS Client (official CDN) -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+  <!-- ══════════════════════════════════════════════════════════
+       SUPABASE CONFIG — Replace these with YOUR project values
+       (from Supabase Dashboard > Settings > API)
+       ══════════════════════════════════════════════════════════ -->
+  <script>
+    window.SUPABASE_URL = "https://abmelywqvhbyoacjhwyx.supabase.co";
+    window.SUPABASE_ANON_KEY = "tQs01ejzGZUhFCjm725Q_SYL4Hg8g";
+  </script>
+
+  <style>
+    body { margin: 0; background: #0a1628; overflow-x: hidden; }
+    #loading {
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh; color: #FFC52F; font-family: system-ui;
+      flex-direction: column; gap: 12px;
+    }
+    #loading .spinner {
+      width: 40px; height: 40px; border: 3px solid #1e3a5f;
+      border-top-color: #FFC52F; border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Auth bar */
+    #auth-bar {
+      background: #0d1f3c; border-bottom: 1px solid #1e3a5f;
+      padding: 6px 16px; font-family: system-ui; font-size: 13px;
+      display: flex; align-items: center; gap: 8px; color: #94a3b8;
+    }
+    #auth-bar input {
+      background: #1a2a4a; border: 1px solid #2d4a6f; color: #e2e8f0;
+      padding: 4px 8px; border-radius: 4px; font-size: 13px; width: 180px;
+    }
+    #auth-bar input:focus { outline: none; border-color: #FFC52F; }
+    #auth-bar button {
+      padding: 4px 12px; border-radius: 4px; font-size: 13px;
+      cursor: pointer; border: none;
+    }
+    #auth-bar .btn-login {
+      background: #22c55e; color: #000; font-weight: 600;
+    }
+    #auth-bar .btn-login:hover { background: #16a34a; }
+    #auth-bar .btn-logout {
+      background: #374151; color: #e2e8f0;
+    }
+    #auth-bar .btn-logout:hover { background: #4b5563; }
+    #auth-bar .status-dot {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+    }
+    #auth-bar .dot-green { background: #22c55e; }
+    #auth-bar .dot-gray { background: #6b7280; }
+    #auth-bar .dot-yellow { background: #eab308; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    #auth-bar .error { color: #ef4444; font-size: 12px; }
+  </style>
+</head>
+<body class="dark">
+
+  <!-- Auth Bar -->
+  <div id="auth-bar">
+    <div id="auth-status">
+      <span class="status-dot dot-yellow"></span>
+      <span>Connecting...</span>
+    </div>
+    <div id="auth-login" style="display:none;">
+      <input type="email" id="auth-email" placeholder="Email" autocomplete="email" />
+      <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password" />
+      <button class="btn-login" onclick="doLogin()">Login</button>
+      <span id="auth-error" class="error"></span>
+    </div>
+    <div id="auth-logged-in" style="display:none;">
+      <span class="status-dot dot-green"></span>
+      <span><strong>Owner Mode</strong> — changes save to cloud</span>
+      <button class="btn-logout" onclick="doMigrate()" id="migrate-btn" title="Push all localStorage data to Supabase (one-time migration)">⬆ Migrate to Cloud</button>
+      <span id="migrate-msg" class="error" style="color:#22c55e;"></span>
+      <button class="btn-logout" onclick="doLogout()">Logout</button>
+    </div>
+    <div id="auth-visitor" style="display:none;">
+      <span class="status-dot dot-gray"></span>
+      <span>Viewing collection (read-only) — changes won't save</span>
+      <button class="btn-login" onclick="showLogin()" style="font-size:12px;padding:2px 8px;">Owner Login</button>
+    </div>
+  </div>
+
+  <!-- Tracker mounts here -->
+  <div id="root">
+    <div id="loading">
+      <div class="spinner"></div>
+      <div>Loading Tyler Black Tracker...</div>
+    </div>
+  </div>
+
+  <!-- Storage shim (Supabase + localStorage) — must be before tracker -->
+  <script src="storage-shim.js"></script>
+
+  <!-- Auth UI logic -->
+  <script>
+    function updateAuthUI() {
+      document.getElementById("auth-status").style.display = "none";
+      document.getElementById("auth-login").style.display = "none";
+      document.getElementById("auth-logged-in").style.display = "none";
+      document.getElementById("auth-visitor").style.display = "none";
+
+      if (window.trackerAuth.isOwner()) {
+        document.getElementById("auth-logged-in").style.display = "flex";
+      } else {
+        document.getElementById("auth-visitor").style.display = "flex";
+      }
+    }
+
+    function showLogin() {
+      document.getElementById("auth-visitor").style.display = "none";
+      document.getElementById("auth-login").style.display = "flex";
+      document.getElementById("auth-email").focus();
+    }
+
+    async function doLogin() {
+      var email = document.getElementById("auth-email").value;
+      var password = document.getElementById("auth-password").value;
+      document.getElementById("auth-error").textContent = "";
+
+      if (!email || !password) {
+        document.getElementById("auth-error").textContent = "Enter email and password";
+        return;
+      }
+
+      var result = await window.trackerAuth.login(email, password);
+      if (result.error) {
+        document.getElementById("auth-error").textContent = result.error;
+      } else {
+        updateAuthUI();
+        // Re-hydrate to ensure we have latest cloud data
+        location.reload();
+      }
+    }
+
+    async function doLogout() {
+      await window.trackerAuth.logout();
+      updateAuthUI();
+    }
+
+    async function doMigrate() {
+      var btn = document.getElementById("migrate-btn");
+      var msg = document.getElementById("migrate-msg");
+      btn.disabled = true;
+      btn.textContent = "Migrating...";
+      msg.textContent = "";
+      try {
+        var result = await window.trackerAuth.migrateToCloud();
+        if (result.error) {
+          msg.style.color = "#ef4444";
+          msg.textContent = result.error;
+        } else if (result.errors && result.errors.length > 0) {
+          msg.style.color = "#eab308";
+          msg.textContent = "Migrated " + result.migrated + "/" + result.total + " keys (" + result.errors.length + " errors)";
+        } else {
+          msg.style.color = "#22c55e";
+          msg.textContent = "✓ Migrated " + result.migrated + " keys to cloud!";
+        }
+      } catch (e) {
+        msg.style.color = "#ef4444";
+        msg.textContent = "Error: " + e.message;
+      }
+      btn.disabled = false;
+      btn.textContent = "⬆ Migrate to Cloud";
+      setTimeout(function() { msg.textContent = ""; }, 8000);
+    }
+
+    // Enter key submits login
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "Enter" && document.getElementById("auth-login").style.display !== "none") {
+        doLogin();
+      }
+    });
+
+    // Wait for storage to be ready, then update UI
+    if (window.storageReady) {
+      window.storageReady.then(function () {
+        updateAuthUI();
+      });
+    } else {
+      // storage-shim didn't load — hide auth bar
+      document.getElementById("auth-status").innerHTML = '<span class="status-dot dot-gray"></span> <span>Offline mode (localStorage only)</span>';
+    }
+  </script>
+
+  <!-- The tracker (Babel transpiles JSX at runtime) -->
+  <script type="text/babel" data-presets="react" src="tracker.jsx"></script>
+
+</body>
+</html>
