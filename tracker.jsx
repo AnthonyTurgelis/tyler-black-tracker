@@ -8156,43 +8156,26 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
     reader.onload = function(e) {
       try {
         var data = JSON.parse(e.target.result);
-        // Support v2 format: { statuses: {}, cardDetails: {}, forSaleFlags: {} }
         if (data.statuses && typeof data.statuses === "object") {
-          var newStatuses = {};
-          var newDetails = {};
-          var newForSale = {};
-          // Import statuses
-          Object.keys(data.statuses).forEach(function(id) {
-            var val = data.statuses[id];
-            if (val === "owned" || val === "in_transit" || val === "not_owned") {
-              newStatuses[id] = val;
-            }
-          });
-          // Import card details
-          if (data.cardDetails && typeof data.cardDetails === "object") {
-            Object.keys(data.cardDetails).forEach(function(id) {
-              var d = data.cardDetails[id];
-              if (d && typeof d === "object") newDetails[id] = d;
-            });
-          }
-          // Import for-sale flags
-          if (data.forSaleFlags && typeof data.forSaleFlags === "object") {
-            Object.keys(data.forSaleFlags).forEach(function(id) {
-              if (data.forSaleFlags[id]) newForSale[id] = true;
-            });
-          }
-          // Apply to state
-          setStatuses(newStatuses);
-          setCardDetails(newDetails);
-          setForSaleFlags(newForSale);
-          // Persist everything through consolidated storage (hits Supabase + localStorage)
-          persistField("statuses", newStatuses);
-          persistField("details", newDetails);
-          persistField("forsale", newForSale);
-          var count = Object.keys(newStatuses).length;
-          var detailCount = Object.keys(newDetails).length;
-          setExportMsg("Restored " + count + " statuses + " + detailCount + " card details from backup!");
-          setTimeout(function() { setExportMsg(""); }, 6000);
+          // Build consolidated alldata object
+          var allData = {
+            statuses: data.statuses,
+            details: data.cardDetails || {},
+            forsale: data.forSaleFlags || {},
+            dirty: [],
+            changelog: [],
+            _saveTimestamp: Date.now()
+          };
+          var payload = JSON.stringify(allData);
+          // Write to both localStorage and cloud
+          localStorage.setItem("tb-alldata-v1", payload);
+          localStorage.setItem("tb-alldata-backup-v1", payload);
+          window.storage.set("tb-alldata-v1", payload);
+          var count = Object.keys(data.statuses).length;
+          var detailCount = Object.keys(data.cardDetails || {}).length;
+          alert("Restored " + count + " statuses + " + detailCount + " card details! Page will reload.");
+          // Reload to pick up restored data
+          setTimeout(function() { location.reload(); }, 500);
         } else {
           setExportMsg("Invalid backup format — expected v2 JSON with statuses object.");
           setTimeout(function() { setExportMsg(""); }, 5000);
