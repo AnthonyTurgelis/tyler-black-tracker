@@ -308,6 +308,17 @@ function displayPrice(v) { if (!v) return ""; var n = parseFloat(v.replace(/[^0-
 const SYNC_DATA = {};
 function TylerBlackTracker() {
   const [loading, setLoading] = useState(true);
+  const [isOwner, setIsOwner] = useState(false);
+  // Poll owner status so UI updates on login/logout
+  useEffect(function() {
+    var interval = setInterval(function() {
+      try {
+        var owner = window.trackerAuth && window.trackerAuth.isOwner();
+        setIsOwner(function(prev) { return prev !== owner ? owner : prev; });
+      } catch(e) {}
+    }, 1000);
+    return function() { clearInterval(interval); };
+  }, []);
   const [statuses, setStatuses] = useState({});
   const [cardDetails, setCardDetails] = useState({});
   const [filterYear, setFilterYear] = useState("all");
@@ -356,6 +367,8 @@ function TylerBlackTracker() {
   const [tcdbFixInput, setTcdbFixInput] = useState(""); // URL input for fixing
   const [tcdbFixingId, setTcdbFixingId] = useState(null); // which card is being fixed
   const [hidePrices, setHidePrices] = useState(true);
+  // Visitors always have prices hidden
+  useEffect(function() { if (!isOwner) setHidePrices(true); }, [isOwner]);
   // Build targetByCardId lookup from localStorage targets (for Lookup/Detailed panels)
   var _mainTargets = useMemo(function() { return loadTargets(); }, [activeTab, targetCardFilter]);
   var targetByCardId = useMemo(function() {
@@ -734,6 +747,8 @@ function TylerBlackTracker() {
         _migrationComplete: true
       };
       loadComplete.current = true; // Now safe to save
+      // Check owner status from auth system
+      try { setIsOwner(window.trackerAuth && window.trackerAuth.isOwner()); } catch(e) {}
       var statusCount = Object.keys(merged).filter(function(k) { return merged[k] !== "not_owned"; }).length;
       diagParts.push(statusCount + " tracked cards");
       setLoading(false);
@@ -1122,14 +1137,14 @@ function TylerBlackTracker() {
     {id:"summary",label:"Summary",color:"cyan"},
     {id:"comc_scanner",label:"Scanner",color:"orange"},
     {id:"targets",label:"Targets",color:"pink",badge:Object.keys(loadTargets()).length},
-    {id:"prices",label:"Prices",color:"indigo",badge:Object.keys(loadPriceHistory()).length},
+    {id:"prices",label:"Prices",color:"indigo",badge:Object.keys(loadPriceHistory()).length,ownerOnly:true},
     {id:"sync",label:"Sync",color:"orange",badge:unsyncedCards.length},
     {id:"cleanup",label:"Cleanup",color:"amber",badge:issueCounts.total},
-    {id:"changelog",label:"Log",color:"rose"},
-    {id:"versions",label:"Versions",color:"indigo"},
-    {id:"board",label:"Board",color:"blue"},
-    {id:"save",label:"Export",color:"emerald"},
-  ];
+    {id:"changelog",label:"Log",color:"rose",ownerOnly:true},
+    {id:"versions",label:"Versions",color:"indigo",ownerOnly:true},
+    {id:"board",label:"Board",color:"blue",ownerOnly:true},
+    {id:"save",label:"Export",color:"emerald",ownerOnly:true},
+  ].filter(function(t) { return !t.ownerOnly || isOwner; });
   const tabColorMap = {yellow:"border-yellow-400 text-yellow-300",cyan:"border-yellow-400 text-yellow-300",teal:"border-yellow-400 text-yellow-300",purple:"border-yellow-400 text-yellow-300",orange:"border-yellow-400 text-yellow-300",emerald:"border-yellow-400 text-yellow-300",amber:"border-yellow-400 text-yellow-300",rose:"border-yellow-400 text-yellow-300",indigo:"border-yellow-400 text-yellow-300",blue:"border-yellow-400 text-yellow-300",pink:"border-yellow-400 text-yellow-300",lime:"border-yellow-400 text-yellow-300"};
   const badgeActiveMap = {orange:"bg-orange-400 text-gray-900",amber:"bg-amber-400 text-gray-900",emerald:"bg-emerald-400 text-gray-900",indigo:"bg-indigo-400 text-gray-900"};
   const badgeInactiveMap = {orange:"bg-orange-900 text-orange-300",amber:"bg-amber-900 text-amber-300",emerald:"bg-emerald-900 text-emerald-300",indigo:"bg-indigo-900 text-indigo-300"};
@@ -1216,14 +1231,14 @@ function TylerBlackTracker() {
             >
               {superSearchMode ? "* SUPER" : "E"}
             </button>
-            <button 
+            {isOwner && <button 
               onClick={function() { setHidePrices(!hidePrices); }} 
               className={"px-1 py-0 rounded transition-colors " + (hidePrices ? "text-gray-600 hover:text-gray-400" : "text-gray-500 hover:text-gray-300 bg-gray-700/50")}
               style={{fontSize:"clamp(7px,0.8vw,9px)"}}
               title={hidePrices ? "Prices hidden — click to show" : "Prices visible — click to hide"}
             >
               {"$"}
-            </button>
+            </button>}
             <button 
               onClick={function() { setShowKbHelp(true); }} 
               className="px-1.5 py-0.5 rounded transition-colors bg-gray-800 text-gray-500 hover:text-white hover:bg-gray-700 font-bold"
@@ -1463,7 +1478,7 @@ function TylerBlackTracker() {
         ) : activeTab === "prices" ? (
           <PricesPanel cards={ALL_CARDS} statuses={statuses} setActiveTab={setActiveTab} setDetailedCardId={setDetailedCardId} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} setDetailedProductFilter={setDetailedProductFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} initialSearch={pricesSearchFilter} setPricesSearchFilter={setPricesSearchFilter} />
         ) : activeTab === "export" || activeTab === "save" ? (
-          <ExportPanel statuses={statuses} cardDetails={cardDetails} forSaleFlags={forSaleFlags} needsSync={needsSync} lastCheckpoint={lastCheckpoint} setLastCheckpoint={setLastCheckpoint} isSavingCheckpoint={isSavingCheckpoint} setIsSavingCheckpoint={setIsSavingCheckpoint} saveCount={saveCount} flashSave={flashSave} saveToast={saveToast} exportCsvRef={exportCsvRef} persistField={persistField} />
+          <ExportPanel statuses={statuses} cardDetails={cardDetails} forSaleFlags={forSaleFlags} needsSync={needsSync} lastCheckpoint={lastCheckpoint} setLastCheckpoint={setLastCheckpoint} isSavingCheckpoint={isSavingCheckpoint} setIsSavingCheckpoint={setIsSavingCheckpoint} saveCount={saveCount} flashSave={flashSave} saveToast={saveToast} exportCsvRef={exportCsvRef} persistField={persistField} setStatuses={setStatuses} setCardDetails={setCardDetails} setForSaleFlags={setForSaleFlags} allDataRef={allDataRef} />
         ) : activeTab === "sync" ? (
           <SyncPanel cards={unsyncedCards} touchupCards={touchupCards} cardDetails={cardDetails} syncIndex={syncIndex} setSyncIndex={setSyncIndex} markSynced={markSynced} hidePrices={hidePrices} />
         ) : activeTab === "cleanup" ? (
@@ -7969,7 +7984,7 @@ function ChangelogPanel({ changelog, setChangelog, statuses, cardDetails, forSal
 }
 
 
-function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheckpoint, setLastCheckpoint, isSavingCheckpoint, setIsSavingCheckpoint, saveCount, flashSave, saveToast, exportCsvRef, persistField }) {
+function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheckpoint, setLastCheckpoint, isSavingCheckpoint, setIsSavingCheckpoint, saveCount, flashSave, saveToast, exportCsvRef, persistField, setStatuses, setCardDetails, setForSaleFlags, allDataRef }) {
   var [exportMsg, setExportMsg] = useState("");
   var [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -8159,52 +8174,84 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
       try {
         var data = JSON.parse(e.target.result);
         if (data.statuses && typeof data.statuses === "object") {
-          var statCount = Object.keys(data.statuses).length;
-          var detailCount = Object.keys(data.cardDetails || {}).length;
-          var fsCount = Object.keys(data.forSaleFlags || {}).length;
-          console.log("[restore] Parsed backup: " + statCount + " statuses, " + detailCount + " details, " + fsCount + " forsale");
-          // Build consolidated alldata object
-          var allData = {
-            statuses: data.statuses,
-            details: data.cardDetails || {},
-            forsale: data.forSaleFlags || {},
-            dirty: [],
-            changelog: [],
-            _saveTimestamp: Date.now()
-          };
-          var payload = JSON.stringify(allData);
-          console.log("[restore] Payload size: " + payload.length + " chars");
-          // Verify payload round-trips correctly
-          var verify = JSON.parse(payload);
-          console.log("[restore] Verify: " + Object.keys(verify.statuses||{}).length + " statuses, " + Object.keys(verify.details||{}).length + " details");
-          // Write to localStorage immediately
-          localStorage.setItem("tb-alldata-v1", payload);
-          localStorage.setItem("tb-alldata-backup-v1", payload);
-          console.log("[restore] Written to localStorage");
-          setExportMsg("Restoring " + statCount + " statuses + " + detailCount + " details to cloud...");
-          // AWAIT the cloud write
+          var newStatuses = data.statuses;
+          var newDetails = data.cardDetails || {};
+          var newForSale = data.forSaleFlags || {};
+          var statCount = Object.keys(newStatuses).length;
+          var detailCount = Object.keys(newDetails).length;
+          console.log("[restore] Parsed: " + statCount + " statuses, " + detailCount + " details");
+
+          // 1. Update allDataRef directly (this is what gets saved to cloud)
+          allDataRef.current.statuses = newStatuses;
+          allDataRef.current.details = newDetails;
+          allDataRef.current.forsale = newForSale;
+          allDataRef.current._saveTimestamp = Date.now();
+          allDataRef.current._migrationComplete = true;
+
+          // 2. Update React state (this is what the UI shows)
+          setStatuses(newStatuses);
+          setCardDetails(newDetails);
+          setForSaleFlags(newForSale);
+
+          // 3. Save to localStorage immediately
+          var payload = JSON.stringify(allDataRef.current);
+          try { localStorage.setItem("tb-alldata-v1", payload); } catch(e2) {}
+          try { localStorage.setItem("tb-alldata-backup-v1", payload); } catch(e2) {}
+
+          // 4. Save to cloud
+          setExportMsg("Saving " + statCount + " statuses + " + detailCount + " details to cloud...");
           try {
-            var cloudResult = await window.storage.set("tb-alldata-v1", payload);
-            console.log("[restore] Cloud write result:", cloudResult);
+            await window.storage.set("tb-alldata-v1", payload);
+            console.log("[restore] Cloud write complete");
           } catch(cloudErr) {
             console.error("[restore] Cloud write failed:", cloudErr);
           }
-          // Verify localStorage still has the data (hydration didn't overwrite)
-          var lsCheck = localStorage.getItem("tb-alldata-v1");
-          if (lsCheck) {
-            var lsData = JSON.parse(lsCheck);
-            console.log("[restore] localStorage verify: " + Object.keys(lsData.statuses||{}).length + " statuses, " + Object.keys(lsData.details||{}).length + " details");
-          }
-          await new Promise(function(r) { setTimeout(r, 1500); });
-          alert("Restored " + statCount + " statuses + " + detailCount + " card details! Page will reload.");
-          window._skipBeforeUnloadSave = true; // Prevent beforeunload from overwriting restored data
-          location.reload();
+
+          setExportMsg("Restored " + statCount + " statuses + " + detailCount + " card details!");
+          setTimeout(function() { setExportMsg(""); }, 5000);
         } else {
           setExportMsg("Invalid backup format — expected v2 JSON with statuses object.");
           setTimeout(function() { setExportMsg(""); }, 5000);
         }
       } catch (err) {
         setExportMsg("Error parsing backup: " + err.message);
+        setTimeout(function() { setExportMsg(""); }, 5000);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function restoreSecondaryData(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = async function(e) {
+      try {
+        var data = JSON.parse(e.target.result);
+        var restored = 0;
+        var SECONDARY_KEYS = [
+          "tb-price-history-v1",
+          "tb-targets-v1",
+          "tb-ebay-blocked-v1",
+          "tb-ebay-bids-v1",
+          "tb-comc-overrides-v1",
+          "tb-custom-cards-v1",
+          "tb-tcdb-fixes-v1",
+          "tb-tcdb-flags-v1"
+        ];
+        for (var i = 0; i < SECONDARY_KEYS.length; i++) {
+          var key = SECONDARY_KEYS[i];
+          if (data[key] !== undefined && data[key] !== null) {
+            var val = typeof data[key] === "string" ? data[key] : JSON.stringify(data[key]);
+            try { localStorage.setItem(key, val); } catch(e2) {}
+            try { await window.storage.set(key, val); } catch(e2) {}
+            restored++;
+            console.log("[restore-secondary] Restored:", key);
+          }
+        }
+        setExportMsg("Restored " + restored + " secondary data keys (prices, targets, etc)!");
+        setTimeout(function() { setExportMsg(""); }, 5000);
+      } catch(err) {
+        setExportMsg("Error parsing secondary data: " + err.message);
         setTimeout(function() { setExportMsg(""); }, 5000);
       }
     };
@@ -8324,6 +8371,11 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
           <label className="w-full py-2 px-3 bg-amber-700 hover:bg-amber-600 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer">
             Restore from JSON Backup
             <input type="file" accept=".json" className="hidden" onChange={function(e) { if (e.target.files[0]) restoreFromJson(e.target.files[0]); e.target.value = ""; }} />
+          </label>
+
+          <label className="w-full py-2 px-3 bg-teal-700 hover:bg-teal-600 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer">
+            Restore Secondary Data (prices, targets, scans)
+            <input type="file" accept=".json" className="hidden" onChange={function(e) { if (e.target.files[0]) restoreSecondaryData(e.target.files[0]); e.target.value = ""; }} />
           </label>
 
           <button onClick={copyRawData} className="w-full py-2 px-3 bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors">
