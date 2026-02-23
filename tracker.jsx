@@ -104,15 +104,15 @@ var TCDB_USER_FIXES = {}; // Populated from localStorage at runtime -- overrides
 var COMC_OVERRIDES = {}; // Populated from localStorage - persistent COMC match overrides
 var PRICE_HISTORY = {}; // Populated from localStorage - historical pricing data by card ID
 function loadPriceHistory() { try { return JSON.parse(localStorage.getItem("tb-price-history-v1") || "{}"); } catch(e) { return {}; } }
-function savePriceHistory(obj) { localStorage.setItem("tb-price-history-v1", JSON.stringify(obj)); window.storage.set("tb-price-history-v1", JSON.stringify(obj)); PRICE_HISTORY = obj; }
+function savePriceHistory(obj) { localStorage.setItem("tb-price-history-v1", JSON.stringify(obj)); try { window.storage.set("tb-price-history-v1", JSON.stringify(obj)); } catch(e) {} PRICE_HISTORY = obj; }
 var TCDB_FLAGS = {}; // Populated from localStorage -- flagged bad links
 var EBAY_BLOCKED = {}; // Populated from localStorage -- blocked eBay listings
 function loadEbayBlocked() { try { return JSON.parse(localStorage.getItem("tb-ebay-blocked-v1") || "{}"); } catch(e) { return {}; } }
-function saveEbayBlocked(obj) { localStorage.setItem("tb-ebay-blocked-v1", JSON.stringify(obj)); window.storage.set("tb-ebay-blocked-v1", JSON.stringify(obj)); EBAY_BLOCKED = obj; }
+function saveEbayBlocked(obj) { localStorage.setItem("tb-ebay-blocked-v1", JSON.stringify(obj)); try { window.storage.set("tb-ebay-blocked-v1", JSON.stringify(obj)); } catch(e) {} EBAY_BLOCKED = obj; }
 function loadEbayBids() { try { return JSON.parse(localStorage.getItem("tb-ebay-bids-v1") || "{}"); } catch(e) { return {}; } }
-function saveEbayBids(obj) { localStorage.setItem("tb-ebay-bids-v1", JSON.stringify(obj)); window.storage.set("tb-ebay-bids-v1", JSON.stringify(obj)); }
+function saveEbayBids(obj) { localStorage.setItem("tb-ebay-bids-v1", JSON.stringify(obj)); try { window.storage.set("tb-ebay-bids-v1", JSON.stringify(obj)); } catch(e) {} }
 function loadTargets() { try { return JSON.parse(localStorage.getItem("tb-targets-v1") || "{}"); } catch(e) { return {}; } }
-function saveTargets(obj) { localStorage.setItem("tb-targets-v1", JSON.stringify(obj)); window.storage.set("tb-targets-v1", JSON.stringify(obj)); }
+function saveTargets(obj) { localStorage.setItem("tb-targets-v1", JSON.stringify(obj)); try { window.storage.set("tb-targets-v1", JSON.stringify(obj)); } catch(e) {} }
 function globalPriceKey(card) {
   if (!card) return null;
   return card.product.slice(0,4) + "|" + card.product + "|" + card.cardNumber + "|" + (card.cardSet || "Base");
@@ -309,15 +309,14 @@ const SYNC_DATA = {};
 function TylerBlackTracker() {
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
-  // Poll owner status so UI updates on login/logout
   useEffect(function() {
-    var interval = setInterval(function() {
+    var iv = setInterval(function() {
       try {
-        var owner = window.trackerAuth && window.trackerAuth.isOwner();
-        setIsOwner(function(prev) { return prev !== owner ? owner : prev; });
+        var o = !!(window.trackerAuth && window.trackerAuth.isOwner());
+        setIsOwner(function(p) { return p === o ? p : o; });
       } catch(e) {}
     }, 1000);
-    return function() { clearInterval(interval); };
+    return function() { clearInterval(iv); };
   }, []);
   const [statuses, setStatuses] = useState({});
   const [cardDetails, setCardDetails] = useState({});
@@ -330,7 +329,7 @@ function TylerBlackTracker() {
   const [saving, setSaving] = useState(false);
   const [expandedCard, setExpandedCard] = useState(null);
   const [showDupes, setShowDupes] = useState(false);
-  const [activeTab, setActiveTab] = useState("collection");
+  const [activeTab, setActiveTab] = useState("summary");
   const [detailedSnFilter, setDetailedSnFilter] = useState(null);
   const [detailedStatusFilter, setDetailedStatusFilter] = useState(null);
   const [detailedCardId, setDetailedCardId] = useState(null);
@@ -367,7 +366,6 @@ function TylerBlackTracker() {
   const [tcdbFixInput, setTcdbFixInput] = useState(""); // URL input for fixing
   const [tcdbFixingId, setTcdbFixingId] = useState(null); // which card is being fixed
   const [hidePrices, setHidePrices] = useState(true);
-  // Visitors always have prices hidden
   useEffect(function() { if (!isOwner) setHidePrices(true); }, [isOwner]);
   // Build targetByCardId lookup from localStorage targets (for Lookup/Detailed panels)
   var _mainTargets = useMemo(function() { return loadTargets(); }, [activeTab, targetCardFilter]);
@@ -453,7 +451,7 @@ function TylerBlackTracker() {
   }
   useEffect(() => {
     function handleBeforeUnload() {
-      if (window._skipBeforeUnloadSave) return; // Restore in progress - don't overwrite
+      if (window._skipBeforeUnloadSave) return;
       if (loadComplete.current && allDataRef.current._migrationComplete) {
         allDataRef.current._saveTimestamp = Date.now();
         var payload = JSON.stringify(allDataRef.current);
@@ -464,7 +462,7 @@ function TylerBlackTracker() {
       }
     }
     function handleVisibilityChange() {
-      if (window._skipBeforeUnloadSave) return; // Restore in progress - don't overwrite
+      if (window._skipBeforeUnloadSave) return;
       if (document.hidden && loadComplete.current && allDataRef.current._migrationComplete) {
         allDataRef.current._saveTimestamp = Date.now();
         var payload = JSON.stringify(allDataRef.current);
@@ -581,7 +579,6 @@ function TylerBlackTracker() {
 
   useEffect(() => {
     async function load() {
-      // Wait for cloud storage hydration (Supabase → localStorage) before reading
       if (window.storageReady) { try { await window.storageReady; } catch(e) {} }
       let diagParts = [];
       let allData = null;
@@ -747,8 +744,6 @@ function TylerBlackTracker() {
         _migrationComplete: true
       };
       loadComplete.current = true; // Now safe to save
-      // Check owner status from auth system
-      try { setIsOwner(window.trackerAuth && window.trackerAuth.isOwner()); } catch(e) {}
       var statusCount = Object.keys(merged).filter(function(k) { return merged[k] !== "not_owned"; }).length;
       diagParts.push(statusCount + " tracked cards");
       setLoading(false);
@@ -1145,8 +1140,6 @@ function TylerBlackTracker() {
     {id:"board",label:"Board",color:"blue",ownerOnly:true},
     {id:"save",label:"Export",color:"emerald",ownerOnly:true},
   ].filter(function(t) { return !t.ownerOnly || isOwner; });
-  // Default visitors to summary tab
-  useEffect(function() { if (!isOwner && (activeTab === "collection" || !TABS.find(function(t){return t.id===activeTab}))) setActiveTab("summary"); }, [isOwner]);
   const tabColorMap = {yellow:"border-yellow-400 text-yellow-300",cyan:"border-yellow-400 text-yellow-300",teal:"border-yellow-400 text-yellow-300",purple:"border-yellow-400 text-yellow-300",orange:"border-yellow-400 text-yellow-300",emerald:"border-yellow-400 text-yellow-300",amber:"border-yellow-400 text-yellow-300",rose:"border-yellow-400 text-yellow-300",indigo:"border-yellow-400 text-yellow-300",blue:"border-yellow-400 text-yellow-300",pink:"border-yellow-400 text-yellow-300",lime:"border-yellow-400 text-yellow-300"};
   const badgeActiveMap = {orange:"bg-orange-400 text-gray-900",amber:"bg-amber-400 text-gray-900",emerald:"bg-emerald-400 text-gray-900",indigo:"bg-indigo-400 text-gray-900"};
   const badgeInactiveMap = {orange:"bg-orange-900 text-orange-300",amber:"bg-amber-900 text-amber-300",emerald:"bg-emerald-900 text-emerald-300",indigo:"bg-indigo-900 text-indigo-300"};
@@ -3313,7 +3306,7 @@ function COMCScannerPanel(props) {
     if (ph[pk].length > 365) ph[pk] = ph[pk].slice(-365);
     if (!batchPH) savePriceHistory(ph); // only save immediately if not batching
   }
-  function saveComcOverrides(obj) { localStorage.setItem("tb-comc-overrides-v1", JSON.stringify(obj)); window.storage.set("tb-comc-overrides-v1", JSON.stringify(obj)); COMC_OVERRIDES = obj; }
+  function saveComcOverrides(obj) { localStorage.setItem("tb-comc-overrides-v1", JSON.stringify(obj)); try { window.storage.set("tb-comc-overrides-v1", JSON.stringify(obj)); } catch(e) {} COMC_OVERRIDES = obj; }
   var _cov = useState(function(){ var o = loadComcOverrides(); COMC_OVERRIDES = o; return o; });
   useState(function(){ PRICE_HISTORY = loadPriceHistory(); });
   var comcOverrides = _cov[0], setComcOverrides = _cov[1];
@@ -8182,37 +8175,23 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
           var statCount = Object.keys(newStatuses).length;
           var detailCount = Object.keys(newDetails).length;
           console.log("[restore] Parsed: " + statCount + " statuses, " + detailCount + " details");
-
-          // 1. Update allDataRef directly (this is what gets saved to cloud)
           allDataRef.current.statuses = newStatuses;
           allDataRef.current.details = newDetails;
           allDataRef.current.forsale = newForSale;
           allDataRef.current._saveTimestamp = Date.now();
           allDataRef.current._migrationComplete = true;
-
-          // 2. Update React state (this is what the UI shows)
           setStatuses(newStatuses);
           setCardDetails(newDetails);
           setForSaleFlags(newForSale);
-
-          // 3. Save to localStorage immediately
           var payload = JSON.stringify(allDataRef.current);
           try { localStorage.setItem("tb-alldata-v1", payload); } catch(e2) {}
           try { localStorage.setItem("tb-alldata-backup-v1", payload); } catch(e2) {}
-
-          // 4. Save to cloud
           setExportMsg("Saving " + statCount + " statuses + " + detailCount + " details to cloud...");
-          try {
-            await window.storage.set("tb-alldata-v1", payload);
-            console.log("[restore] Cloud write complete");
-          } catch(cloudErr) {
-            console.error("[restore] Cloud write failed:", cloudErr);
-          }
-
+          try { await window.storage.set("tb-alldata-v1", payload); } catch(e2) {}
           setExportMsg("Restored " + statCount + " statuses + " + detailCount + " card details!");
           setTimeout(function() { setExportMsg(""); }, 5000);
         } else {
-          setExportMsg("Invalid backup format — expected v2 JSON with statuses object.");
+          setExportMsg("Invalid backup format.");
           setTimeout(function() { setExportMsg(""); }, 5000);
         }
       } catch (err) {
@@ -8231,21 +8210,11 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
         var data = JSON.parse(e.target.result);
         var restored = 0;
         var SECONDARY_KEYS = [
-          "tb-price-history-v1",
-          "tb-targets-v1",
-          "tb-ebay-blocked-v1",
-          "tb-ebay-bids-v1",
-          "tb-comc-overrides-v1",
-          "tb-custom-cards-v1",
-          "tb-tcdb-fixes-v1",
-          "tb-tcdb-flags-v1",
-          "tb-last-ebay-paste-v1",
-          "tb-last-comc-paste-v1",
-          "tb-last-130pt-paste-v1",
-          "tb-last-sportlots-paste-v1",
-          "tb-last-whatnot-paste-v1"
+          "tb-price-history-v1","tb-targets-v1","tb-ebay-blocked-v1","tb-ebay-bids-v1",
+          "tb-comc-overrides-v1","tb-custom-cards-v1","tb-tcdb-fixes-v1","tb-tcdb-flags-v1",
+          "tb-last-ebay-paste-v1","tb-last-comc-paste-v1","tb-last-130pt-paste-v1",
+          "tb-last-sportlots-paste-v1","tb-last-whatnot-paste-v1"
         ];
-        // Also restore any tb- key in the file not already in our list
         var allFileKeys = Object.keys(data);
         for (var j = 0; j < allFileKeys.length; j++) {
           if (allFileKeys[j].startsWith("tb-") && SECONDARY_KEYS.indexOf(allFileKeys[j]) === -1) {
@@ -8262,7 +8231,7 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
             console.log("[restore-secondary] Restored:", key);
           }
         }
-        setExportMsg("Restored " + restored + " secondary data keys (prices, targets, etc)!");
+        setExportMsg("Restored " + restored + " secondary data keys!");
         setTimeout(function() { setExportMsg(""); }, 5000);
       } catch(err) {
         setExportMsg("Error parsing secondary data: " + err.message);
@@ -8410,6 +8379,7 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
     </div>
   );
 }
+
 
 // Mount the app — wait for cloud hydration so useState initializers see hydrated localStorage
 (async function() {
