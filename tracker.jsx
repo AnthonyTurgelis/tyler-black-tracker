@@ -1131,20 +1131,22 @@ function TylerBlackTracker() {
   const acquired = stats.owned + stats.inTransit;
   const needRegular = stats.notOwned - stats.notOwned1of1;
   const TABS = [
-    {id:"collection",label:"Collection",color:"yellow"},
+    {id:"collection",label:"Collection",color:"yellow",ownerOnly:true},
     {id:"lookup",label:"Lookup",color:"purple"},
     {id:"detailed",label:"Detailed",color:"emerald"},
     {id:"summary",label:"Summary",color:"cyan"},
-    {id:"comc_scanner",label:"Scanner",color:"orange"},
-    {id:"targets",label:"Targets",color:"pink",badge:Object.keys(loadTargets()).length},
+    {id:"comc_scanner",label:"Scanner",color:"orange",ownerOnly:true},
+    {id:"targets",label:"Targets",color:"pink",badge:Object.keys(loadTargets()).length,ownerOnly:true},
     {id:"prices",label:"Prices",color:"indigo",badge:Object.keys(loadPriceHistory()).length,ownerOnly:true},
-    {id:"sync",label:"Sync",color:"orange",badge:unsyncedCards.length},
-    {id:"cleanup",label:"Cleanup",color:"amber",badge:issueCounts.total},
+    {id:"sync",label:"Sync",color:"orange",badge:unsyncedCards.length,ownerOnly:true},
+    {id:"cleanup",label:"Cleanup",color:"amber",badge:issueCounts.total,ownerOnly:true},
     {id:"changelog",label:"Log",color:"rose",ownerOnly:true},
     {id:"versions",label:"Versions",color:"indigo",ownerOnly:true},
     {id:"board",label:"Board",color:"blue",ownerOnly:true},
     {id:"save",label:"Export",color:"emerald",ownerOnly:true},
   ].filter(function(t) { return !t.ownerOnly || isOwner; });
+  // Default visitors to summary tab
+  useEffect(function() { if (!isOwner && (activeTab === "collection" || !TABS.find(function(t){return t.id===activeTab}))) setActiveTab("summary"); }, [isOwner]);
   const tabColorMap = {yellow:"border-yellow-400 text-yellow-300",cyan:"border-yellow-400 text-yellow-300",teal:"border-yellow-400 text-yellow-300",purple:"border-yellow-400 text-yellow-300",orange:"border-yellow-400 text-yellow-300",emerald:"border-yellow-400 text-yellow-300",amber:"border-yellow-400 text-yellow-300",rose:"border-yellow-400 text-yellow-300",indigo:"border-yellow-400 text-yellow-300",blue:"border-yellow-400 text-yellow-300",pink:"border-yellow-400 text-yellow-300",lime:"border-yellow-400 text-yellow-300"};
   const badgeActiveMap = {orange:"bg-orange-400 text-gray-900",amber:"bg-amber-400 text-gray-900",emerald:"bg-emerald-400 text-gray-900",indigo:"bg-indigo-400 text-gray-900"};
   const badgeInactiveMap = {orange:"bg-orange-900 text-orange-300",amber:"bg-amber-900 text-amber-300",emerald:"bg-emerald-900 text-emerald-300",indigo:"bg-indigo-900 text-indigo-300"};
@@ -8236,8 +8238,20 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
           "tb-comc-overrides-v1",
           "tb-custom-cards-v1",
           "tb-tcdb-fixes-v1",
-          "tb-tcdb-flags-v1"
+          "tb-tcdb-flags-v1",
+          "tb-last-ebay-paste-v1",
+          "tb-last-comc-paste-v1",
+          "tb-last-130pt-paste-v1",
+          "tb-last-sportlots-paste-v1",
+          "tb-last-whatnot-paste-v1"
         ];
+        // Also restore any tb- key in the file not already in our list
+        var allFileKeys = Object.keys(data);
+        for (var j = 0; j < allFileKeys.length; j++) {
+          if (allFileKeys[j].startsWith("tb-") && SECONDARY_KEYS.indexOf(allFileKeys[j]) === -1) {
+            SECONDARY_KEYS.push(allFileKeys[j]);
+          }
+        }
         for (var i = 0; i < SECONDARY_KEYS.length; i++) {
           var key = SECONDARY_KEYS[i];
           if (data[key] !== undefined && data[key] !== null) {
