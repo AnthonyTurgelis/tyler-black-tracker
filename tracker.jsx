@@ -8153,7 +8153,7 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
   function restoreFromJson(file) {
     if (!file) return;
     var reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
       try {
         var data = JSON.parse(e.target.result);
         if (data.statuses && typeof data.statuses === "object") {
@@ -8167,15 +8167,22 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
             _saveTimestamp: Date.now()
           };
           var payload = JSON.stringify(allData);
-          // Write to both localStorage and cloud
+          // Write to localStorage immediately
           localStorage.setItem("tb-alldata-v1", payload);
           localStorage.setItem("tb-alldata-backup-v1", payload);
-          window.storage.set("tb-alldata-v1", payload);
           var count = Object.keys(data.statuses).length;
           var detailCount = Object.keys(data.cardDetails || {}).length;
+          setExportMsg("Restoring " + count + " statuses + " + detailCount + " details to cloud...");
+          // AWAIT the cloud write so it finishes before we reload
+          try {
+            await window.storage.set("tb-alldata-v1", payload);
+          } catch(cloudErr) {
+            console.error("Cloud write failed:", cloudErr);
+          }
+          // Extra safety delay for cloud propagation
+          await new Promise(function(r) { setTimeout(r, 1000); });
           alert("Restored " + count + " statuses + " + detailCount + " card details! Page will reload.");
-          // Reload to pick up restored data
-          setTimeout(function() { location.reload(); }, 500);
+          location.reload();
         } else {
           setExportMsg("Invalid backup format — expected v2 JSON with statuses object.");
           setTimeout(function() { setExportMsg(""); }, 5000);
