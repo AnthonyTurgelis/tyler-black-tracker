@@ -8234,8 +8234,12 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
             console.log("[restore-secondary] Restored:", key);
           }
         }
-        setExportMsg("Restored " + restored + " secondary data keys! Reloading...");
-        setTimeout(function() { window._skipBeforeUnloadSave = true; location.reload(); }, 1500);
+        setExportMsg("Restored " + restored + " secondary data keys! Switch tabs to see data.");
+        // Refresh module-level globals from localStorage
+        try { PRICE_HISTORY = loadPriceHistory(); } catch(e2) {}
+        try { EBAY_BLOCKED = loadEbayBlocked(); } catch(e2) {}
+        try { COMC_OVERRIDES = JSON.parse(localStorage.getItem("tb-comc-overrides-v1") || "{}"); } catch(e2) {}
+        setTimeout(function() { setExportMsg(""); }, 8000);
       } catch(err) {
         setExportMsg("Error parsing secondary data: " + err.message);
         setTimeout(function() { setExportMsg(""); }, 5000);
