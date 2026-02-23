@@ -440,6 +440,7 @@ function TylerBlackTracker() {
   }
   useEffect(() => {
     function handleBeforeUnload() {
+      if (window._skipBeforeUnloadSave) return; // Restore in progress - don't overwrite
       if (loadComplete.current && allDataRef.current._migrationComplete) {
         allDataRef.current._saveTimestamp = Date.now();
         var payload = JSON.stringify(allDataRef.current);
@@ -450,6 +451,7 @@ function TylerBlackTracker() {
       }
     }
     function handleVisibilityChange() {
+      if (window._skipBeforeUnloadSave) return; // Restore in progress - don't overwrite
       if (document.hidden && loadComplete.current && allDataRef.current._migrationComplete) {
         allDataRef.current._saveTimestamp = Date.now();
         var payload = JSON.stringify(allDataRef.current);
@@ -8195,6 +8197,7 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
           }
           await new Promise(function(r) { setTimeout(r, 1500); });
           alert("Restored " + statCount + " statuses + " + detailCount + " card details! Page will reload.");
+          window._skipBeforeUnloadSave = true; // Prevent beforeunload from overwriting restored data
           location.reload();
         } else {
           setExportMsg("Invalid backup format — expected v2 JSON with statuses object.");
