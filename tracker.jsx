@@ -8157,6 +8157,10 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
       try {
         var data = JSON.parse(e.target.result);
         if (data.statuses && typeof data.statuses === "object") {
+          var statCount = Object.keys(data.statuses).length;
+          var detailCount = Object.keys(data.cardDetails || {}).length;
+          var fsCount = Object.keys(data.forSaleFlags || {}).length;
+          console.log("[restore] Parsed backup: " + statCount + " statuses, " + detailCount + " details, " + fsCount + " forsale");
           // Build consolidated alldata object
           var allData = {
             statuses: data.statuses,
@@ -8167,21 +8171,30 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
             _saveTimestamp: Date.now()
           };
           var payload = JSON.stringify(allData);
+          console.log("[restore] Payload size: " + payload.length + " chars");
+          // Verify payload round-trips correctly
+          var verify = JSON.parse(payload);
+          console.log("[restore] Verify: " + Object.keys(verify.statuses||{}).length + " statuses, " + Object.keys(verify.details||{}).length + " details");
           // Write to localStorage immediately
           localStorage.setItem("tb-alldata-v1", payload);
           localStorage.setItem("tb-alldata-backup-v1", payload);
-          var count = Object.keys(data.statuses).length;
-          var detailCount = Object.keys(data.cardDetails || {}).length;
-          setExportMsg("Restoring " + count + " statuses + " + detailCount + " details to cloud...");
-          // AWAIT the cloud write so it finishes before we reload
+          console.log("[restore] Written to localStorage");
+          setExportMsg("Restoring " + statCount + " statuses + " + detailCount + " details to cloud...");
+          // AWAIT the cloud write
           try {
-            await window.storage.set("tb-alldata-v1", payload);
+            var cloudResult = await window.storage.set("tb-alldata-v1", payload);
+            console.log("[restore] Cloud write result:", cloudResult);
           } catch(cloudErr) {
-            console.error("Cloud write failed:", cloudErr);
+            console.error("[restore] Cloud write failed:", cloudErr);
           }
-          // Extra safety delay for cloud propagation
-          await new Promise(function(r) { setTimeout(r, 1000); });
-          alert("Restored " + count + " statuses + " + detailCount + " card details! Page will reload.");
+          // Verify localStorage still has the data (hydration didn't overwrite)
+          var lsCheck = localStorage.getItem("tb-alldata-v1");
+          if (lsCheck) {
+            var lsData = JSON.parse(lsCheck);
+            console.log("[restore] localStorage verify: " + Object.keys(lsData.statuses||{}).length + " statuses, " + Object.keys(lsData.details||{}).length + " details");
+          }
+          await new Promise(function(r) { setTimeout(r, 1500); });
+          alert("Restored " + statCount + " statuses + " + detailCount + " card details! Page will reload.");
           location.reload();
         } else {
           setExportMsg("Invalid backup format — expected v2 JSON with statuses object.");

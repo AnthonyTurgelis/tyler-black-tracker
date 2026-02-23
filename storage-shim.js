@@ -139,10 +139,36 @@
       for (var i = 0; i < rows.length; i++) {
         var row = rows[i];
         try {
-          var val = typeof row.value === "string" ? row.value : JSON.stringify(row.value);
-          localStorage.setItem(row.key, val);
+          var cloudVal = typeof row.value === "string" ? row.value : JSON.stringify(row.value);
+          // For alldata key, compare timestamps — don't overwrite newer local data
+          if (row.key === "tb-alldata-v1") {
+            var localVal = localStorage.getItem(row.key);
+            if (localVal) {
+              try {
+                var localData = JSON.parse(localVal);
+                var cloudData = typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+                var localTs = localData._saveTimestamp || 0;
+                var cloudTs = cloudData._saveTimestamp || 0;
+                if (localTs > cloudTs) {
+                  console.log("[storage] Keeping local " + row.key + " (local:" + localTs + " > cloud:" + cloudTs + ")");
+                  continue;
+                }
+                // Also check: if local has more data, keep local
+                var localStatuses = Object.keys(localData.statuses || {}).length;
+                var cloudStatuses = Object.keys(cloudData.statuses || {}).length;
+                if (localStatuses > cloudStatuses + 10) {
+                  console.log("[storage] Keeping local " + row.key + " (local has " + localStatuses + " statuses vs cloud " + cloudStatuses + ")");
+                  continue;
+                }
+              } catch (parseErr) {
+                // Can't compare, use cloud
+              }
+            }
+          }
+          localStorage.setItem(row.key, cloudVal);
+          console.log("[storage] Hydrated:", row.key, "(" + cloudVal.length + " chars)");
         } catch (e) {
-          console.warn("[storage] Cache write failed for", row.key);
+          console.warn("[storage] Cache write failed for", row.key, e);
         }
       }
       hydrated = true;
