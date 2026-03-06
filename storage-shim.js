@@ -30,7 +30,8 @@
     "tb-ebay-blocked-v1",
     "tb-ebay-bids-v1",
     "tb-comc-overrides-v1",
-    "tb-custom-cards-v1"
+    "tb-custom-cards-v1",
+    "tb-linked-tweets-v1"
   ];
 
   function isCloudKey(key) {
@@ -165,6 +166,15 @@
               }
             }
           }
+          // For non-alldata keys: only hydrate if localStorage doesn't already have data
+          // This prevents cloud (which may be stale) from overwriting fresh local writes
+          if (row.key !== "tb-alldata-v1") {
+            var existingLocal = localStorage.getItem(row.key);
+            if (existingLocal && existingLocal.length > 2) {
+              console.log("[storage] Keeping local " + row.key + " (" + existingLocal.length + " chars, cloud has " + cloudVal.length + " chars)");
+              continue;
+            }
+          }
           localStorage.setItem(row.key, cloudVal);
           console.log("[storage] Hydrated:", row.key, "(" + cloudVal.length + " chars)");
         } catch (e) {
@@ -251,8 +261,8 @@
       try { localStorage.setItem(key, value); }
       catch (e) { console.error("[storage] localStorage set failed:", key, e); }
 
-      // Cloud keys: also persist to Supabase (fire-and-forget)
-      if (isCloudKey(key)) writeToCloud(key, value);
+      // Cloud keys: also persist to Supabase (awaited for restore reliability)
+      if (isCloudKey(key)) await writeToCloud(key, value);
 
       return { key: key, value: value, shared: false };
     },

@@ -1142,6 +1142,7 @@ function TylerBlackTracker() {
     {id:"changelog",label:"Log",color:"rose",ownerOnly:true},
     {id:"versions",label:"Versions",color:"indigo",ownerOnly:true},
     {id:"board",label:"Board",color:"blue",ownerOnly:true},
+    {id:"tweets",label:"Tweets",color:"blue",ownerOnly:true},
     {id:"save",label:"Export",color:"emerald",ownerOnly:true},
   ].filter(function(t) { return !t.ownerOnly || isOwner; });
   const tabColorMap = {yellow:"border-yellow-400 text-yellow-300",cyan:"border-yellow-400 text-yellow-300",teal:"border-yellow-400 text-yellow-300",purple:"border-yellow-400 text-yellow-300",orange:"border-yellow-400 text-yellow-300",emerald:"border-yellow-400 text-yellow-300",amber:"border-yellow-400 text-yellow-300",rose:"border-yellow-400 text-yellow-300",indigo:"border-yellow-400 text-yellow-300",blue:"border-yellow-400 text-yellow-300",pink:"border-yellow-400 text-yellow-300",lime:"border-yellow-400 text-yellow-300"};
@@ -1470,6 +1471,8 @@ function TylerBlackTracker() {
           <VersionLogPanel />
         ) : activeTab === "board" ? (
           <TaskBoardPanel />
+        ) : activeTab === "tweets" ? (
+          <LinkedTweetsPanel />
         ) : activeTab === "comc_scanner" ? (
           <COMCScannerPanel cards={ALL_CARDS} statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} needsSync={needsSync} setDetailedCardId={setDetailedCardId} setActiveTab={setActiveTab} persistedState={scannerStateRef.current} onStateChange={function(s) { scannerStateRef.current = s; }} editCustomCardById={editCustomCardById} />
         ) : activeTab === "targets" ? (
@@ -7428,6 +7431,149 @@ function TargetsPanel({ cards, statuses, setCardStatus, updateCardDetail, setDet
     </div>
   );
 }
+function LinkedTweetsPanel() {
+  var TWEETS_KEY = "tb-linked-tweets-v1";
+  function loadTweets() { try { return JSON.parse(localStorage.getItem(TWEETS_KEY) || "[]"); } catch(e) { return []; } }
+  function saveTweets(t) { localStorage.setItem(TWEETS_KEY, JSON.stringify(t)); try { window.storage.set(TWEETS_KEY, JSON.stringify(t)); } catch(e) {} }
+
+  var [tweets, setTweets] = useState(loadTweets);
+  var [inputUrl, setInputUrl] = useState("");
+  var [scriptLoaded, setScriptLoaded] = useState(!!window.twttr);
+  var embedRef = useRef(null);
+
+  // Load Twitter widgets.js once
+  useEffect(function() {
+    if (window.twttr) { setScriptLoaded(true); return; }
+    var s = document.createElement("script");
+    s.src = "https://platform.twitter.com/widgets.js";
+    s.async = true;
+    s.onload = function() { setScriptLoaded(true); };
+    document.head.appendChild(s);
+  }, []);
+
+  // Re-render embeds whenever selected tweets or script changes
+  useEffect(function() {
+    if (!scriptLoaded || !window.twttr || !embedRef.current) return;
+    // Clear existing embeds
+    embedRef.current.innerHTML = "";
+    var selected = tweets.filter(function(t) { return t.selected; });
+    if (selected.length === 0) {
+      embedRef.current.innerHTML = '<div style="color:#6b7280;text-align:center;padding:40px;font-size:13px;">No tweets selected. Add tweet URLs above and toggle them on.</div>';
+      return;
+    }
+    selected.forEach(function(t) {
+      var tweetId = extractTweetId(t.url);
+      if (!tweetId) return;
+      var container = document.createElement("div");
+      container.style.minWidth = "0";
+      embedRef.current.appendChild(container);
+      window.twttr.widgets.createTweet(tweetId, container, { theme: "dark", conversation: "none", width: 380 });
+    });
+  }, [tweets, scriptLoaded]);
+
+  function extractTweetId(url) {
+    var m = url.match(/(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/);
+    return m ? m[1] : null;
+  }
+
+  function addTweet() {
+    var url = inputUrl.trim();
+    if (!url) return;
+    var id = extractTweetId(url);
+    if (!id) { alert("Could not parse tweet URL. Use format: https://x.com/user/status/123456"); return; }
+    // Normalize URL
+    var normalized = "https://x.com/i/status/" + id;
+    // Check for duplicates
+    if (tweets.some(function(t) { return extractTweetId(t.url) === id; })) { alert("Tweet already added"); setInputUrl(""); return; }
+    var updated = [{ url: normalized, selected: true, addedDate: new Date().toISOString().slice(0, 10) }].concat(tweets);
+    setTweets(updated);
+    saveTweets(updated);
+    setInputUrl("");
+  }
+
+  function toggleSelect(idx) {
+    var updated = tweets.map(function(t, i) { return i === idx ? Object.assign({}, t, { selected: !t.selected }) : t; });
+    setTweets(updated);
+    saveTweets(updated);
+  }
+
+  function removeTweet(idx) {
+    var updated = tweets.filter(function(_, i) { return i !== idx; });
+    setTweets(updated);
+    saveTweets(updated);
+  }
+
+  function moveTweet(idx, dir) {
+    if (idx + dir < 0 || idx + dir >= tweets.length) return;
+    var updated = tweets.slice();
+    var temp = updated[idx];
+    updated[idx] = updated[idx + dir];
+    updated[idx + dir] = temp;
+    setTweets(updated);
+    saveTweets(updated);
+  }
+
+  var selectedCount = tweets.filter(function(t) { return t.selected; }).length;
+
+  return (
+    <div className="p-3" style={{fontSize:"clamp(10px,1.2vw,13px)"}}>
+      <div className="flex items-center gap-2 mb-3">
+        <h2 className="text-white font-bold" style={{fontSize:"clamp(14px,1.6vw,18px)"}}>Linked Tweets</h2>
+        <span className="text-gray-500 text-xs">{selectedCount} selected / {tweets.length} total</span>
+      </div>
+
+      {/* Input */}
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          value={inputUrl}
+          onChange={function(e) { setInputUrl(e.target.value); }}
+          onKeyDown={function(e) { if (e.key === "Enter") addTweet(); }}
+          placeholder="Paste tweet URL (x.com or twitter.com)..."
+          className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 outline-none focus:border-blue-500"
+          style={{fontSize:"clamp(11px,1.2vw,13px)"}}
+        />
+        <button onClick={addTweet} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-colors" style={{fontSize:"clamp(11px,1.2vw,13px)"}}>
+          Add
+        </button>
+      </div>
+
+      {/* Tweet list - management */}
+      {tweets.length > 0 && (
+        <div className="mb-4 border border-gray-700 rounded-lg overflow-hidden">
+          <div className="bg-gray-800/50 px-3 py-1.5 text-gray-400 font-semibold text-xs border-b border-gray-700">Manage Tweets</div>
+          <div className="max-h-48 overflow-y-auto">
+            {tweets.map(function(t, idx) {
+              var tweetId = extractTweetId(t.url);
+              return (
+                <div key={tweetId || idx} className={"flex items-center gap-2 px-3 py-1.5 border-b border-gray-800 " + (t.selected ? "bg-blue-950/30" : "bg-gray-900/30")}>
+                  <button onClick={function() { toggleSelect(idx); }}
+                    className={"w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors " + (t.selected ? "bg-blue-600 border-blue-500 text-white" : "border-gray-600 text-gray-600 hover:border-gray-400")}
+                    style={{fontSize:"11px"}}>
+                    {t.selected ? "\u2713" : ""}
+                  </button>
+                  <span className="flex-1 text-gray-300 truncate font-mono text-xs">{t.url}</span>
+                  <span className="text-gray-600 text-xs flex-shrink-0">{t.addedDate}</span>
+                  <button onClick={function() { moveTweet(idx, -1); }} className="text-gray-600 hover:text-gray-300 px-1" title="Move up">{"\u25B2"}</button>
+                  <button onClick={function() { moveTweet(idx, 1); }} className="text-gray-600 hover:text-gray-300 px-1" title="Move down">{"\u25BC"}</button>
+                  <button onClick={function() { if (confirm("Remove this tweet?")) removeTweet(idx); }} className="text-red-800 hover:text-red-400 px-1 flex-shrink-0" title="Remove">{"\u2715"}</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Embedded tweets grid */}
+      <div ref={embedRef} className="grid gap-3" style={{
+        gridTemplateColumns: selectedCount <= 1 ? "1fr" : selectedCount <= 4 ? "repeat(2, 1fr)" : "repeat(3, 1fr)",
+        maxHeight: "calc(100vh - 300px)",
+        overflowY: "auto"
+      }} />
+    </div>
+  );
+}
+
 function TaskBoardPanel() {
   var [showDone, setShowDone] = useState(false);
   var [tasks, setTasks] = useState({
