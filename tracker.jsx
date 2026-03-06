@@ -224,7 +224,7 @@ function pt130Url(card) {
   var q = "tyler black " + yr + " " + card.cardNumber + " " + prodNoYear;
   return "https://130point.com/sales/?search=" + encodeURIComponent(q.trim());
 }
-let ALL_CARDS = expandData(RAW_DATA).filter(function(c) { return c.id !== 1; }); // Hide test card (ID 1) but keep it for ID stability
+let ALL_CARDS = expandData(RAW_DATA).filter(function(c) { return c.id !== 1; });
 
 // Custom cards added by user via COMC Scanner "Add to DB" feature
 var CUSTOM_CARDS_KEY = "tb-custom-cards-v1";
@@ -928,7 +928,7 @@ function TylerBlackTracker() {
     });
   }, [saveStatuses, saveDetails, persistField]);
   const updateCardDetail = useCallback((cardId, field, value) => {
-    if (window.trackerAuth && !window.trackerAuth.isOwner()) return; // Read-only for visitors
+    if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
     setSessionChanges(prev => prev + 1);
     setCardDetails(prev => {
       var oldVal = (prev[cardId] || {})[field] || "";
@@ -946,7 +946,7 @@ function TylerBlackTracker() {
     });
   }, [saveDetails, pushUndo, logChange, persistField]);
   const setCardStatus = useCallback((cardId, status) => {
-    if (window.trackerAuth && !window.trackerAuth.isOwner()) return; // Read-only for visitors
+    if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
     setSessionChanges(prev => prev + 1);
     setStatuses(prev => {
       const prevStatus = prev[cardId] || "not_owned";
@@ -987,7 +987,7 @@ function TylerBlackTracker() {
     });
   }, [saveStatuses, pushUndo, logChange, persistField]);
   const toggleForSale = useCallback((cardId) => {
-    if (window.trackerAuth && !window.trackerAuth.isOwner()) return; // Read-only for visitors
+    if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
     setSessionChanges(prev => prev + 1);
     setForSaleFlags(prev => {
       var wasFlagged = !!prev[cardId];
@@ -1005,6 +1005,7 @@ function TylerBlackTracker() {
     ALL_CARDS.forEach(card => {
       if (HIDDEN_DUPES.has(card.id)) return;
       if (card.product.startsWith("TEST")) return;
+      if (card.isCustom) return;
       visibleTotal++;
       const s = statuses[card.id] || "not_owned";
       const d = cardDetails[card.id] || {};
@@ -1624,6 +1625,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
   function passesFilter(card, minSN, inclBlank, ex1of1, unnumOnly, spOnly) {
     if (HIDDEN_DUPES.has(card.id)) return false;
     if (card.product.startsWith("TEST")) return false;
+    if (card.isCustom) return false;
     if (rookieOnly && !card.product.startsWith("2021") && !card.product.startsWith("2024")) return false;
     if (spOnly) return !!SSP_TAGS[card.cardSet];
     var pr = parseInt(card.copies);
@@ -8177,7 +8179,6 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
           var newForSale = data.forSaleFlags || {};
           var statCount = Object.keys(newStatuses).length;
           var detailCount = Object.keys(newDetails).length;
-          console.log("[restore] Parsed: " + statCount + " statuses, " + detailCount + " details");
           allDataRef.current.statuses = newStatuses;
           allDataRef.current.details = newDetails;
           allDataRef.current.forsale = newForSale;
@@ -8210,39 +8211,34 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
     var reader = new FileReader();
     reader.onload = async function(e) {
       try {
-        var data = JSON.parse(e.target.result);
+        var raw = e.target.result;
+        var data = JSON.parse(raw);
+        var fileKeys = Object.keys(data);
         var restored = 0;
-        var SECONDARY_KEYS = [
-          "tb-price-history-v1","tb-targets-v1","tb-ebay-blocked-v1","tb-ebay-bids-v1",
-          "tb-comc-overrides-v1","tb-custom-cards-v1","tb-tcdb-fixes-v1","tb-tcdb-flags-v1",
-          "tb-last-ebay-paste-v1","tb-last-comc-paste-v1","tb-last-130pt-paste-v1",
-          "tb-last-sportlots-paste-v1","tb-last-whatnot-paste-v1"
-        ];
-        var allFileKeys = Object.keys(data);
-        for (var j = 0; j < allFileKeys.length; j++) {
-          if (allFileKeys[j].startsWith("tb-") && SECONDARY_KEYS.indexOf(allFileKeys[j]) === -1) {
-            SECONDARY_KEYS.push(allFileKeys[j]);
-          }
+        var details = [];
+        for (var j = 0; j < fileKeys.length; j++) {
+          var key = fileKeys[j];
+          if (!key.startsWith("tb-")) continue;
+          if (key === "tb-alldata-v1" || key === "tb-alldata-backup-v1") continue;
+          var val = data[key];
+          if (val === undefined || val === null) continue;
+          var strVal = typeof val === "string" ? val : JSON.stringify(val);
+          if (strVal === "{}" || strVal === "[]" || strVal === "null" || strVal === "") continue;
+          try { localStorage.setItem(key, strVal); } catch(e2) {}
+          try { await window.storage.set(key, strVal); } catch(e2) {}
+          restored++;
+          details.push(key.replace("tb-","").replace("-v1","") + "(" + (strVal.length/1024).toFixed(0) + "KB)");
         }
-        for (var i = 0; i < SECONDARY_KEYS.length; i++) {
-          var key = SECONDARY_KEYS[i];
-          if (data[key] !== undefined && data[key] !== null) {
-            var val = typeof data[key] === "string" ? data[key] : JSON.stringify(data[key]);
-            try { localStorage.setItem(key, val); } catch(e2) {}
-            try { await window.storage.set(key, val); } catch(e2) {}
-            restored++;
-            console.log("[restore-secondary] Restored:", key);
-          }
-        }
-        setExportMsg("Restored " + restored + " secondary data keys! Switch tabs to see data.");
-        // Refresh module-level globals from localStorage
         try { PRICE_HISTORY = loadPriceHistory(); } catch(e2) {}
         try { EBAY_BLOCKED = loadEbayBlocked(); } catch(e2) {}
         try { COMC_OVERRIDES = JSON.parse(localStorage.getItem("tb-comc-overrides-v1") || "{}"); } catch(e2) {}
-        setTimeout(function() { setExportMsg(""); }, 8000);
+        alert("Restored " + restored + " keys:\n" + details.join("\n"));
+        setExportMsg("Restored " + restored + " secondary keys! Switch tabs to see data.");
+        setTimeout(function() { setExportMsg(""); }, 15000);
       } catch(err) {
-        setExportMsg("Error parsing secondary data: " + err.message);
-        setTimeout(function() { setExportMsg(""); }, 5000);
+        alert("RESTORE ERROR: " + err.message);
+        setExportMsg("Error: " + err.message);
+        setTimeout(function() { setExportMsg(""); }, 10000);
       }
     };
     reader.readAsText(file);
@@ -8388,8 +8384,30 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
 }
 
 
+// Global error handler — shows errors visually instead of white screen
+window.addEventListener("error", function(e) {
+  var root = document.getElementById("root");
+  if (root) root.innerHTML = '<div style="color:#ef4444;background:#1a0505;padding:20px;font-family:monospace;white-space:pre-wrap;margin:20px;">' +
+    '<h2 style="color:#FFC52F;">Tyler Black Tracker — Load Error</h2>' +
+    '<p>Error: ' + (e.message || 'Unknown') + '</p>' +
+    '<p>File: ' + (e.filename || '?') + ' line ' + (e.lineno || '?') + '</p>' +
+    '<p style="color:#666;margin-top:10px;">Your data is safe in localStorage/Supabase. This is a code error, not a data error.</p></div>';
+});
+
 // Mount the app — wait for cloud hydration so useState initializers see hydrated localStorage
 (async function() {
-  if (window.storageReady) { try { await window.storageReady; } catch(e) {} }
-  ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(TylerBlackTracker));
+  try {
+    if (window.storageReady) { try { await window.storageReady; } catch(e) { console.warn("storageReady failed:", e); } }
+    var root = document.getElementById("root");
+    if (!root) { console.error("No #root element"); return; }
+    ReactDOM.createRoot(root).render(React.createElement(TylerBlackTracker));
+  } catch(e) {
+    console.error("Mount error:", e);
+    var root = document.getElementById("root");
+    if (root) root.innerHTML = '<div style="color:#ef4444;background:#1a0505;padding:20px;font-family:monospace;white-space:pre-wrap;margin:20px;">' +
+      '<h2 style="color:#FFC52F;">Tyler Black Tracker — Mount Error</h2>' +
+      '<p>' + e.message + '</p>' +
+      '<pre style="color:#888;font-size:11px;">' + (e.stack || '').substring(0, 500) + '</pre>' +
+      '<p style="color:#666;margin-top:10px;">Your data is safe. Screenshot this and share it.</p></div>';
+  }
 })();
