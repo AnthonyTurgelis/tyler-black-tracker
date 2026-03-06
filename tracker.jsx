@@ -1142,7 +1142,7 @@ function TylerBlackTracker() {
     {id:"changelog",label:"Log",color:"rose",ownerOnly:true},
     {id:"versions",label:"Versions",color:"indigo",ownerOnly:true},
     {id:"board",label:"Board",color:"blue",ownerOnly:true},
-    {id:"tweets",label:"Tweets",color:"blue",ownerOnly:true},
+    {id:"tweets",label:"Tweets",color:"blue"},
     {id:"save",label:"Export",color:"emerald",ownerOnly:true},
   ].filter(function(t) { return !t.ownerOnly || isOwner; });
   const tabColorMap = {yellow:"border-yellow-400 text-yellow-300",cyan:"border-yellow-400 text-yellow-300",teal:"border-yellow-400 text-yellow-300",purple:"border-yellow-400 text-yellow-300",orange:"border-yellow-400 text-yellow-300",emerald:"border-yellow-400 text-yellow-300",amber:"border-yellow-400 text-yellow-300",rose:"border-yellow-400 text-yellow-300",indigo:"border-yellow-400 text-yellow-300",blue:"border-yellow-400 text-yellow-300",pink:"border-yellow-400 text-yellow-300",lime:"border-yellow-400 text-yellow-300"};
@@ -1472,7 +1472,7 @@ function TylerBlackTracker() {
         ) : activeTab === "board" ? (
           <TaskBoardPanel />
         ) : activeTab === "tweets" ? (
-          <LinkedTweetsPanel />
+          <LinkedTweetsPanel isOwner={isOwner} />
         ) : activeTab === "comc_scanner" ? (
           <COMCScannerPanel cards={ALL_CARDS} statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} needsSync={needsSync} setDetailedCardId={setDetailedCardId} setActiveTab={setActiveTab} persistedState={scannerStateRef.current} onStateChange={function(s) { scannerStateRef.current = s; }} editCustomCardById={editCustomCardById} />
         ) : activeTab === "targets" ? (
@@ -7431,7 +7431,7 @@ function TargetsPanel({ cards, statuses, setCardStatus, updateCardDetail, setDet
     </div>
   );
 }
-function LinkedTweetsPanel() {
+function LinkedTweetsPanel({ isOwner }) {
   var TWEETS_KEY = "tb-linked-tweets-v1";
   function loadTweets() { try { return JSON.parse(localStorage.getItem(TWEETS_KEY) || "[]"); } catch(e) { return []; } }
   function saveTweets(t) { localStorage.setItem(TWEETS_KEY, JSON.stringify(t)); try { window.storage.set(TWEETS_KEY, JSON.stringify(t)); } catch(e) {} }
@@ -7439,7 +7439,14 @@ function LinkedTweetsPanel() {
   var [tweets, setTweets] = useState(loadTweets);
   var [inputUrl, setInputUrl] = useState("");
   var [scriptLoaded, setScriptLoaded] = useState(!!window.twttr);
+  var [embedsLoading, setEmbedsLoading] = useState(true);
+  var [manageOpen, setManageOpen] = useState(false);
   var embedRef = useRef(null);
+
+  function extractTweetId(url) {
+    var m = url.match(/(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/);
+    return m ? m[1] : null;
+  }
 
   // Load Twitter widgets.js once
   useEffect(function() {
@@ -7454,36 +7461,42 @@ function LinkedTweetsPanel() {
   // Re-render embeds whenever selected tweets or script changes
   useEffect(function() {
     if (!scriptLoaded || !window.twttr || !embedRef.current) return;
-    // Clear existing embeds
     embedRef.current.innerHTML = "";
     var selected = tweets.filter(function(t) { return t.selected; });
     if (selected.length === 0) {
-      embedRef.current.innerHTML = '<div style="color:#6b7280;text-align:center;padding:40px;font-size:13px;">No tweets selected. Add tweet URLs above and toggle them on.</div>';
+      setEmbedsLoading(false);
       return;
     }
+    setEmbedsLoading(true);
+    var loaded = 0;
+    var total = selected.length;
     selected.forEach(function(t) {
       var tweetId = extractTweetId(t.url);
-      if (!tweetId) return;
-      var container = document.createElement("div");
-      container.style.minWidth = "0";
-      embedRef.current.appendChild(container);
-      window.twttr.widgets.createTweet(tweetId, container, { theme: "dark", conversation: "none", width: 380 });
+      if (!tweetId) { loaded++; return; }
+      var cell = document.createElement("div");
+      cell.className = "tweet-cell";
+      embedRef.current.appendChild(cell);
+      window.twttr.widgets.createTweet(tweetId, cell, {
+        theme: "dark",
+        conversation: "none",
+        dnt: true,
+        align: "center"
+      }).then(function() {
+        loaded++;
+        if (loaded >= total) setEmbedsLoading(false);
+      }).catch(function() {
+        loaded++;
+        if (loaded >= total) setEmbedsLoading(false);
+      });
     });
   }, [tweets, scriptLoaded]);
-
-  function extractTweetId(url) {
-    var m = url.match(/(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/);
-    return m ? m[1] : null;
-  }
 
   function addTweet() {
     var url = inputUrl.trim();
     if (!url) return;
     var id = extractTweetId(url);
-    if (!id) { alert("Could not parse tweet URL. Use format: https://x.com/user/status/123456"); return; }
-    // Normalize URL
+    if (!id) { alert("Could not parse tweet URL.\nUse format: https://x.com/user/status/123456"); return; }
     var normalized = "https://x.com/i/status/" + id;
-    // Check for duplicates
     if (tweets.some(function(t) { return extractTweetId(t.url) === id; })) { alert("Tweet already added"); setInputUrl(""); return; }
     var updated = [{ url: normalized, selected: true, addedDate: new Date().toISOString().slice(0, 10) }].concat(tweets);
     setTweets(updated);
@@ -7516,60 +7529,101 @@ function LinkedTweetsPanel() {
   var selectedCount = tweets.filter(function(t) { return t.selected; }).length;
 
   return (
-    <div className="p-3" style={{fontSize:"clamp(10px,1.2vw,13px)"}}>
-      <div className="flex items-center gap-2 mb-3">
-        <h2 className="text-white font-bold" style={{fontSize:"clamp(14px,1.6vw,18px)"}}>Linked Tweets</h2>
-        <span className="text-gray-500 text-xs">{selectedCount} selected / {tweets.length} total</span>
+    <div style={{padding:"clamp(8px,1.5vw,20px)", maxWidth:1400, margin:"0 auto"}}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <span style={{fontSize:"clamp(16px,2vw,22px)",fontWeight:800,color:"#FFC52F",letterSpacing:"-0.02em"}}>Tyler Black</span>
+          <span style={{fontSize:"clamp(11px,1.3vw,15px)",color:"#94a3b8",fontWeight:500}}>Featured Tweets</span>
+        </div>
+        {isOwner && (
+          <button onClick={function() { setManageOpen(!manageOpen); }}
+            className={"px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors " + (manageOpen ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200")}
+            style={{fontSize:"clamp(10px,1.1vw,12px)"}}>
+            {manageOpen ? "Done Managing" : "Manage (" + tweets.length + ")"}
+          </button>
+        )}
       </div>
 
-      {/* Input */}
-      <div className="flex gap-2 mb-4">
-        <input
-          type="text"
-          value={inputUrl}
-          onChange={function(e) { setInputUrl(e.target.value); }}
-          onKeyDown={function(e) { if (e.key === "Enter") addTweet(); }}
-          placeholder="Paste tweet URL (x.com or twitter.com)..."
-          className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 outline-none focus:border-blue-500"
-          style={{fontSize:"clamp(11px,1.2vw,13px)"}}
-        />
-        <button onClick={addTweet} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-colors" style={{fontSize:"clamp(11px,1.2vw,13px)"}}>
-          Add
-        </button>
-      </div>
-
-      {/* Tweet list - management */}
-      {tweets.length > 0 && (
-        <div className="mb-4 border border-gray-700 rounded-lg overflow-hidden">
-          <div className="bg-gray-800/50 px-3 py-1.5 text-gray-400 font-semibold text-xs border-b border-gray-700">Manage Tweets</div>
-          <div className="max-h-48 overflow-y-auto">
-            {tweets.map(function(t, idx) {
-              var tweetId = extractTweetId(t.url);
-              return (
-                <div key={tweetId || idx} className={"flex items-center gap-2 px-3 py-1.5 border-b border-gray-800 " + (t.selected ? "bg-blue-950/30" : "bg-gray-900/30")}>
-                  <button onClick={function() { toggleSelect(idx); }}
-                    className={"w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors " + (t.selected ? "bg-blue-600 border-blue-500 text-white" : "border-gray-600 text-gray-600 hover:border-gray-400")}
-                    style={{fontSize:"11px"}}>
-                    {t.selected ? "\u2713" : ""}
-                  </button>
-                  <span className="flex-1 text-gray-300 truncate font-mono text-xs">{t.url}</span>
-                  <span className="text-gray-600 text-xs flex-shrink-0">{t.addedDate}</span>
-                  <button onClick={function() { moveTweet(idx, -1); }} className="text-gray-600 hover:text-gray-300 px-1" title="Move up">{"\u25B2"}</button>
-                  <button onClick={function() { moveTweet(idx, 1); }} className="text-gray-600 hover:text-gray-300 px-1" title="Move down">{"\u25BC"}</button>
-                  <button onClick={function() { if (confirm("Remove this tweet?")) removeTweet(idx); }} className="text-red-800 hover:text-red-400 px-1 flex-shrink-0" title="Remove">{"\u2715"}</button>
+      {/* Owner management panel - collapsible */}
+      {isOwner && manageOpen && (
+        <div className="mb-4 border border-gray-700/60 rounded-xl overflow-hidden" style={{background:"rgba(15,29,50,0.7)"}}>
+          <div className="p-3">
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                value={inputUrl}
+                onChange={function(e) { setInputUrl(e.target.value); }}
+                onKeyDown={function(e) { if (e.key === "Enter") addTweet(); }}
+                placeholder="Paste tweet URL (x.com or twitter.com)..."
+                className="flex-1 bg-gray-800/80 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-500 outline-none focus:border-blue-500"
+                style={{fontSize:"clamp(11px,1.2vw,13px)"}}
+              />
+              <button onClick={addTweet} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-colors flex-shrink-0" style={{fontSize:"clamp(11px,1.2vw,13px)"}}>
+                Add
+              </button>
+            </div>
+            {tweets.length > 0 && (
+              <div className="rounded-lg border border-gray-700/50 overflow-hidden">
+                <div className="max-h-56 overflow-y-auto">
+                  {tweets.map(function(t, idx) {
+                    var tweetId = extractTweetId(t.url);
+                    return (
+                      <div key={tweetId || idx} className={"flex items-center gap-2 px-3 py-1.5 border-b border-gray-800/50 " + (t.selected ? "bg-blue-950/40" : "bg-transparent")}>
+                        <button onClick={function() { toggleSelect(idx); }}
+                          className={"w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-all " + (t.selected ? "bg-blue-600 border-blue-400 text-white" : "border-gray-600 text-transparent hover:border-gray-400")}
+                          style={{fontSize:"11px"}}>
+                          {"\u2713"}
+                        </button>
+                        <span className={"flex-1 truncate font-mono " + (t.selected ? "text-gray-200" : "text-gray-500")} style={{fontSize:"clamp(9px,1vw,11px)"}}>{t.url}</span>
+                        <span className="text-gray-600 flex-shrink-0" style={{fontSize:"10px"}}>{t.addedDate}</span>
+                        <button onClick={function() { moveTweet(idx, -1); }} className="text-gray-600 hover:text-gray-300 px-0.5" title="Move up" style={{fontSize:"10px"}}>{"\u25B2"}</button>
+                        <button onClick={function() { moveTweet(idx, 1); }} className="text-gray-600 hover:text-gray-300 px-0.5" title="Move down" style={{fontSize:"10px"}}>{"\u25BC"}</button>
+                        <button onClick={function() { if (confirm("Remove this tweet?")) removeTweet(idx); }} className="text-red-900 hover:text-red-400 px-0.5 flex-shrink-0" title="Remove" style={{fontSize:"11px"}}>{"\u2715"}</button>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Embedded tweets grid */}
-      <div ref={embedRef} className="grid gap-3" style={{
-        gridTemplateColumns: selectedCount <= 1 ? "1fr" : selectedCount <= 4 ? "repeat(2, 1fr)" : "repeat(3, 1fr)",
-        maxHeight: "calc(100vh - 300px)",
-        overflowY: "auto"
+      {/* Loading state */}
+      {embedsLoading && selectedCount > 0 && (
+        <div className="flex items-center justify-center py-8 gap-3">
+          <div style={{width:20,height:20,border:"2px solid #1e3a5f",borderTopColor:"#FFC52F",borderRadius:"50%",animation:"spin 0.8s linear infinite"}} />
+          <span className="text-gray-500" style={{fontSize:"13px"}}>Loading tweets...</span>
+        </div>
+      )}
+
+      {/* Empty state for visitors */}
+      {selectedCount === 0 && !isOwner && (
+        <div className="text-center py-16">
+          <div style={{fontSize:"28px",marginBottom:12,color:"#4b5563"}}>No tweets yet</div>
+          <div className="text-gray-500" style={{fontSize:"14px"}}>No tweets featured yet.</div>
+        </div>
+      )}
+
+      {/* Empty state for owner */}
+      {selectedCount === 0 && isOwner && !manageOpen && (
+        <div className="text-center py-12">
+          <div className="text-gray-600 mb-2" style={{fontSize:"14px"}}>No tweets selected for display.</div>
+          <button onClick={function() { setManageOpen(true); }} className="text-blue-400 hover:text-blue-300 underline" style={{fontSize:"13px"}}>Open Manage to add tweets</button>
+        </div>
+      )}
+
+      {/* Tweet embed gallery */}
+      <div ref={embedRef} style={{
+        display: "grid",
+        gridTemplateColumns: selectedCount <= 1 ? "minmax(0, 550px)" : selectedCount <= 4 ? "repeat(2, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
+        justifyContent: selectedCount <= 1 ? "center" : "stretch",
+        gap: "clamp(8px,1.2vw,16px)",
+        paddingBottom: 20
       }} />
+
+      <style dangerouslySetInnerHTML={{__html: "\n        .tweet-cell { min-width: 0; }\n        .tweet-cell .twitter-tweet { margin: 0 !important; }\n        .tweet-cell iframe { border-radius: 12px !important; }\n        @keyframes spin { to { transform: rotate(360deg); } }\n      "}} />
     </div>
   );
 }
