@@ -104,11 +104,11 @@ var TCDB_USER_FIXES = {}; // Populated from localStorage at runtime -- overrides
 var COMC_OVERRIDES = {}; // Populated from localStorage - persistent COMC match overrides
 var PRICE_HISTORY = {}; // Populated from localStorage - historical pricing data by card ID
 function loadPriceHistory() { try { return JSON.parse(localStorage.getItem("tb-price-history-v1") || "{}"); } catch(e) { return {}; } }
-function savePriceHistory(obj) { localStorage.setItem("tb-price-history-v1", JSON.stringify(obj)); try { window.storage.set("tb-price-history-v1", JSON.stringify(obj)); } catch(e) {} PRICE_HISTORY = obj; }
+function savePriceHistory(obj) { localStorage.setItem("tb-price-history-v1", JSON.stringify(obj)); PRICE_HISTORY = obj; try { window.storage.set("tb-price-history-v1", JSON.stringify(obj)); } catch(e) {} }
 var TCDB_FLAGS = {}; // Populated from localStorage -- flagged bad links
 var EBAY_BLOCKED = {}; // Populated from localStorage -- blocked eBay listings
 function loadEbayBlocked() { try { return JSON.parse(localStorage.getItem("tb-ebay-blocked-v1") || "{}"); } catch(e) { return {}; } }
-function saveEbayBlocked(obj) { localStorage.setItem("tb-ebay-blocked-v1", JSON.stringify(obj)); try { window.storage.set("tb-ebay-blocked-v1", JSON.stringify(obj)); } catch(e) {} EBAY_BLOCKED = obj; }
+function saveEbayBlocked(obj) { localStorage.setItem("tb-ebay-blocked-v1", JSON.stringify(obj)); EBAY_BLOCKED = obj; try { window.storage.set("tb-ebay-blocked-v1", JSON.stringify(obj)); } catch(e) {} }
 function loadEbayBids() { try { return JSON.parse(localStorage.getItem("tb-ebay-bids-v1") || "{}"); } catch(e) { return {}; } }
 function saveEbayBids(obj) { localStorage.setItem("tb-ebay-bids-v1", JSON.stringify(obj)); try { window.storage.set("tb-ebay-bids-v1", JSON.stringify(obj)); } catch(e) {} }
 function loadTargets() { try { return JSON.parse(localStorage.getItem("tb-targets-v1") || "{}"); } catch(e) { return {}; } }
@@ -116,6 +116,138 @@ function saveTargets(obj) { localStorage.setItem("tb-targets-v1", JSON.stringify
 function globalPriceKey(card) {
   if (!card) return null;
   return card.product.slice(0,4) + "|" + card.product + "|" + card.cardNumber + "|" + (card.cardSet || "Base");
+}
+// === CARD IMAGE SYSTEM ===
+var IMAGE_SOURCES = {
+  comc: { label: "COMC", color: "#f97316", bg: "bg-orange-950/60", border: "border-orange-700", text: "text-orange-400" },
+  personal: { label: "Mine", color: "#3b82f6", bg: "bg-blue-950/60", border: "border-blue-700", text: "text-blue-400" },
+  ebay: { label: "eBay", color: "#eab308", bg: "bg-yellow-950/60", border: "border-yellow-700", text: "text-yellow-400" },
+  other: { label: "Other", color: "#6b7280", bg: "bg-gray-800/60", border: "border-gray-600", text: "text-gray-400" }
+};
+function compressImage(file, maxW, quality) {
+  maxW = maxW || 200; quality = quality || 0.45;
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        var w = img.width, h = img.height;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        var canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        var dataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve(dataUrl);
+      };
+      img.onerror = function() { reject(new Error("Failed to load image")); };
+      img.src = e.target.result;
+    };
+    reader.onerror = function() { reject(new Error("Failed to read file")); };
+    reader.readAsDataURL(file);
+  });
+}
+function detectImageSource(url) {
+  if (!url) return "other";
+  if (url.indexOf("img.comc.com") !== -1 || url.indexOf("comc.com") !== -1) return "comc";
+  if (url.indexOf("ebay") !== -1 || url.indexOf("i.ebayimg") !== -1) return "ebay";
+  if (url.indexOf("data:image") === 0) return "personal";
+  return "other";
+}
+function CardImageSection({ cardId, cardDetails, updateCardDetail, compact }) {
+  var d = cardDetails[cardId] || {};
+  var imgUrl = d.imageUrl || "";
+  var imgSrc = d.imageSource || (imgUrl ? detectImageSource(imgUrl) : "");
+  var srcCfg = IMAGE_SOURCES[imgSrc] || IMAGE_SOURCES.other;
+  var [showPanel, setShowPanel] = useState(false);
+  var [pasteUrl, setPasteUrl] = useState("");
+  var [pasteSrc, setPasteSrc] = useState("comc");
+  var [uploading, setUploading] = useState(false);
+  var [showFull, setShowFull] = useState(false);
+  var fileRef = useRef(null);
+
+  function handlePasteUrl() {
+    if (!pasteUrl.trim()) return;
+    var detected = detectImageSource(pasteUrl.trim());
+    updateCardDetail(cardId, "imageUrl", pasteUrl.trim());
+    updateCardDetail(cardId, "imageSource", pasteSrc || detected);
+    setPasteUrl(""); setShowPanel(false);
+  }
+  function handleFileUpload(e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    compressImage(file, 250, 0.5).then(function(dataUrl) {
+      updateCardDetail(cardId, "imageUrl", dataUrl);
+      updateCardDetail(cardId, "imageSource", "personal");
+      setUploading(false); setShowPanel(false);
+    }).catch(function() { setUploading(false); alert("Failed to process image"); });
+  }
+  function removeImage() {
+    updateCardDetail(cardId, "imageUrl", "");
+    updateCardDetail(cardId, "imageSource", "");
+    setShowFull(false);
+  }
+
+  // Compact mode: just a tiny indicator
+  if (compact) {
+    if (!imgUrl) return null;
+    return React.createElement("div", { className: "relative flex-shrink-0 cursor-pointer rounded overflow-hidden border border-gray-700", style: { width: "24px", height: "32px" }, onClick: function(e) { e.stopPropagation(); setShowFull(!showFull); }, title: "Click to preview — Source: " + srcCfg.label },
+      React.createElement("img", { src: imgUrl, alt: "", className: "w-full h-full object-cover", style: { imageRendering: "auto" }, onError: function(e) { e.target.style.display = "none"; } }),
+      React.createElement("div", { className: "absolute bottom-0 left-0 right-0 text-center leading-none", style: { fontSize: "5px", padding: "1px 0", backgroundColor: srcCfg.color + "cc", color: "#fff" } }, srcCfg.label)
+    );
+  }
+
+  return React.createElement("div", { className: "mt-1.5 pt-1 border-t border-gray-800" },
+    React.createElement("div", { className: "text-gray-600 text-[8px] font-bold mb-0.5 tracking-wider flex items-center justify-between" },
+      React.createElement("span", null, "CARD IMAGE"),
+      React.createElement("div", { className: "flex gap-1" },
+        imgUrl && React.createElement("button", { onClick: removeImage, className: "text-red-500 hover:text-red-400 text-[8px]" }, "✕ Remove"),
+        React.createElement("button", { onClick: function() { setShowPanel(!showPanel); }, className: "text-cyan-500 hover:text-cyan-400 text-[8px]" }, showPanel ? "Cancel" : (imgUrl ? "Change" : "+ Add"))
+      )
+    ),
+    // Image preview
+    imgUrl && React.createElement("div", { className: "flex gap-2 items-start mb-1" },
+      React.createElement("div", { className: "relative cursor-pointer flex-shrink-0", onClick: function() { setShowFull(!showFull); } },
+        React.createElement("img", { src: imgUrl, alt: "Card image", className: "rounded border border-gray-700 object-cover", style: { width: showFull ? "160px" : "60px", height: "auto", maxHeight: showFull ? "220px" : "84px", transition: "all 0.2s" }, onError: function(e) { e.target.style.display = "none"; e.target.nextSibling && (e.target.nextSibling.style.display = "block"); } }),
+        React.createElement("div", { style: { display: "none" }, className: "text-red-400 text-[8px] p-1" }, "Failed to load"),
+        React.createElement("div", { className: "absolute top-0 right-0 px-1 rounded-bl text-[7px] font-bold", style: { backgroundColor: srcCfg.color + "dd", color: "#fff" } }, srcCfg.label)
+      ),
+      !showFull && React.createElement("div", { className: "text-[9px] text-gray-500" },
+        React.createElement("div", null, "Source: ", React.createElement("span", { className: srcCfg.text + " font-bold" }, srcCfg.label)),
+        React.createElement("div", { className: "text-gray-700" }, "Click to expand")
+      )
+    ),
+    // Add/Change panel
+    showPanel && React.createElement("div", { className: "p-1.5 bg-gray-950 rounded border border-gray-700 space-y-1.5", onClick: function(e) { e.stopPropagation(); } },
+      // URL paste
+      React.createElement("div", null,
+        React.createElement("div", { className: "text-[8px] text-gray-500 mb-0.5" }, "Paste image URL (COMC, eBay, etc.)"),
+        React.createElement("div", { className: "flex gap-1" },
+          React.createElement("input", { type: "text", value: pasteUrl, onChange: function(e) { setPasteUrl(e.target.value); var det = detectImageSource(e.target.value); if (det !== "personal") setPasteSrc(det); }, placeholder: "https://img.comc.com/...", className: "flex-1 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-[10px] outline-none focus:border-cyan-600 text-white" }),
+          React.createElement("select", { value: pasteSrc, onChange: function(e) { setPasteSrc(e.target.value); }, className: "bg-gray-900 border border-gray-700 rounded px-1 py-0.5 text-[10px] text-gray-300" },
+            React.createElement("option", { value: "comc" }, "COMC"),
+            React.createElement("option", { value: "ebay" }, "eBay"),
+            React.createElement("option", { value: "other" }, "Other")
+          ),
+          React.createElement("button", { onClick: handlePasteUrl, disabled: !pasteUrl.trim(), className: "px-2 py-0.5 rounded text-[10px] font-bold " + (pasteUrl.trim() ? "bg-cyan-800 hover:bg-cyan-700 text-white" : "bg-gray-800 text-gray-600") }, "Save")
+        )
+      ),
+      // Separator
+      React.createElement("div", { className: "flex items-center gap-2 text-[8px] text-gray-600" },
+        React.createElement("div", { className: "flex-1 border-t border-gray-800" }),
+        "or",
+        React.createElement("div", { className: "flex-1 border-t border-gray-800" })
+      ),
+      // Upload / Camera
+      React.createElement("div", { className: "flex gap-1" },
+        React.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: handleFileUpload, className: "hidden" }),
+        React.createElement("button", { onClick: function() { if (fileRef.current) { fileRef.current.removeAttribute("capture"); fileRef.current.click(); } }, disabled: uploading, className: "flex-1 px-2 py-1 rounded text-[10px] font-bold bg-blue-900/60 border border-blue-700 text-blue-300 hover:bg-blue-800/60" }, uploading ? "Processing..." : "📁 Upload Photo"),
+        React.createElement("button", { onClick: function() { if (fileRef.current) { fileRef.current.setAttribute("capture", "environment"); fileRef.current.click(); } }, disabled: uploading, className: "flex-1 px-2 py-1 rounded text-[10px] font-bold bg-green-900/60 border border-green-700 text-green-300 hover:bg-green-800/60" }, uploading ? "..." : "📷 Camera")
+      ),
+      React.createElement("div", { className: "text-[7px] text-gray-600" }, "Photos auto-compressed to ~5KB thumbnail. COMC images allowed with attribution.")
+    )
+  );
 }
 function Sparkline({ card, width, height }) {
   var pk = globalPriceKey(card);
@@ -224,7 +356,7 @@ function pt130Url(card) {
   var q = "tyler black " + yr + " " + card.cardNumber + " " + prodNoYear;
   return "https://130point.com/sales/?search=" + encodeURIComponent(q.trim());
 }
-let ALL_CARDS = expandData(RAW_DATA).filter(function(c) { return c.id !== 1; });
+let ALL_CARDS = expandData(RAW_DATA);
 
 // Custom cards added by user via COMC Scanner "Add to DB" feature
 var CUSTOM_CARDS_KEY = "tb-custom-cards-v1";
@@ -308,16 +440,6 @@ function displayPrice(v) { if (!v) return ""; var n = parseFloat(v.replace(/[^0-
 const SYNC_DATA = {};
 function TylerBlackTracker() {
   const [loading, setLoading] = useState(true);
-  const [isOwner, setIsOwner] = useState(false);
-  useEffect(function() {
-    var iv = setInterval(function() {
-      try {
-        var o = !!(window.trackerAuth && window.trackerAuth.isOwner());
-        setIsOwner(function(p) { return p === o ? p : o; });
-      } catch(e) {}
-    }, 1000);
-    return function() { clearInterval(iv); };
-  }, []);
   const [statuses, setStatuses] = useState({});
   const [cardDetails, setCardDetails] = useState({});
   const [filterYear, setFilterYear] = useState("all");
@@ -329,7 +451,7 @@ function TylerBlackTracker() {
   const [saving, setSaving] = useState(false);
   const [expandedCard, setExpandedCard] = useState(null);
   const [showDupes, setShowDupes] = useState(false);
-  const [activeTab, setActiveTab] = useState("summary");
+  const [activeTab, setActiveTab] = useState("collection");
   const [detailedSnFilter, setDetailedSnFilter] = useState(null);
   const [detailedStatusFilter, setDetailedStatusFilter] = useState(null);
   const [detailedCardId, setDetailedCardId] = useState(null);
@@ -366,7 +488,6 @@ function TylerBlackTracker() {
   const [tcdbFixInput, setTcdbFixInput] = useState(""); // URL input for fixing
   const [tcdbFixingId, setTcdbFixingId] = useState(null); // which card is being fixed
   const [hidePrices, setHidePrices] = useState(true);
-  useEffect(function() { if (!isOwner) setHidePrices(true); }, [isOwner]);
   // Build targetByCardId lookup from localStorage targets (for Lookup/Detailed panels)
   var _mainTargets = useMemo(function() { return loadTargets(); }, [activeTab, targetCardFilter]);
   var targetByCardId = useMemo(function() {
@@ -451,7 +572,6 @@ function TylerBlackTracker() {
   }
   useEffect(() => {
     function handleBeforeUnload() {
-      if (window._skipBeforeUnloadSave) return;
       if (loadComplete.current && allDataRef.current._migrationComplete) {
         allDataRef.current._saveTimestamp = Date.now();
         var payload = JSON.stringify(allDataRef.current);
@@ -462,7 +582,6 @@ function TylerBlackTracker() {
       }
     }
     function handleVisibilityChange() {
-      if (window._skipBeforeUnloadSave) return;
       if (document.hidden && loadComplete.current && allDataRef.current._migrationComplete) {
         allDataRef.current._saveTimestamp = Date.now();
         var payload = JSON.stringify(allDataRef.current);
@@ -579,6 +698,7 @@ function TylerBlackTracker() {
 
   useEffect(() => {
     async function load() {
+      // Wait for cloud storage hydration before reading
       if (window.storageReady) { try { await window.storageReady; } catch(e) {} }
       let diagParts = [];
       let allData = null;
@@ -928,7 +1048,6 @@ function TylerBlackTracker() {
     });
   }, [saveStatuses, saveDetails, persistField]);
   const updateCardDetail = useCallback((cardId, field, value) => {
-    if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
     setSessionChanges(prev => prev + 1);
     setCardDetails(prev => {
       var oldVal = (prev[cardId] || {})[field] || "";
@@ -946,7 +1065,6 @@ function TylerBlackTracker() {
     });
   }, [saveDetails, pushUndo, logChange, persistField]);
   const setCardStatus = useCallback((cardId, status) => {
-    if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
     setSessionChanges(prev => prev + 1);
     setStatuses(prev => {
       const prevStatus = prev[cardId] || "not_owned";
@@ -987,7 +1105,6 @@ function TylerBlackTracker() {
     });
   }, [saveStatuses, pushUndo, logChange, persistField]);
   const toggleForSale = useCallback((cardId) => {
-    if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
     setSessionChanges(prev => prev + 1);
     setForSaleFlags(prev => {
       var wasFlagged = !!prev[cardId];
@@ -1005,7 +1122,6 @@ function TylerBlackTracker() {
     ALL_CARDS.forEach(card => {
       if (HIDDEN_DUPES.has(card.id)) return;
       if (card.product.startsWith("TEST")) return;
-      if (card.isCustom) return;
       visibleTotal++;
       const s = statuses[card.id] || "not_owned";
       const d = cardDetails[card.id] || {};
@@ -1130,21 +1246,20 @@ function TylerBlackTracker() {
   const acquired = stats.owned + stats.inTransit;
   const needRegular = stats.notOwned - stats.notOwned1of1;
   const TABS = [
-    {id:"collection",label:"Collection",color:"yellow",ownerOnly:true},
+    {id:"collection",label:"Collection",color:"yellow"},
     {id:"lookup",label:"Lookup",color:"purple"},
     {id:"detailed",label:"Detailed",color:"emerald"},
     {id:"summary",label:"Summary",color:"cyan"},
-    {id:"comc_scanner",label:"Scanner",color:"orange",ownerOnly:true},
-    {id:"targets",label:"Targets",color:"pink",badge:Object.keys(loadTargets()).length,ownerOnly:true},
-    {id:"prices",label:"Prices",color:"indigo",badge:Object.keys(loadPriceHistory()).length,ownerOnly:true},
-    {id:"sync",label:"Sync",color:"orange",badge:unsyncedCards.length,ownerOnly:true},
-    {id:"cleanup",label:"Cleanup",color:"amber",badge:issueCounts.total,ownerOnly:true},
-    {id:"changelog",label:"Log",color:"rose",ownerOnly:true},
-    {id:"versions",label:"Versions",color:"indigo",ownerOnly:true},
-    {id:"board",label:"Board",color:"blue",ownerOnly:true},
-    {id:"tweets",label:"Tweets",color:"blue"},
-    {id:"save",label:"Export",color:"emerald",ownerOnly:true},
-  ].filter(function(t) { return !t.ownerOnly || isOwner; });
+    {id:"comc_scanner",label:"Scanner",color:"orange"},
+    {id:"targets",label:"Targets",color:"pink",badge:Object.keys(loadTargets()).length},
+    {id:"prices",label:"Prices",color:"indigo",badge:Object.keys(loadPriceHistory()).length},
+    {id:"sync",label:"Sync",color:"orange",badge:unsyncedCards.length},
+    {id:"cleanup",label:"Cleanup",color:"amber",badge:issueCounts.total},
+    {id:"changelog",label:"Log",color:"rose"},
+    {id:"versions",label:"Versions",color:"indigo"},
+    {id:"board",label:"Board",color:"blue"},
+    {id:"save",label:"Export",color:"emerald"},
+  ];
   const tabColorMap = {yellow:"border-yellow-400 text-yellow-300",cyan:"border-yellow-400 text-yellow-300",teal:"border-yellow-400 text-yellow-300",purple:"border-yellow-400 text-yellow-300",orange:"border-yellow-400 text-yellow-300",emerald:"border-yellow-400 text-yellow-300",amber:"border-yellow-400 text-yellow-300",rose:"border-yellow-400 text-yellow-300",indigo:"border-yellow-400 text-yellow-300",blue:"border-yellow-400 text-yellow-300",pink:"border-yellow-400 text-yellow-300",lime:"border-yellow-400 text-yellow-300"};
   const badgeActiveMap = {orange:"bg-orange-400 text-gray-900",amber:"bg-amber-400 text-gray-900",emerald:"bg-emerald-400 text-gray-900",indigo:"bg-indigo-400 text-gray-900"};
   const badgeInactiveMap = {orange:"bg-orange-900 text-orange-300",amber:"bg-amber-900 text-amber-300",emerald:"bg-emerald-900 text-emerald-300",indigo:"bg-indigo-900 text-indigo-300"};
@@ -1231,14 +1346,14 @@ function TylerBlackTracker() {
             >
               {superSearchMode ? "* SUPER" : "E"}
             </button>
-            {isOwner && <button 
+            <button 
               onClick={function() { setHidePrices(!hidePrices); }} 
               className={"px-1 py-0 rounded transition-colors " + (hidePrices ? "text-gray-600 hover:text-gray-400" : "text-gray-500 hover:text-gray-300 bg-gray-700/50")}
               style={{fontSize:"clamp(7px,0.8vw,9px)"}}
               title={hidePrices ? "Prices hidden — click to show" : "Prices visible — click to hide"}
             >
               {"$"}
-            </button>}
+            </button>
             <button 
               onClick={function() { setShowKbHelp(true); }} 
               className="px-1.5 py-0.5 rounded transition-colors bg-gray-800 text-gray-500 hover:text-white hover:bg-gray-700 font-bold"
@@ -1344,6 +1459,7 @@ function TylerBlackTracker() {
               <div key={card.id} data-focus-idx={pageCards.indexOf(card)} className={"rounded-sm overflow-hidden " + rowBg + (isFocused ? " ring-1 ring-yellow-400/70 bg-yellow-950/20" : "")}>
                 <div className="flex items-center gap-1 cursor-pointer" style={{padding:"clamp(1px,0.2vw,3px) clamp(3px,0.5vw,8px)"}} onClick={function(){setExpandedCard(isExpanded ? null : card.id);}}>
                   <div className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + cfg.dot} />
+                  {details.imageUrl && <div className="flex-shrink-0 rounded overflow-hidden border border-gray-700" style={{width:"18px",height:"24px"}} title={"Image: " + (IMAGE_SOURCES[details.imageSource] || IMAGE_SOURCES.other).label}><img src={details.imageUrl} alt="" className="w-full h-full object-cover" onError={function(e){e.target.parentElement.style.display="none";}} /></div>}
                   <div className="flex-1 min-w-0 flex items-baseline gap-1 truncate" style={{fontSize:"clamp(9px,1.2vw,12px)"}}>
                     <span className="font-semibold text-white whitespace-nowrap">#{card.cardNumber}</span>
                     <span className="text-gray-300 truncate">{card.cardSet}</span>
@@ -1434,6 +1550,7 @@ function TylerBlackTracker() {
                         </div>
                       )}
                     </div>
+                    <div className="col-span-2"><CardImageSection cardId={card.id} cardDetails={cardDetails} updateCardDetail={updateCardDetail} /></div>
                   </div>
                 )}
               </div>
@@ -1471,8 +1588,6 @@ function TylerBlackTracker() {
           <VersionLogPanel />
         ) : activeTab === "board" ? (
           <TaskBoardPanel />
-        ) : activeTab === "tweets" ? (
-          <LinkedTweetsPanel isOwner={isOwner} />
         ) : activeTab === "comc_scanner" ? (
           <COMCScannerPanel cards={ALL_CARDS} statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} needsSync={needsSync} setDetailedCardId={setDetailedCardId} setActiveTab={setActiveTab} persistedState={scannerStateRef.current} onStateChange={function(s) { scannerStateRef.current = s; }} editCustomCardById={editCustomCardById} />
         ) : activeTab === "targets" ? (
@@ -1480,7 +1595,7 @@ function TylerBlackTracker() {
         ) : activeTab === "prices" ? (
           <PricesPanel cards={ALL_CARDS} statuses={statuses} setActiveTab={setActiveTab} setDetailedCardId={setDetailedCardId} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} setDetailedProductFilter={setDetailedProductFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} initialSearch={pricesSearchFilter} setPricesSearchFilter={setPricesSearchFilter} />
         ) : activeTab === "export" || activeTab === "save" ? (
-          <ExportPanel statuses={statuses} cardDetails={cardDetails} forSaleFlags={forSaleFlags} needsSync={needsSync} lastCheckpoint={lastCheckpoint} setLastCheckpoint={setLastCheckpoint} isSavingCheckpoint={isSavingCheckpoint} setIsSavingCheckpoint={setIsSavingCheckpoint} saveCount={saveCount} flashSave={flashSave} saveToast={saveToast} exportCsvRef={exportCsvRef} persistField={persistField} setStatuses={setStatuses} setCardDetails={setCardDetails} setForSaleFlags={setForSaleFlags} allDataRef={allDataRef} />
+          <ExportPanel statuses={statuses} cardDetails={cardDetails} forSaleFlags={forSaleFlags} needsSync={needsSync} lastCheckpoint={lastCheckpoint} setLastCheckpoint={setLastCheckpoint} isSavingCheckpoint={isSavingCheckpoint} setIsSavingCheckpoint={setIsSavingCheckpoint} saveCount={saveCount} flashSave={flashSave} saveToast={saveToast} exportCsvRef={exportCsvRef} persistField={persistField} />
         ) : activeTab === "sync" ? (
           <SyncPanel cards={unsyncedCards} touchupCards={touchupCards} cardDetails={cardDetails} syncIndex={syncIndex} setSyncIndex={setSyncIndex} markSynced={markSynced} hidePrices={hidePrices} />
         ) : activeTab === "cleanup" ? (
@@ -1628,7 +1743,6 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
   function passesFilter(card, minSN, inclBlank, ex1of1, unnumOnly, spOnly) {
     if (HIDDEN_DUPES.has(card.id)) return false;
     if (card.product.startsWith("TEST")) return false;
-    if (card.isCustom) return false;
     if (rookieOnly && !card.product.startsWith("2021") && !card.product.startsWith("2024")) return false;
     if (spOnly) return !!SSP_TAGS[card.cardSet];
     var pr = parseInt(card.copies);
@@ -2336,6 +2450,7 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
               <button onClick={function() { setDetailedProductFilter(selectedCard.product); setDetailedCardNumFilter(null); setDetailedStatusFilter("all"); setDetailedSnFilter("all"); setActiveTab("detailed"); }} className="py-0.5 px-1.5 rounded bg-gray-800/60 border border-gray-700 text-gray-400 hover:bg-gray-700/50 font-bold" title="View full set in Detailed tab">Full Set</button>
             </div>
           </div>
+          <CardImageSection cardId={selectedCard.id} cardDetails={cardDetails} updateCardDetail={updateCardDetail} />
         </div>
       )}
     </div>
@@ -2885,6 +3000,7 @@ function CleanupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, 
                     <a href={variantOnlyUrl(card)} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-0.5 bg-purple-900/40 border border-purple-700 text-purple-300 rounded hover:bg-purple-800/40" title="Search this variant without player name">Variant</a>
                     <a href={pt130Url(card)} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-0.5 bg-teal-900/40 border border-teal-700 text-teal-300 rounded hover:bg-teal-800/40">130pt</a>
                   </div>
+                  <CardImageSection cardId={card.id} cardDetails={cardDetails} updateCardDetail={updateCardDetail} />
                 </div>
               )}
             </div>
@@ -3314,7 +3430,7 @@ function COMCScannerPanel(props) {
     if (ph[pk].length > 365) ph[pk] = ph[pk].slice(-365);
     if (!batchPH) savePriceHistory(ph); // only save immediately if not batching
   }
-  function saveComcOverrides(obj) { localStorage.setItem("tb-comc-overrides-v1", JSON.stringify(obj)); try { window.storage.set("tb-comc-overrides-v1", JSON.stringify(obj)); } catch(e) {} COMC_OVERRIDES = obj; }
+  function saveComcOverrides(obj) { localStorage.setItem("tb-comc-overrides-v1", JSON.stringify(obj)); COMC_OVERRIDES = obj; try { window.storage.set("tb-comc-overrides-v1", JSON.stringify(obj)); } catch(e) {} }
   var _cov = useState(function(){ var o = loadComcOverrides(); COMC_OVERRIDES = o; return o; });
   useState(function(){ PRICE_HISTORY = loadPriceHistory(); });
   var comcOverrides = _cov[0], setComcOverrides = _cov[1];
@@ -7431,203 +7547,6 @@ function TargetsPanel({ cards, statuses, setCardStatus, updateCardDetail, setDet
     </div>
   );
 }
-function LinkedTweetsPanel({ isOwner }) {
-  var TWEETS_KEY = "tb-linked-tweets-v1";
-  function loadTweets() { try { return JSON.parse(localStorage.getItem(TWEETS_KEY) || "[]"); } catch(e) { return []; } }
-  function saveTweets(t) { localStorage.setItem(TWEETS_KEY, JSON.stringify(t)); try { window.storage.set(TWEETS_KEY, JSON.stringify(t)); } catch(e) {} }
-
-  var [tweets, setTweets] = useState(loadTweets);
-  var [inputUrl, setInputUrl] = useState("");
-  var [scriptLoaded, setScriptLoaded] = useState(!!window.twttr);
-  var [embedsLoading, setEmbedsLoading] = useState(true);
-  var [manageOpen, setManageOpen] = useState(false);
-  var embedRef = useRef(null);
-
-  function extractTweetId(url) {
-    var m = url.match(/(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/);
-    return m ? m[1] : null;
-  }
-
-  // Load Twitter widgets.js once
-  useEffect(function() {
-    if (window.twttr) { setScriptLoaded(true); return; }
-    var s = document.createElement("script");
-    s.src = "https://platform.twitter.com/widgets.js";
-    s.async = true;
-    s.onload = function() { setScriptLoaded(true); };
-    document.head.appendChild(s);
-  }, []);
-
-  // Re-render embeds whenever selected tweets or script changes
-  useEffect(function() {
-    if (!scriptLoaded || !window.twttr || !embedRef.current) return;
-    embedRef.current.innerHTML = "";
-    var selected = tweets.filter(function(t) { return t.selected; });
-    if (selected.length === 0) {
-      setEmbedsLoading(false);
-      return;
-    }
-    setEmbedsLoading(true);
-    var loaded = 0;
-    var total = selected.length;
-    selected.forEach(function(t) {
-      var tweetId = extractTweetId(t.url);
-      if (!tweetId) { loaded++; return; }
-      var cell = document.createElement("div");
-      cell.className = "tweet-cell";
-      embedRef.current.appendChild(cell);
-      window.twttr.widgets.createTweet(tweetId, cell, {
-        theme: "dark",
-        conversation: "none",
-        dnt: true,
-        align: "center"
-      }).then(function() {
-        loaded++;
-        if (loaded >= total) setEmbedsLoading(false);
-      }).catch(function() {
-        loaded++;
-        if (loaded >= total) setEmbedsLoading(false);
-      });
-    });
-  }, [tweets, scriptLoaded]);
-
-  function addTweet() {
-    var url = inputUrl.trim();
-    if (!url) return;
-    var id = extractTweetId(url);
-    if (!id) { alert("Could not parse tweet URL.\nUse format: https://x.com/user/status/123456"); return; }
-    var normalized = "https://x.com/i/status/" + id;
-    if (tweets.some(function(t) { return extractTweetId(t.url) === id; })) { alert("Tweet already added"); setInputUrl(""); return; }
-    var updated = [{ url: normalized, selected: true, addedDate: new Date().toISOString().slice(0, 10) }].concat(tweets);
-    setTweets(updated);
-    saveTweets(updated);
-    setInputUrl("");
-  }
-
-  function toggleSelect(idx) {
-    var updated = tweets.map(function(t, i) { return i === idx ? Object.assign({}, t, { selected: !t.selected }) : t; });
-    setTweets(updated);
-    saveTweets(updated);
-  }
-
-  function removeTweet(idx) {
-    var updated = tweets.filter(function(_, i) { return i !== idx; });
-    setTweets(updated);
-    saveTweets(updated);
-  }
-
-  function moveTweet(idx, dir) {
-    if (idx + dir < 0 || idx + dir >= tweets.length) return;
-    var updated = tweets.slice();
-    var temp = updated[idx];
-    updated[idx] = updated[idx + dir];
-    updated[idx + dir] = temp;
-    setTweets(updated);
-    saveTweets(updated);
-  }
-
-  var selectedCount = tweets.filter(function(t) { return t.selected; }).length;
-
-  return (
-    <div style={{padding:"clamp(8px,1.5vw,20px)", maxWidth:1400, margin:"0 auto"}}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <span style={{fontSize:"clamp(16px,2vw,22px)",fontWeight:800,color:"#FFC52F",letterSpacing:"-0.02em"}}>Tyler Black</span>
-          <span style={{fontSize:"clamp(11px,1.3vw,15px)",color:"#94a3b8",fontWeight:500}}>Featured Tweets</span>
-        </div>
-        {isOwner && (
-          <button onClick={function() { setManageOpen(!manageOpen); }}
-            className={"px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors " + (manageOpen ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200")}
-            style={{fontSize:"clamp(10px,1.1vw,12px)"}}>
-            {manageOpen ? "Done Managing" : "Manage (" + tweets.length + ")"}
-          </button>
-        )}
-      </div>
-
-      {/* Owner management panel - collapsible */}
-      {isOwner && manageOpen && (
-        <div className="mb-4 border border-gray-700/60 rounded-xl overflow-hidden" style={{background:"rgba(15,29,50,0.7)"}}>
-          <div className="p-3">
-            <div className="flex gap-2 mb-3">
-              <input
-                type="text"
-                value={inputUrl}
-                onChange={function(e) { setInputUrl(e.target.value); }}
-                onKeyDown={function(e) { if (e.key === "Enter") addTweet(); }}
-                placeholder="Paste tweet URL (x.com or twitter.com)..."
-                className="flex-1 bg-gray-800/80 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-500 outline-none focus:border-blue-500"
-                style={{fontSize:"clamp(11px,1.2vw,13px)"}}
-              />
-              <button onClick={addTweet} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-colors flex-shrink-0" style={{fontSize:"clamp(11px,1.2vw,13px)"}}>
-                Add
-              </button>
-            </div>
-            {tweets.length > 0 && (
-              <div className="rounded-lg border border-gray-700/50 overflow-hidden">
-                <div className="max-h-56 overflow-y-auto">
-                  {tweets.map(function(t, idx) {
-                    var tweetId = extractTweetId(t.url);
-                    return (
-                      <div key={tweetId || idx} className={"flex items-center gap-2 px-3 py-1.5 border-b border-gray-800/50 " + (t.selected ? "bg-blue-950/40" : "bg-transparent")}>
-                        <button onClick={function() { toggleSelect(idx); }}
-                          className={"w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-all " + (t.selected ? "bg-blue-600 border-blue-400 text-white" : "border-gray-600 text-transparent hover:border-gray-400")}
-                          style={{fontSize:"11px"}}>
-                          {"\u2713"}
-                        </button>
-                        <span className={"flex-1 truncate font-mono " + (t.selected ? "text-gray-200" : "text-gray-500")} style={{fontSize:"clamp(9px,1vw,11px)"}}>{t.url}</span>
-                        <span className="text-gray-600 flex-shrink-0" style={{fontSize:"10px"}}>{t.addedDate}</span>
-                        <button onClick={function() { moveTweet(idx, -1); }} className="text-gray-600 hover:text-gray-300 px-0.5" title="Move up" style={{fontSize:"10px"}}>{"\u25B2"}</button>
-                        <button onClick={function() { moveTweet(idx, 1); }} className="text-gray-600 hover:text-gray-300 px-0.5" title="Move down" style={{fontSize:"10px"}}>{"\u25BC"}</button>
-                        <button onClick={function() { if (confirm("Remove this tweet?")) removeTweet(idx); }} className="text-red-900 hover:text-red-400 px-0.5 flex-shrink-0" title="Remove" style={{fontSize:"11px"}}>{"\u2715"}</button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Loading state */}
-      {embedsLoading && selectedCount > 0 && (
-        <div className="flex items-center justify-center py-8 gap-3">
-          <div style={{width:20,height:20,border:"2px solid #1e3a5f",borderTopColor:"#FFC52F",borderRadius:"50%",animation:"spin 0.8s linear infinite"}} />
-          <span className="text-gray-500" style={{fontSize:"13px"}}>Loading tweets...</span>
-        </div>
-      )}
-
-      {/* Empty state for visitors */}
-      {selectedCount === 0 && !isOwner && (
-        <div className="text-center py-16">
-          <div style={{fontSize:"28px",marginBottom:12,color:"#4b5563"}}>No tweets yet</div>
-          <div className="text-gray-500" style={{fontSize:"14px"}}>No tweets featured yet.</div>
-        </div>
-      )}
-
-      {/* Empty state for owner */}
-      {selectedCount === 0 && isOwner && !manageOpen && (
-        <div className="text-center py-12">
-          <div className="text-gray-600 mb-2" style={{fontSize:"14px"}}>No tweets selected for display.</div>
-          <button onClick={function() { setManageOpen(true); }} className="text-blue-400 hover:text-blue-300 underline" style={{fontSize:"13px"}}>Open Manage to add tweets</button>
-        </div>
-      )}
-
-      {/* Tweet embed gallery */}
-      <div ref={embedRef} style={{
-        display: "grid",
-        gridTemplateColumns: selectedCount <= 1 ? "minmax(0, 550px)" : selectedCount <= 4 ? "repeat(2, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
-        justifyContent: selectedCount <= 1 ? "center" : "stretch",
-        gap: "clamp(8px,1.2vw,16px)",
-        paddingBottom: 20
-      }} />
-
-      <style dangerouslySetInnerHTML={{__html: "\n        .tweet-cell { min-width: 0; }\n        .tweet-cell .twitter-tweet { margin: 0 !important; }\n        .tweet-cell iframe { border-radius: 12px !important; }\n        @keyframes spin { to { transform: rotate(360deg); } }\n      "}} />
-    </div>
-  );
-}
-
 function TaskBoardPanel() {
   var [showDone, setShowDone] = useState(false);
   var [tasks, setTasks] = useState({
@@ -7861,6 +7780,7 @@ function TaskBoardPanel() {
 }
 function VersionLogPanel() {
   var VERSION_HISTORY = [
+    { date: "2026-03-12 20:00", change: "CARD IMAGE SYSTEM: (1) Add images to any card via URL paste (COMC, eBay) or camera/upload from phone. (2) Personal photos auto-compressed to ~5KB JPEG thumbnails — stored in cardDetails, persists in Supabase. (3) Source indicator badge on each image: COMC (orange), Personal/Mine (blue), eBay (yellow), Other (gray). (4) Auto-detects image source from URL (img.comc.com → COMC, ebayimg → eBay, etc.). (5) Image section appears in: Main collection expanded detail, Lookup panel detail card, Detailed panel card expansion. (6) Tiny 18x24px thumbnail indicator in card row when image exists. (7) Click thumbnail to expand/collapse preview. (8) Camera button uses device rear camera on mobile; Upload for file picker. (9) COMC images allowed per their hotlinking policy with attribution. (10) Remove button to clear image from any card.", verified: false },
     { date: "2026-02-22 01:00", change: "TCDB COMPARISON SCANNER: New 'TCDB' mode in Scanner tab. (1) Paste your TCDB collection page (Have/Want/In-Transit) — auto-detects which list from header text. (2) Parses card lines by year+product+variant+cardNumber pattern. (3) Matches to tracker DB using existing matchToCards engine. (4) Compares TCDB status vs tracker status, highlighting mismatches. (5) Filter by Mismatch/Match/Unmatched/All. (6) Individual 'Fix' buttons update tracker status to match TCDB. (7) Bulk 'Fix All' button for mass mismatch resolution. (8) Deduplicates matched cards. Also: removed card preview images (TCDB blocks embedding), removed t18 from backlog.", verified: false },
     { date: "2026-02-21 18:30", change: "TCDB PASTE AND VERIFY: New Paste and Verify mode in Sync tab. Paste TCDB collection page text (tab-separated tables, checklist views, plain text). Parser extracts card numbers with set context headers. Fuzzy matcher finds cards by (cardNumber, year, product) with variant tiebreaker. Bulk Verify All or individual verify buttons. Already-synced cards show green checkmarks. Unmatched lines listed for manual review. Verified cards removed from Sync queue. Player-agnostic parser foundation for V2/V3.", verified: false },
     { date: "2026-02-21 03:00", change: "BREWERS COLOR THEME: Complete visual overhaul inspired by Milwaukee Brewers palette. (1) Navy-dark backgrounds (#0a1628 base, #111a2e panels) replace pure gray. (2) Brewers gold (#FFC52F) replaces green for owned status, title, progress bar, tab accents, header stats. (3) Blue (#5b9bd5) for in-transit. (4) Summary panel text brightened throughout — headers gold, labels cream/slate, counts visible. (5) Collection card rows: gold border-left for owned, brighter variant text, brighter product names. (6) Gauge arc gold, bar tracks navy instead of dark red. (7) Scanner header gold. (8) $ toggle defaults hidden, ultra-subtle. (9) Price history readers fixed for flat array format.", verified: false },
@@ -8184,7 +8104,7 @@ function ChangelogPanel({ changelog, setChangelog, statuses, cardDetails, forSal
 }
 
 
-function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheckpoint, setLastCheckpoint, isSavingCheckpoint, setIsSavingCheckpoint, saveCount, flashSave, saveToast, exportCsvRef, persistField, setStatuses, setCardDetails, setForSaleFlags, allDataRef }) {
+function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheckpoint, setLastCheckpoint, isSavingCheckpoint, setIsSavingCheckpoint, saveCount, flashSave, saveToast, exportCsvRef, persistField }) {
   var [exportMsg, setExportMsg] = useState("");
   var [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -8367,83 +8287,6 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
     setTimeout(function() { setExportMsg(""); }, 4000);
   }
 
-  function restoreFromJson(file) {
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = async function(e) {
-      try {
-        var data = JSON.parse(e.target.result);
-        if (data.statuses && typeof data.statuses === "object") {
-          var newStatuses = data.statuses;
-          var newDetails = data.cardDetails || {};
-          var newForSale = data.forSaleFlags || {};
-          var statCount = Object.keys(newStatuses).length;
-          var detailCount = Object.keys(newDetails).length;
-          allDataRef.current.statuses = newStatuses;
-          allDataRef.current.details = newDetails;
-          allDataRef.current.forsale = newForSale;
-          allDataRef.current._saveTimestamp = Date.now();
-          allDataRef.current._migrationComplete = true;
-          setStatuses(newStatuses);
-          setCardDetails(newDetails);
-          setForSaleFlags(newForSale);
-          var payload = JSON.stringify(allDataRef.current);
-          try { localStorage.setItem("tb-alldata-v1", payload); } catch(e2) {}
-          try { localStorage.setItem("tb-alldata-backup-v1", payload); } catch(e2) {}
-          setExportMsg("Saving " + statCount + " statuses + " + detailCount + " details to cloud...");
-          try { await window.storage.set("tb-alldata-v1", payload); } catch(e2) {}
-          setExportMsg("Restored " + statCount + " statuses + " + detailCount + " card details!");
-          setTimeout(function() { setExportMsg(""); }, 5000);
-        } else {
-          setExportMsg("Invalid backup format.");
-          setTimeout(function() { setExportMsg(""); }, 5000);
-        }
-      } catch (err) {
-        setExportMsg("Error parsing backup: " + err.message);
-        setTimeout(function() { setExportMsg(""); }, 5000);
-      }
-    };
-    reader.readAsText(file);
-  }
-
-  function restoreSecondaryData(file) {
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = async function(e) {
-      try {
-        var raw = e.target.result;
-        var data = JSON.parse(raw);
-        var fileKeys = Object.keys(data);
-        var restored = 0;
-        var details = [];
-        for (var j = 0; j < fileKeys.length; j++) {
-          var key = fileKeys[j];
-          if (!key.startsWith("tb-")) continue;
-          if (key === "tb-alldata-v1" || key === "tb-alldata-backup-v1") continue;
-          var val = data[key];
-          if (val === undefined || val === null) continue;
-          var strVal = typeof val === "string" ? val : JSON.stringify(val);
-          if (strVal === "{}" || strVal === "[]" || strVal === "null" || strVal === "") continue;
-          try { localStorage.setItem(key, strVal); } catch(e2) {}
-          try { await window.storage.set(key, strVal); } catch(e2) {}
-          restored++;
-          details.push(key.replace("tb-","").replace("-v1","") + "(" + (strVal.length/1024).toFixed(0) + "KB)");
-        }
-        try { PRICE_HISTORY = loadPriceHistory(); } catch(e2) {}
-        try { EBAY_BLOCKED = loadEbayBlocked(); } catch(e2) {}
-        try { COMC_OVERRIDES = JSON.parse(localStorage.getItem("tb-comc-overrides-v1") || "{}"); } catch(e2) {}
-        alert("Restored " + restored + " keys:\n" + details.join("\n"));
-        setExportMsg("Restored " + restored + " secondary keys! Switch tabs to see data.");
-        setTimeout(function() { setExportMsg(""); }, 15000);
-      } catch(err) {
-        alert("RESTORE ERROR: " + err.message);
-        setExportMsg("Error: " + err.message);
-        setTimeout(function() { setExportMsg(""); }, 10000);
-      }
-    };
-    reader.readAsText(file);
-  }
-
   function copyRawData() {
     var data = { statuses: statuses, cardDetails: cardDetails, forSaleFlags: forSaleFlags };
     navigator.clipboard.writeText(JSON.stringify(data)).then(function() {
@@ -8554,16 +8397,6 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
             Download Full State Backup (JSON)
           </button>
 
-          <label className="w-full py-2 px-3 bg-amber-700 hover:bg-amber-600 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer">
-            Restore from JSON Backup
-            <input type="file" accept=".json" className="hidden" onChange={function(e) { if (e.target.files[0]) restoreFromJson(e.target.files[0]); e.target.value = ""; }} />
-          </label>
-
-          <label className="w-full py-2 px-3 bg-teal-700 hover:bg-teal-600 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer">
-            Restore Secondary Data (prices, targets, scans)
-            <input type="file" accept=".json" className="hidden" onChange={function(e) { if (e.target.files[0]) restoreSecondaryData(e.target.files[0]); e.target.value = ""; }} />
-          </label>
-
           <button onClick={copyRawData} className="w-full py-2 px-3 bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors">
             Copy State to Clipboard
           </button>
@@ -8583,31 +8416,8 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
   );
 }
 
-
-// Global error handler — shows errors visually instead of white screen
-window.addEventListener("error", function(e) {
-  var root = document.getElementById("root");
-  if (root) root.innerHTML = '<div style="color:#ef4444;background:#1a0505;padding:20px;font-family:monospace;white-space:pre-wrap;margin:20px;">' +
-    '<h2 style="color:#FFC52F;">Tyler Black Tracker — Load Error</h2>' +
-    '<p>Error: ' + (e.message || 'Unknown') + '</p>' +
-    '<p>File: ' + (e.filename || '?') + ' line ' + (e.lineno || '?') + '</p>' +
-    '<p style="color:#666;margin-top:10px;">Your data is safe in localStorage/Supabase. This is a code error, not a data error.</p></div>';
-});
-
 // Mount the app — wait for cloud hydration so useState initializers see hydrated localStorage
 (async function() {
-  try {
-    if (window.storageReady) { try { await window.storageReady; } catch(e) { console.warn("storageReady failed:", e); } }
-    var root = document.getElementById("root");
-    if (!root) { console.error("No #root element"); return; }
-    ReactDOM.createRoot(root).render(React.createElement(TylerBlackTracker));
-  } catch(e) {
-    console.error("Mount error:", e);
-    var root = document.getElementById("root");
-    if (root) root.innerHTML = '<div style="color:#ef4444;background:#1a0505;padding:20px;font-family:monospace;white-space:pre-wrap;margin:20px;">' +
-      '<h2 style="color:#FFC52F;">Tyler Black Tracker — Mount Error</h2>' +
-      '<p>' + e.message + '</p>' +
-      '<pre style="color:#888;font-size:11px;">' + (e.stack || '').substring(0, 500) + '</pre>' +
-      '<p style="color:#666;margin-top:10px;">Your data is safe. Screenshot this and share it.</p></div>';
-  }
+  if (window.storageReady) { try { await window.storageReady; } catch(e) {} }
+  ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(TylerBlackTracker));
 })();
