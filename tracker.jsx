@@ -117,6 +117,118 @@ function globalPriceKey(card) {
   if (!card) return null;
   return card.product.slice(0,4) + "|" + card.product + "|" + card.cardNumber + "|" + (card.cardSet || "Base");
 }
+// === CARD IMAGE SYSTEM ===
+var IMAGE_SOURCES = {
+  comc: { label: "COMC", color: "#f97316", bg: "bg-orange-950/60", border: "border-orange-700", text: "text-orange-400" },
+  personal: { label: "Mine", color: "#3b82f6", bg: "bg-blue-950/60", border: "border-blue-700", text: "text-blue-400" },
+  ebay: { label: "eBay", color: "#eab308", bg: "bg-yellow-950/60", border: "border-yellow-700", text: "text-yellow-400" },
+  other: { label: "Other", color: "#6b7280", bg: "bg-gray-800/60", border: "border-gray-600", text: "text-gray-400" }
+};
+function compressImage(file, maxW, quality) {
+  maxW = maxW || 200; quality = quality || 0.45;
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        var w = img.width, h = img.height;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        var canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = function() { reject(new Error("Failed to load image")); };
+      img.src = e.target.result;
+    };
+    reader.onerror = function() { reject(new Error("Failed to read file")); };
+    reader.readAsDataURL(file);
+  });
+}
+function detectImageSource(url) {
+  if (!url) return "other";
+  if (url.indexOf("img.comc.com") !== -1 || url.indexOf("comc.com") !== -1) return "comc";
+  if (url.indexOf("ebay") !== -1 || url.indexOf("i.ebayimg") !== -1) return "ebay";
+  if (url.indexOf("data:image") === 0) return "personal";
+  return "other";
+}
+function CardImageSection({ cardId, cardDetails, updateCardDetail }) {
+  var d = cardDetails[cardId] || {};
+  var imgUrl = d.imageUrl || "";
+  var imgSrc = d.imageSource || (imgUrl ? detectImageSource(imgUrl) : "");
+  var srcCfg = IMAGE_SOURCES[imgSrc] || IMAGE_SOURCES.other;
+  var [showPanel, setShowPanel] = useState(false);
+  var [pasteUrl, setPasteUrl] = useState("");
+  var [pasteSrc, setPasteSrc] = useState("comc");
+  var [uploading, setUploading] = useState(false);
+  var [showFull, setShowFull] = useState(false);
+  var fileRef = useRef(null);
+  function handlePasteUrl() {
+    if (!pasteUrl.trim()) return;
+    var detected = detectImageSource(pasteUrl.trim());
+    updateCardDetail(cardId, "imageUrl", pasteUrl.trim());
+    updateCardDetail(cardId, "imageSource", pasteSrc || detected);
+    setPasteUrl(""); setShowPanel(false);
+  }
+  function handleFileUpload(e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    compressImage(file, 250, 0.5).then(function(dataUrl) {
+      updateCardDetail(cardId, "imageUrl", dataUrl);
+      updateCardDetail(cardId, "imageSource", "personal");
+      setUploading(false); setShowPanel(false);
+    }).catch(function() { setUploading(false); alert("Failed to process image"); });
+  }
+  function removeImage() {
+    updateCardDetail(cardId, "imageUrl", "");
+    updateCardDetail(cardId, "imageSource", "");
+    setShowFull(false);
+  }
+  return React.createElement("div", { className: "mt-1.5 pt-1 border-t border-gray-800" },
+    React.createElement("div", { className: "text-gray-600 text-[8px] font-bold mb-0.5 tracking-wider flex items-center justify-between" },
+      React.createElement("span", null, "CARD IMAGE"),
+      React.createElement("div", { className: "flex gap-1" },
+        imgUrl && React.createElement("button", { onClick: removeImage, className: "text-red-500 hover:text-red-400 text-[8px]" }, "\u2715 Remove"),
+        React.createElement("button", { onClick: function() { setShowPanel(!showPanel); }, className: "text-cyan-500 hover:text-cyan-400 text-[8px]" }, showPanel ? "Cancel" : (imgUrl ? "Change" : "+ Add"))
+      )
+    ),
+    imgUrl && React.createElement("div", { className: "flex gap-2 items-start mb-1" },
+      React.createElement("div", { className: "relative cursor-pointer flex-shrink-0", onClick: function() { setShowFull(!showFull); } },
+        React.createElement("img", { src: imgUrl, alt: "Card", className: "rounded border border-gray-700 object-cover", style: { width: showFull ? "160px" : "60px", height: "auto", maxHeight: showFull ? "220px" : "84px", transition: "all 0.2s" }, onError: function(e) { e.target.style.display = "none"; } }),
+        React.createElement("div", { className: "absolute top-0 right-0 px-1 rounded-bl text-[7px] font-bold", style: { backgroundColor: srcCfg.color + "dd", color: "#fff" } }, srcCfg.label)
+      ),
+      !showFull && React.createElement("div", { className: "text-[9px] text-gray-500" },
+        React.createElement("div", null, "Source: ", React.createElement("span", { className: srcCfg.text + " font-bold" }, srcCfg.label)),
+        React.createElement("div", { className: "text-gray-700" }, "Click to expand")
+      )
+    ),
+    showPanel && React.createElement("div", { className: "p-1.5 bg-gray-950 rounded border border-gray-700 space-y-1.5", onClick: function(e) { e.stopPropagation(); } },
+      React.createElement("div", null,
+        React.createElement("div", { className: "text-[8px] text-gray-500 mb-0.5" }, "Paste image URL (COMC, eBay, etc.)"),
+        React.createElement("div", { className: "flex gap-1" },
+          React.createElement("input", { type: "text", value: pasteUrl, onChange: function(e) { setPasteUrl(e.target.value); var det = detectImageSource(e.target.value); if (det !== "personal") setPasteSrc(det); }, placeholder: "https://img.comc.com/...", className: "flex-1 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-[10px] outline-none focus:border-cyan-600 text-white" }),
+          React.createElement("select", { value: pasteSrc, onChange: function(e) { setPasteSrc(e.target.value); }, className: "bg-gray-900 border border-gray-700 rounded px-1 py-0.5 text-[10px] text-gray-300" },
+            React.createElement("option", { value: "comc" }, "COMC"),
+            React.createElement("option", { value: "ebay" }, "eBay"),
+            React.createElement("option", { value: "other" }, "Other")
+          ),
+          React.createElement("button", { onClick: handlePasteUrl, disabled: !pasteUrl.trim(), className: "px-2 py-0.5 rounded text-[10px] font-bold " + (pasteUrl.trim() ? "bg-cyan-800 hover:bg-cyan-700 text-white" : "bg-gray-800 text-gray-600") }, "Save")
+        )
+      ),
+      React.createElement("div", { className: "flex items-center gap-2 text-[8px] text-gray-600" },
+        React.createElement("div", { className: "flex-1 border-t border-gray-800" }), "or", React.createElement("div", { className: "flex-1 border-t border-gray-800" })
+      ),
+      React.createElement("div", { className: "flex gap-1" },
+        React.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: handleFileUpload, className: "hidden" }),
+        React.createElement("button", { onClick: function() { if (fileRef.current) { fileRef.current.removeAttribute("capture"); fileRef.current.click(); } }, disabled: uploading, className: "flex-1 px-2 py-1 rounded text-[10px] font-bold bg-blue-900/60 border border-blue-700 text-blue-300 hover:bg-blue-800/60" }, uploading ? "Processing..." : "Upload Photo"),
+        React.createElement("button", { onClick: function() { if (fileRef.current) { fileRef.current.setAttribute("capture", "environment"); fileRef.current.click(); } }, disabled: uploading, className: "flex-1 px-2 py-1 rounded text-[10px] font-bold bg-green-900/60 border border-green-700 text-green-300 hover:bg-green-800/60" }, uploading ? "..." : "Camera")
+      ),
+      React.createElement("div", { className: "text-[7px] text-gray-600" }, "Photos auto-compressed to ~5KB. COMC images allowed with attribution.")
+    )
+  );
+}
 function Sparkline({ card, width, height }) {
   var pk = globalPriceKey(card);
   if (!pk || !PRICE_HISTORY[pk]) return null;
@@ -1344,6 +1456,7 @@ function TylerBlackTracker() {
               <div key={card.id} data-focus-idx={pageCards.indexOf(card)} className={"rounded-sm overflow-hidden " + rowBg + (isFocused ? " ring-1 ring-yellow-400/70 bg-yellow-950/20" : "")}>
                 <div className="flex items-center gap-1 cursor-pointer" style={{padding:"clamp(1px,0.2vw,3px) clamp(3px,0.5vw,8px)"}} onClick={function(){setExpandedCard(isExpanded ? null : card.id);}}>
                   <div className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + cfg.dot} />
+                  {details.imageUrl && <div className="flex-shrink-0 rounded overflow-hidden border border-gray-700" style={{width:"18px",height:"24px"}} title={"Image: " + (IMAGE_SOURCES[details.imageSource] || IMAGE_SOURCES.other).label}><img src={details.imageUrl} alt="" className="w-full h-full object-cover" onError={function(e){e.target.parentElement.style.display="none";}} /></div>}
                   <div className="flex-1 min-w-0 flex items-baseline gap-1 truncate" style={{fontSize:"clamp(9px,1.2vw,12px)"}}>
                     <span className="font-semibold text-white whitespace-nowrap">#{card.cardNumber}</span>
                     <span className="text-gray-300 truncate">{card.cardSet}</span>
@@ -1434,6 +1547,7 @@ function TylerBlackTracker() {
                         </div>
                       )}
                     </div>
+                    <div className="col-span-2"><CardImageSection cardId={card.id} cardDetails={cardDetails} updateCardDetail={updateCardDetail} /></div>
                   </div>
                 )}
               </div>
@@ -2336,6 +2450,7 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
               <button onClick={function() { setDetailedProductFilter(selectedCard.product); setDetailedCardNumFilter(null); setDetailedStatusFilter("all"); setDetailedSnFilter("all"); setActiveTab("detailed"); }} className="py-0.5 px-1.5 rounded bg-gray-800/60 border border-gray-700 text-gray-400 hover:bg-gray-700/50 font-bold" title="View full set in Detailed tab">Full Set</button>
             </div>
           </div>
+          <CardImageSection cardId={selectedCard.id} cardDetails={cardDetails} updateCardDetail={updateCardDetail} />
         </div>
       )}
     </div>
@@ -2885,6 +3000,7 @@ function CleanupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, 
                     <a href={variantOnlyUrl(card)} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-0.5 bg-purple-900/40 border border-purple-700 text-purple-300 rounded hover:bg-purple-800/40" title="Search this variant without player name">Variant</a>
                     <a href={pt130Url(card)} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-0.5 bg-teal-900/40 border border-teal-700 text-teal-300 rounded hover:bg-teal-800/40">130pt</a>
                   </div>
+                  <CardImageSection cardId={card.id} cardDetails={cardDetails} updateCardDetail={updateCardDetail} />
                 </div>
               )}
             </div>
@@ -7861,6 +7977,7 @@ function TaskBoardPanel() {
 }
 function VersionLogPanel() {
   var VERSION_HISTORY = [
+    { date: "2026-03-12 20:00", change: "CARD IMAGE SYSTEM: Add images to any card via URL paste (COMC, eBay) or camera/upload from phone. Photos auto-compressed to ~5KB thumbnails stored in cardDetails via Supabase. Source badges: COMC (orange), Mine (blue), eBay (yellow), Other (gray). Auto-detects source from URL. Image section in Collection expanded detail, Lookup detail, Detailed panel. Tiny thumbnail in card rows when image exists.", verified: false },
     { date: "2026-02-22 01:00", change: "TCDB COMPARISON SCANNER: New 'TCDB' mode in Scanner tab. (1) Paste your TCDB collection page (Have/Want/In-Transit) — auto-detects which list from header text. (2) Parses card lines by year+product+variant+cardNumber pattern. (3) Matches to tracker DB using existing matchToCards engine. (4) Compares TCDB status vs tracker status, highlighting mismatches. (5) Filter by Mismatch/Match/Unmatched/All. (6) Individual 'Fix' buttons update tracker status to match TCDB. (7) Bulk 'Fix All' button for mass mismatch resolution. (8) Deduplicates matched cards. Also: removed card preview images (TCDB blocks embedding), removed t18 from backlog.", verified: false },
     { date: "2026-02-21 18:30", change: "TCDB PASTE AND VERIFY: New Paste and Verify mode in Sync tab. Paste TCDB collection page text (tab-separated tables, checklist views, plain text). Parser extracts card numbers with set context headers. Fuzzy matcher finds cards by (cardNumber, year, product) with variant tiebreaker. Bulk Verify All or individual verify buttons. Already-synced cards show green checkmarks. Unmatched lines listed for manual review. Verified cards removed from Sync queue. Player-agnostic parser foundation for V2/V3.", verified: false },
     { date: "2026-02-21 03:00", change: "BREWERS COLOR THEME: Complete visual overhaul inspired by Milwaukee Brewers palette. (1) Navy-dark backgrounds (#0a1628 base, #111a2e panels) replace pure gray. (2) Brewers gold (#FFC52F) replaces green for owned status, title, progress bar, tab accents, header stats. (3) Blue (#5b9bd5) for in-transit. (4) Summary panel text brightened throughout — headers gold, labels cream/slate, counts visible. (5) Collection card rows: gold border-left for owned, brighter variant text, brighter product names. (6) Gauge arc gold, bar tracks navy instead of dark red. (7) Scanner header gold. (8) $ toggle defaults hidden, ultra-subtle. (9) Price history readers fixed for flat array format.", verified: false },
