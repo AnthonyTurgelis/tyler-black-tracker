@@ -708,8 +708,10 @@ function TylerBlackTracker() {
         } catch(e2) { diagParts.push("localStorage backup read error: " + e2.message); }
       }
       // If no consolidated data, or consolidated data is missing the migration flag
-      // (meaning a broken build may have written partial data), try legacy keys
-      if (!allData || !allData._migrationComplete) {
+      // (meaning a broken build may have written partial data), try legacy keys.
+      // GUARD: legacy keys are TB-only (`tb-statuses-v2`, etc.). In WNBA mode we must
+      // never read from them — doing so would contaminate `tempo-alldata-v1` with TB data.
+      if ((typeof window === "undefined" || window.MODE !== "wnba") && (!allData || !allData._migrationComplete)) {
         if (!allData) allData = {};
         var legacyKeys = [
           ["tb-statuses-v2", "statuses"],
@@ -756,24 +758,33 @@ function TylerBlackTracker() {
       var changelogArr = allData.changelog || [];
       // Build statuses
       const merged = { ...stored };
-      PRESET_OWNED.forEach(id => { if (!merged[id]) merged[id] = "owned"; });
-      PRESET_INTRANSIT.forEach(id => { if (!merged[id]) merged[id] = "in_transit"; });
+      // GUARD: PRESET_OWNED / PRESET_INTRANSIT are TB-only seed lists baked into RAW_DATA.
+      // Applying them in WNBA mode would falsely mark WNBA cards as owned/in-transit
+      // by ID collision (e.g. TB card #2 → WNBA card #2).
+      if (typeof window === "undefined" || window.MODE !== "wnba") {
+        PRESET_OWNED.forEach(id => { if (!merged[id]) merged[id] = "owned"; });
+        PRESET_INTRANSIT.forEach(id => { if (!merged[id]) merged[id] = "in_transit"; });
+      }
       // Migrate old for_sale statuses
       Object.entries(merged).forEach(([id, s]) => {
         if (s === "for_sale") { merged[id] = "owned"; fsFlags[id] = true; }
       });
       setForSaleFlags(fsFlags);
       setStatuses(merged);
-      // Build details from presets + user edits
+      // Build details from presets + user edits.
+      // GUARD: PRESET_DETAILS is TB-only — applying it in WNBA mode would attach TB
+      // serial numbers / prices / notes to WNBA cards by ID collision.
       const mergedDetails = {};
-      Object.entries(PRESET_DETAILS).forEach(([id, d]) => {
-        mergedDetails[id] = {};
-        if (d.s) mergedDetails[id].serial = d.s;
-        if (d.p) mergedDetails[id].price = d.p;
-        if (d.d) mergedDetails[id].date = d.d;
-        if (d.n) mergedDetails[id].notes = d.n;
-        if (d.pr) mergedDetails[id].printRun = d.pr;
-      });
+      if (typeof window === "undefined" || window.MODE !== "wnba") {
+        Object.entries(PRESET_DETAILS).forEach(([id, d]) => {
+          mergedDetails[id] = {};
+          if (d.s) mergedDetails[id].serial = d.s;
+          if (d.p) mergedDetails[id].price = d.p;
+          if (d.d) mergedDetails[id].date = d.d;
+          if (d.n) mergedDetails[id].notes = d.n;
+          if (d.pr) mergedDetails[id].printRun = d.pr;
+        });
+      }
       Object.entries(details).forEach(([id, d]) => {
         mergedDetails[id] = { ...(mergedDetails[id] || {}), ...d };
       });
