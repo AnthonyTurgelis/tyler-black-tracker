@@ -177,6 +177,16 @@ function cardYear(card) {
   }
   return "";
 }
+// getCardQty: how many physical copies the user has of a card.
+// - If cardDetails[id].qty is set explicitly, use that.
+// - Otherwise infer from status: owned/in_transit -> 1, else 0.
+// This keeps existing TB data working without migration.
+function getCardQty(cardDetails, statuses, cardId) {
+  var d = cardDetails && cardDetails[cardId];
+  if (d && d.qty != null && d.qty !== "" && !isNaN(parseInt(d.qty))) return Math.max(0, parseInt(d.qty));
+  var s = statuses && statuses[cardId];
+  return (s === "owned" || s === "in_transit") ? 1 : 0;
+}
 function tcdbUrl(card) {
   // Priority 1: user-corrected links
   var fix = card && TCDB_USER_FIXES[card.id];
@@ -1060,6 +1070,35 @@ function TylerBlackTracker() {
       return next;
     });
   }, [saveStatuses, pushUndo, logChange, persistField]);
+  // adjustCardQty: change owned-copy count by `delta` (positive or negative). If qty
+  // crosses 0->1, auto-set status to in_transit (newly-acquired). If crosses 1+ -> 0,
+  // auto-set status to not_owned. Setting an explicit value uses setCardQty below.
+  const adjustCardQty = useCallback((cardId, delta) => {
+    if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
+    var current = getCardQty(cardDetails, statuses, cardId);
+    var next = Math.max(0, current + (delta || 0));
+    if (next === current) return;
+    updateCardDetail(cardId, "qty", String(next));
+    var prevStatus = statuses[cardId] || "not_owned";
+    if (current === 0 && next >= 1 && prevStatus === "not_owned") {
+      setCardStatus(cardId, "in_transit");
+    } else if (current >= 1 && next === 0 && (prevStatus === "owned" || prevStatus === "in_transit")) {
+      setCardStatus(cardId, "not_owned");
+    }
+  }, [cardDetails, statuses, updateCardDetail, setCardStatus]);
+  const setCardQty = useCallback((cardId, newQty) => {
+    if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
+    var current = getCardQty(cardDetails, statuses, cardId);
+    var n = Math.max(0, parseInt(newQty) || 0);
+    if (n === current) return;
+    updateCardDetail(cardId, "qty", String(n));
+    var prevStatus = statuses[cardId] || "not_owned";
+    if (current === 0 && n >= 1 && prevStatus === "not_owned") {
+      setCardStatus(cardId, "in_transit");
+    } else if (current >= 1 && n === 0 && (prevStatus === "owned" || prevStatus === "in_transit")) {
+      setCardStatus(cardId, "not_owned");
+    }
+  }, [cardDetails, statuses, updateCardDetail, setCardStatus]);
   const toggleStatus = useCallback((cardId) => {
     setSessionChanges(prev => prev + 1);
     setStatuses(prev => {
@@ -2450,13 +2489,17 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
               <span className="text-gray-500 w-10">Notes</span>
               <input type="text" value={d.notes || ""} onChange={function(e) { updateCardDetail(selectedCard.id, "notes", e.target.value); }} placeholder="..." className="flex-1 bg-gray-950 border border-gray-700 rounded px-1 py-0 text-white outline-none" />
             </div>
-            {(fs === "owned" || fs === "in_transit") && <div className="flex items-center gap-1">
-              <span className="text-gray-500 w-10">Qty</span>
-              <button onClick={function(){var q=Math.max(1,parseInt(d.qty||"1")-1); updateCardDetail(selectedCard.id,"qty",String(q));}} className="bg-gray-800 border border-gray-700 rounded w-5 h-5 text-gray-400 hover:text-white hover:bg-gray-700 font-bold text-[10px] flex items-center justify-center">-</button>
-              <input type="number" min="1" value={d.qty || "1"} onChange={function(e) { updateCardDetail(selectedCard.id, "qty", e.target.value); }} className="w-10 text-center bg-gray-950 border border-gray-700 rounded px-1 py-0 text-white outline-none" />
-              <button onClick={function(){var q=parseInt(d.qty||"1")+1; updateCardDetail(selectedCard.id,"qty",String(q));}} className="bg-gray-800 border border-gray-700 rounded w-5 h-5 text-gray-400 hover:text-white hover:bg-gray-700 font-bold text-[10px] flex items-center justify-center">+</button>
-              {parseInt(d.qty || "1") > 1 && <span className="text-pink-400 text-[9px]">extra for sale/trade</span>}
-            </div>}
+            {(function() {
+              var curQty = getCardQty(cardDetails, statuses, selectedCard.id);
+              return <div className="flex items-center gap-1 col-span-2">
+                <span className="text-gray-500 w-10">Qty</span>
+                <button onClick={function(){ adjustCardQty(selectedCard.id, -1); }} className="bg-gray-800 border border-gray-700 rounded w-5 h-5 text-gray-400 hover:text-white hover:bg-gray-700 font-bold text-[10px] flex items-center justify-center" title={curQty <= 1 ? "Down to 0 (sets status to not owned)" : "Decrement quantity"}>-</button>
+                <input type="number" min="0" value={curQty} onChange={function(e){ setCardQty(selectedCard.id, e.target.value); }} className="w-10 text-center bg-gray-950 border border-gray-700 rounded px-1 py-0 text-white outline-none" />
+                <button onClick={function(){ adjustCardQty(selectedCard.id, 1); }} className="bg-gray-800 border border-gray-700 rounded w-5 h-5 text-gray-400 hover:text-white hover:bg-gray-700 font-bold text-[10px] flex items-center justify-center" title={curQty === 0 ? "Add 1 copy (sets status to in-transit)" : "Increment quantity"}>+</button>
+                {curQty > 1 && <span className="text-green-400 font-black text-[10px] bg-green-950/40 border border-green-800 rounded px-1">{"+" + (curQty - 1) + " extra"}</span>}
+                {curQty === 0 && fs !== "not_owned" && <span className="text-orange-400 text-[8px]">(0 — click + to acquire)</span>}
+              </div>;
+            })()}
           </div>
           {/* === SEARCH LINKS === */}
           <div className="mt-1.5 pt-1 border-t border-gray-800">
@@ -2598,7 +2641,20 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
       else if (sortCol === "product") { av = a.product; bv = b.product; }
       else if (sortCol === "number") { av = a.cardNumber; bv = b.cardNumber; }
       else if (sortCol === "variant") { av = a.cardSet; bv = b.cardSet; }
-      else if (sortCol === "sn") { av = a.copies || ""; bv = b.copies || ""; }
+      else if (sortCol === "sn") {
+        // Sort primarily by user-entered serial number (e.g. 57/99 -> 57). If a card
+        // has no serial entered, fall back to print run (smaller print = higher rarity, sort first).
+        var aSerial = parseInt((da.serial || "").replace(/[^0-9]/g, ""));
+        var bSerial = parseInt((db.serial || "").replace(/[^0-9]/g, ""));
+        if (!isNaN(aSerial) && !isNaN(bSerial)) { av = aSerial; bv = bSerial; }
+        else if (!isNaN(aSerial)) { av = aSerial; bv = 999999; }
+        else if (!isNaN(bSerial)) { av = 999999; bv = bSerial; }
+        else { av = parseInt(a.copies) || 999999; bv = parseInt(b.copies) || 999999; }
+      }
+      else if (sortCol === "qty") {
+        av = getCardQty(cardDetails, statuses, a.id);
+        bv = getCardQty(cardDetails, statuses, b.id);
+      }
       else if (sortCol === "serial") { av = da.serial || ""; bv = db.serial || ""; }
       else if (sortCol === "price") { av = parseFloat((da.price || "0").replace(/[^0-9.]/g, "")) || 0; bv = parseFloat((db.price || "0").replace(/[^0-9.]/g, "")) || 0; }
       else if (sortCol === "date") { av = da.date || ""; bv = db.date || ""; }
@@ -2775,9 +2831,15 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
                     var serialVal = dd.serial || "";
                     var hasSN = card.copies || isMissingSN(card, cardDetails);
                     var isMSN = isMissingSN(card, cardDetails);
+                    var qty = getCardQty(cardDetails, statuses, card.id);
                     return <span className="flex items-center gap-0.5">
                       {eff ? <span className="text-yellow-400 font-black" style={{fontSize:"11px"}}>{"/" + eff}</span> : isMSN ? <span className="text-orange-400 font-black text-[9px]">SN?</span> : <span className="text-gray-700">-</span>}
                       {hasSN && <input type="text" value={serialVal} onChange={function(e) { updateCardDetail(card.id, "serial", e.target.value); }} placeholder="#" className={"bg-transparent border-b font-black focus:border-yellow-400 w-8 outline-none " + (serialVal ? "text-yellow-300 border-yellow-700" : isMSN ? "text-gray-500 border-orange-700" : "text-gray-500 border-gray-700")} style={{fontSize: "11px"}} />}
+                      {/* Inline qty controls — minus, count when >0, plus */}
+                      <button onClick={function(e){ e.stopPropagation(); adjustCardQty(card.id, -1); }} className="bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white font-bold leading-none ml-0.5 px-0.5" style={{fontSize:"10px",minWidth:"12px"}} title={qty <= 1 ? "0 = not owned" : "-1 copy"}>-</button>
+                      <span className={"font-black " + (qty === 0 ? "text-gray-600" : qty > 1 ? "text-green-400" : "text-cyan-300")} style={{fontSize:"10px",minWidth:"10px",textAlign:"center"}}>{qty}</span>
+                      <button onClick={function(e){ e.stopPropagation(); adjustCardQty(card.id, 1); }} className="bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white font-bold leading-none px-0.5" style={{fontSize:"10px",minWidth:"12px"}} title={qty === 0 ? "+1 (sets in-transit)" : "+1 copy"}>+</button>
+                      {qty > 1 && <span className="text-green-400 font-black ml-0.5" style={{fontSize:"9px"}} title={(qty-1) + " extra copy" + (qty-1 > 1 ? "s" : "")}>{"+" + (qty-1)}</span>}
                     </span>;
                   })()}</td>
                   {!hidePrices && <td className="px-0.5 py-0.5"><input type="text" value={d.price ? displayPrice(d.price) : ""} onChange={function(e) { updateCardDetail(card.id, "price", formatPrice(e.target.value)); }} onBlur={function() { if (d.price) updateCardDetail(card.id, "price", displayPrice(d.price)); }} placeholder="-" className="bg-transparent border-b border-gray-700 focus:border-gray-400 w-12 text-white outline-none" style={{fontSize: "9px"}} />{(function() { var tp = getLowestTargetPrice(card.id, targetByCardId); return tp ? <span onClick={function() { setTargetCardFilter(card.id); setActiveTab("targets"); }} className="text-pink-400 font-bold cursor-pointer hover:text-pink-300 text-[7px] ml-0.5" title={"🎯 $" + tp.toFixed(2)}>{"🎯"}</span> : null; })()}{(function() { if (s !== "not_owned") return null; var sp = getLowestScannerPrice(card); return sp ? <span className="text-cyan-500 text-[7px] ml-0.5" title={"Cheapest: $" + sp.toFixed(2)}>{"🔍"}</span> : null; })()}</td>}
