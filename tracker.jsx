@@ -1132,7 +1132,7 @@ function TylerBlackTracker() {
     const notOwned1of1 = total1of1 - owned1of1;
     return { total: visibleTotal, owned, inTransit, notOwned, owned1of1, total1of1, notOwned1of1, forSale, dupeTransit, dupeSale, dupeComc, notSynced, totalSpent };
   }, [statuses, cardDetails, forSaleFlags]);
-  const years = useMemo(() => [...new Set(ALL_CARDS.map(c => c.product.match(/^\d{4}/)?.[0]).filter(Boolean))].sort(), []);
+  const years = useMemo(() => [...new Set(ALL_CARDS.map(c => cardYear(c) || c.product.match(/^\d{4}/)?.[0]).filter(Boolean))].sort(), []);
   const cardNumbers = useMemo(() => {
     var nums = [...new Set(ALL_CARDS.map(c => c.cardNumber))];
     nums.sort((a, b) => { var an = parseInt(a), bn = parseInt(b); if (!isNaN(an) && !isNaN(bn)) return an - bn; return a.localeCompare(b); });
@@ -1720,6 +1720,7 @@ function ProgressBar({ label, owned, transit, total, sub }) {
   );
 }
 function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDetailedSnFilter }) {
+  var trackerMode = useTrackerMode();
   var [view, setView] = useState("dashboard"); // dashboard, heatmap, breakdown
   var [splitBy, setSplitBy] = useState("year");
   var [expanded, setExpanded] = useState(null);
@@ -1728,6 +1729,15 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
   var [includeBlankSN, setIncludeBlankSN] = useState(true);
   var [exclude1of1, setExclude1of1] = useState(false);
   var [rookieOnly, setRookieOnly] = useState(false);
+  // WNBA-only: filter stats to a single player. null = all players.
+  var [selectedPlayer, setSelectedPlayer] = useState(null);
+  // Build the active player list once. Only relevant in WNBA mode.
+  var playerList = useMemo(function() {
+    if (trackerMode !== "wnba" || typeof window === "undefined" || !window.TEMPO_ROSTER) return [];
+    return Object.keys(window.TEMPO_ROSTER)
+      .filter(function(k) { var p = window.TEMPO_ROSTER[k]; return p.active && p.role !== "coach"; })
+      .map(function(k) { return { key: k, name: window.TEMPO_ROSTER[k].name }; });
+  }, [trackerMode]);
 
   var PRESETS = [
     {label:"All",sn:1,blank:true,ex1:false},
@@ -1758,6 +1768,8 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
     var owned=0,transit=0,total=0,sps=0,spsAcq=0,ssps=0,sspsAcq=0;
     var byYear={},byBrand={},byProduct={},cardsByProduct={};
     cards.forEach(function(card) {
+      // WNBA player filter — only include cards for the selected player when one is chosen
+      if (selectedPlayer && card.player !== selectedPlayer) return;
       if (!passesFilter(card, minSN, inclBlank, ex1of1, unnumOnly, spOnly)) return;
       var s = sts[card.id] || "not_owned";
       var acq = s==="owned"||s==="in_transit" ? 1 : 0;
@@ -1767,7 +1779,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
       var tag = SSP_TAGS[card.cardSet];
       if (tag === "SP") { sps++; spsAcq += acq; }
       if (tag === "SSP") { ssps++; sspsAcq += acq; }
-      var year = card.product.slice(0,4);
+      var year = cardYear(card) || card.product.slice(0,4); // cardYear handles WNBA (numeric year field) + TB (year-prefix product)
       var brand = getBrand(card.product);
       var prod = card.product;
       function add(map, key) {
@@ -1785,14 +1797,14 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
 
   var stats = useMemo(function() {
     return calcStats(ALL_CARDS, statuses, snMin, includeBlankSN, exclude1of1, false, false);
-  }, [statuses, snMin, includeBlankSN, exclude1of1, rookieOnly]);
+  }, [statuses, snMin, includeBlankSN, exclude1of1, rookieOnly, selectedPlayer]);
 
   var presetStats = useMemo(function() {
     return PRESETS.map(function(p) {
       var s = calcStats(ALL_CARDS, statuses, p.sn, p.blank, p.ex1, p.unnumOnly, p.spOnly);
       return {label:p.label, pct: s.total ? ((s.owned+s.transit)/s.total*100) : 0, owned:s.owned, transit:s.transit, total:s.total, sn:p.sn, blank:p.blank, ex1:p.ex1, unnumOnly:p.unnumOnly, spOnly:p.spOnly, snKey:p.snKey};
     });
-  }, [statuses, rookieOnly]);
+  }, [statuses, rookieOnly, selectedPlayer]);
 
   var pct = stats.total ? (stats.owned+stats.transit)/stats.total*100 : 0;
   var pctOwned = stats.total ? stats.owned/stats.total*100 : 0;
@@ -1885,6 +1897,23 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
       {/* ============ DASHBOARD VIEW ============ */}
       {view === "dashboard" && (
         <div className="space-y-1">
+          {/* WNBA-only: player filter chips. Hidden in TB mode. */}
+          {trackerMode === "wnba" && playerList.length > 0 && (
+            <div className="flex flex-wrap gap-1 items-center px-1 pb-0.5" style={{borderBottom:"1px solid #1a2d4a"}}>
+              <span className="font-bold mr-1" style={{color:"#a855f7",fontSize:"clamp(8px,0.9vw,10px)"}}>Player:</span>
+              <button onClick={function(){ setSelectedPlayer(null); }}
+                className={"px-1.5 py-0.5 rounded font-semibold transition-colors "+
+                  (selectedPlayer===null ? "bg-purple-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700")}
+                style={{fontSize:"clamp(8px,0.9vw,10px)"}}>All</button>
+              {playerList.map(function(p) {
+                return (<button key={p.key} onClick={function(){ setSelectedPlayer(p.key); }}
+                  className={"px-1.5 py-0.5 rounded font-semibold transition-colors "+
+                    (selectedPlayer===p.key ? "bg-purple-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700")}
+                  style={{fontSize:"clamp(8px,0.9vw,10px)"}}
+                  title={p.name}>{p.name.split(" ").pop()}</button>);
+              })}
+            </div>
+          )}
           {/* TOP ROW: Gauge+stats LEFT, By Year RIGHT */}
           <div className="flex gap-1.5 items-stretch">
             {/* Gauge + legend */}
@@ -2507,7 +2536,7 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
   }, [initialProductFilter, initialCardNumFilter]);
   
   var PAGE_SIZE = 50;
-  var years = useMemo(function() { return [...new Set(ALL_CARDS.map(function(c) { return c.product.slice(0,4); }))].sort(); }, []);
+  var years = useMemo(function() { return [...new Set(ALL_CARDS.map(function(c) { return cardYear(c) || c.product.slice(0,4); }))].sort(); }, []);
   var filteredProducts = useMemo(function() {
     var cards = dYear === "all" ? ALL_CARDS : ALL_CARDS.filter(function(c) { return c.product.startsWith(dYear); });
     return [...new Set(cards.map(function(c) { return c.product; }))].sort();
@@ -2813,7 +2842,7 @@ function CleanupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, 
     return issues;
   }
 
-  var years = useMemo(function() { return [...new Set(ALL_CARDS.map(function(c) { return c.product.slice(0,4); }))].sort(); }, []);
+  var years = useMemo(function() { return [...new Set(ALL_CARDS.map(function(c) { return cardYear(c) || c.product.slice(0,4); }))].sort(); }, []);
   var filteredProducts = useMemo(function() {
     var cards = cYear === "all" ? ALL_CARDS : ALL_CARDS.filter(function(c) { return c.product.startsWith(cYear); });
     return [...new Set(cards.map(function(c) { return c.product; }))].sort();
