@@ -357,10 +357,25 @@ var CARD_BY_ID = {};
 ALL_CARDS.forEach(function(c) { CARD_BY_ID[c.id] = c; });
 const PRESET_OWNED = new Set(RAW_DATA.owned || []);
 const PRESET_INTRANSIT = new Set(RAW_DATA.intransit || []);
-const DUPES = RAW_DATA.dupes || [];
+const TB_DUPES = RAW_DATA.dupes || [];
+let DUPES = TB_DUPES;
 // Duplicate dedup: HIDDEN_DUPES are non-primary IDs for identical cards (same product/cardNumber/variant/copies)
 // These are hidden from collection display. Primary card gets qty > 1 when user owns extra copies.
-const HIDDEN_DUPES = new Set([34,111,129,295,343,353,356,417,436,465,526,528,678,740,746,876,879,1063,1093,1104,1137,1187,1285,1328,1330,1336,1374,1383,1388,1445,1446,1447,1448,1449,1450,1451,1452,1453,1454,1455,1456,1457,1458,1459,1460,1461,1462,1463,1464,1465,1466,1467,1468,1469,1470,1471]);
+// TB_HIDDEN_DUPES is TB-specific. In WNBA mode HIDDEN_DUPES becomes empty set (WNBA tempo_data has no dupes baked in).
+const TB_HIDDEN_DUPES = new Set([34,111,129,295,343,353,356,417,436,465,526,528,678,740,746,876,879,1063,1093,1104,1137,1187,1285,1328,1330,1336,1374,1383,1388,1445,1446,1447,1448,1449,1450,1451,1452,1453,1454,1455,1456,1457,1458,1459,1460,1461,1462,1463,1464,1465,1466,1467,1468,1469,1470,1471]);
+let HIDDEN_DUPES = TB_HIDDEN_DUPES;
+// Swap DUPES/HIDDEN_DUPES on mode change so TB IDs don't poison WNBA card lookups
+if (typeof window !== "undefined") {
+  window.addEventListener("modechange", function(e) {
+    if (e.detail.mode === "wnba") {
+      DUPES = [];
+      HIDDEN_DUPES = new Set();
+    } else {
+      DUPES = TB_DUPES;
+      HIDDEN_DUPES = TB_HIDDEN_DUPES;
+    }
+  });
+}
 const DUPE_QTY_INIT = {33:1,294:1,875:1,878:1}; // primary cards with extra statused copies
 const NOT_SYNCED = new Set(RAW_DATA.not_synced || []);
 const NOT_ON_TCDB = new Set([1472,1473,1474,1475,1476,1477,1478,1479]);
@@ -1173,12 +1188,24 @@ function TylerBlackTracker() {
     const notOwned1of1 = total1of1 - owned1of1;
     return { total: visibleTotal, owned, inTransit, notOwned, owned1of1, total1of1, notOwned1of1, forSale, dupeTransit, dupeSale, dupeComc, notSynced, totalSpent };
   }, [statuses, cardDetails, forSaleFlags]);
-  const years = useMemo(() => [...new Set(ALL_CARDS.map(c => cardYear(c) || c.product.match(/^\d{4}/)?.[0]).filter(Boolean))].sort(), []);
+  // Smart filters: each dropdown only shows options that are still valid given the OTHER active filters.
+  // years respects player+product (so picking a player narrows the year dropdown to that player's cards)
+  const years = useMemo(() => {
+    var cards = ALL_CARDS;
+    if (filterPlayer) cards = cards.filter(c => c.player === filterPlayer);
+    if (filterProduct !== "all") cards = cards.filter(c => c.product === filterProduct);
+    return [...new Set(cards.map(c => cardYear(c) || c.product.match(/^\d{4}/)?.[0]).filter(Boolean))].sort();
+  }, [filterPlayer, filterProduct]);
+  // cardNumbers respects player+year+product
   const cardNumbers = useMemo(() => {
-    var nums = [...new Set(ALL_CARDS.map(c => c.cardNumber))];
+    var cards = ALL_CARDS;
+    if (filterPlayer) cards = cards.filter(c => c.player === filterPlayer);
+    if (filterYear !== "all") cards = cards.filter(c => cardYear(c) === filterYear);
+    if (filterProduct !== "all") cards = cards.filter(c => c.product === filterProduct);
+    var nums = [...new Set(cards.map(c => c.cardNumber))];
     nums.sort((a, b) => { var an = parseInt(a), bn = parseInt(b); if (!isNaN(an) && !isNaN(bn)) return an - bn; return a.localeCompare(b); });
     return nums;
-  }, []);
+  }, [filterPlayer, filterYear, filterProduct]);
   const filteredProducts = useMemo(() => {
     let cards = ALL_CARDS;
     // Use cardYear() so WNBA cards (numeric `year` field) work, not just TB prefix-style
@@ -1210,6 +1237,10 @@ function TylerBlackTracker() {
   const pageCards = filtered.slice(page * pageSize, (page + 1) * pageSize);
   useEffect(() => { setPage(0); }, [filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer]);
   useEffect(() => { if (filterProduct !== "all" && !filteredProducts.includes(filterProduct)) setFilterProduct("all"); }, [filterYear, filterPlayer]);
+  // Auto-reset year if it's no longer valid for the new player
+  useEffect(() => { if (filterYear !== "all" && !years.includes(filterYear)) setFilterYear("all"); }, [filterPlayer, filterProduct]);
+  // Auto-reset card# if it's no longer valid for current filters
+  useEffect(() => { if (filterCardNum && !cardNumbers.includes(filterCardNum)) setFilterCardNum(""); }, [filterPlayer, filterYear, filterProduct]);
   // Reset focus when page/filters change
   useEffect(function() { setFocusIdx(-1); }, [page, filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer]);
   // Build the WNBA active player list for filter chips. Empty in TB mode.
