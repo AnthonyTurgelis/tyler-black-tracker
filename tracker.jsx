@@ -165,6 +165,18 @@ function Sparkline({ card, width, height }) {
     React.createElement("polyline", { points: pts, fill: "none", stroke: lastColor, strokeWidth: "1.2", strokeLinecap: "round", strokeLinejoin: "round" })
   );
 }
+// cardYear: prefer explicit numeric `card.year` (WNBA cards), fall back to product
+// regex (TB cards encode year as "2024 Topps Update" prefix). Returns string for
+// consistency with existing call sites that expect string output.
+function cardYear(card) {
+  if (!card) return "";
+  if (card.year != null && card.year !== "") return String(card.year);
+  if (card.product) {
+    var m = card.product.match(/^(\d{4})/);
+    if (m) return m[1];
+  }
+  return "";
+}
 function tcdbUrl(card) {
   // Priority 1: user-corrected links
   var fix = card && TCDB_USER_FIXES[card.id];
@@ -1207,7 +1219,7 @@ function TylerBlackTracker() {
       {/* STICKY HEADER */}
       <div className="flex-shrink-0 backdrop-blur-sm border-b z-30" style={{background:"rgba(10,22,40,0.97)",borderColor:"#1a2d4a",padding:"clamp(2px,0.3vw,4px) clamp(4px,0.6vw,12px)"}}>
         <div className="flex items-center gap-1.5">
-          <span className="font-black tracking-tight whitespace-nowrap" style={{color:"#FFC52F",fontSize:"clamp(13px,1.8vw,18px)"}}>TYLER BLACK</span>
+          <span className="font-black tracking-tight whitespace-nowrap" style={{color: trackerMode === "wnba" ? "#a855f7" : "#FFC52F", fontSize:"clamp(13px,1.8vw,18px)"}}>{trackerMode === "wnba" ? "TORONTO TEMPO" : "TYLER BLACK"}</span>
           <div className="flex-1 rounded-full h-1.5 overflow-hidden min-w-8 max-w-24" style={{background:"#1a2d4a"}}>
             <div className="h-full flex">
               <button 
@@ -8675,7 +8687,14 @@ window.addEventListener("error", function(e) {
     if (window.storageReady) { try { await window.storageReady; } catch(e) { console.warn("storageReady failed:", e); } }
     var root = document.getElementById("root");
     if (!root) { console.error("No #root element"); return; }
-    ReactDOM.createRoot(root).render(React.createElement(TylerBlackTracker));
+    // Wrapper component: forces a full remount of TylerBlackTracker when mode changes,
+    // so all useState / useMemo / useEffect re-initialize and data reloads from the
+    // correct mode-prefixed storage key. State loss across mode switch is intentional.
+    function TrackerRoot() {
+      var mode = useTrackerMode();
+      return React.createElement(TylerBlackTracker, { key: mode });
+    }
+    ReactDOM.createRoot(root).render(React.createElement(TrackerRoot));
   } catch(e) {
     console.error("Mount error:", e);
     var root = document.getElementById("root");
