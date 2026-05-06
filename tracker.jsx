@@ -518,6 +518,8 @@ function TylerBlackTracker() {
   useEffect(() => {
     function handleBeforeUnload() {
       if (window._skipBeforeUnloadSave) return;
+      // GUARD: abort if mode toggled mid-flight (data is for old mode, would contaminate new mode's storage)
+      if (loadedModeRef.current && loadedModeRef.current !== window.MODE) return;
       if (loadComplete.current && allDataRef.current._migrationComplete) {
         allDataRef.current._saveTimestamp = Date.now();
         var payload = JSON.stringify(allDataRef.current);
@@ -529,6 +531,8 @@ function TylerBlackTracker() {
     }
     function handleVisibilityChange() {
       if (window._skipBeforeUnloadSave) return;
+      // GUARD: abort if mode toggled mid-flight
+      if (loadedModeRef.current && loadedModeRef.current !== window.MODE) return;
       if (document.hidden && loadComplete.current && allDataRef.current._migrationComplete) {
         allDataRef.current._saveTimestamp = Date.now();
         var payload = JSON.stringify(allDataRef.current);
@@ -545,6 +549,8 @@ function TylerBlackTracker() {
     if (loading) return;
     function doBackup() {
       if (!loadComplete.current) return;
+      // GUARD: abort if mode toggled mid-flight (timer captured stale closure)
+      if (loadedModeRef.current && loadedModeRef.current !== window.MODE) return;
       allDataRef.current._saveTimestamp = Date.now();
       var payload = JSON.stringify(allDataRef.current);
       try {
@@ -572,6 +578,10 @@ function TylerBlackTracker() {
   const allDataRef = useRef({});
   const savePending = useRef(false);
   const loadComplete = useRef(false); // Guard: prevents saves before data loads
+  // GUARD: tracks which mode (tb/wnba) the data was loaded for. If window.MODE
+  // differs from this when a save fires, the save is from a stale closure (mode
+  // toggled mid-flight) and must be aborted to prevent cross-mode contamination.
+  const loadedModeRef = useRef(null);
 
   // Debounced single-key save: coalesces all changes into one write
   const flushSave = useCallback(async () => {
@@ -579,6 +589,11 @@ function TylerBlackTracker() {
     // CRITICAL GUARD: Never save before load completes - would wipe real data with empty {}
     if (!loadComplete.current || !allDataRef.current._migrationComplete) {
       console.warn("SAVE BLOCKED - load not complete yet");
+      return;
+    }
+    // GUARD: abort if mode toggled mid-flight (debounced timer fired after toggle)
+    if (loadedModeRef.current && loadedModeRef.current !== window.MODE) {
+      console.warn("[storage] SAVE BLOCKED - mode changed (data for " + loadedModeRef.current + ", current mode " + window.MODE + ")");
       return;
     }
     allDataRef.current._saveTimestamp = Date.now();
@@ -821,6 +836,9 @@ function TylerBlackTracker() {
         _migrationComplete: true
       };
       loadComplete.current = true; // Now safe to save
+      // Capture which mode this data was loaded for. Saves that fire from
+      // stale closures after a mode toggle will see a mismatch and abort.
+      loadedModeRef.current = (typeof window !== "undefined" ? (window.MODE || "tb") : "tb");
       var statusCount = Object.keys(merged).filter(function(k) { return merged[k] !== "not_owned"; }).length;
       diagParts.push(statusCount + " tracked cards");
       setLoading(false);
