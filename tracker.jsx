@@ -1560,6 +1560,18 @@ function TylerBlackTracker() {
                     {needsSync.has(card.id) ? <span className="text-pink-500">!</span> : null}
                   </div>
                   <span className="text-gray-500 truncate hidden sm:inline flex-shrink min-w-0" style={{fontSize:"clamp(8px,0.9vw,10px)",maxWidth:"clamp(80px,12vw,200px)"}}>{card.product.slice(5)}</span>
+                  {/* Inline qty +/- controls. Click +/- to adjust without expanding the row. */}
+                  <div className="flex items-center gap-0.5 flex-shrink-0" onClick={function(e){e.stopPropagation();}}>
+                    {(function() {
+                      var qty = getCardQty(cardDetails, statuses, card.id);
+                      return <React.Fragment>
+                        <button onClick={function(){ adjustCardQty(card.id, -1); }} className="bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white font-bold leading-none px-1" style={{fontSize:"clamp(9px,1vw,11px)",minWidth:"14px"}} title={qty <= 1 ? "Remove (sets not owned)" : "-1 copy"}>-</button>
+                        <span className={"font-black tabular-nums " + (qty === 0 ? "text-gray-600" : qty > 1 ? "text-green-400" : "text-cyan-300")} style={{fontSize:"clamp(9px,1vw,11px)",minWidth:"12px",textAlign:"center"}}>{qty}</span>
+                        <button onClick={function(){ adjustCardQty(card.id, 1); }} className="bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white font-bold leading-none px-1" style={{fontSize:"clamp(9px,1vw,11px)",minWidth:"14px"}} title={qty === 0 ? "Acquire (sets in-transit)" : "+1 copy"}>+</button>
+                        {qty > 1 && <span className="text-green-400 font-black ml-0.5" style={{fontSize:"clamp(8px,0.9vw,10px)"}} title={(qty-1)+" extra"}>{"+"+(qty-1)}</span>}
+                      </React.Fragment>;
+                    })()}
+                  </div>
                   <div className="flex gap-0.5 flex-shrink-0" onClick={function(e){e.stopPropagation();}}>
                     {PRIMARY_STATUSES.map(function(key) {
                       var c = STATUS_CONFIG[key];
@@ -2481,6 +2493,27 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
                           {sspBadge(card.cardSet)}
                           {card.isAuto === "Yes" && <span className="text-yellow-500 text-[8px] font-bold flex-shrink-0 bg-yellow-950/40 px-0.5 rounded">A</span>}
                           {card.isMem === "Yes" && <span className="text-purple-500 text-[8px] font-bold flex-shrink-0 bg-purple-950/40 px-0.5 rounded">M</span>}
+                          {/* Inline qty +/- — works in any view, click doesn't select */}
+                          <div className="flex items-center gap-0.5 flex-shrink-0" onClick={function(e){e.stopPropagation();}}>
+                            {(function() {
+                              var qty = getCardQty(cardDetails, statuses, card.id);
+                              function adjust(delta) {
+                                var current = getCardQty(cardDetails, statuses, card.id);
+                                var next = Math.max(0, current + delta);
+                                if (next === current) return;
+                                updateCardDetail(card.id, "qty", String(next));
+                                var prevStatus = statuses[card.id] || "not_owned";
+                                if (current === 0 && next >= 1 && prevStatus === "not_owned") setCardStatus(card.id, "in_transit");
+                                else if (current >= 1 && next === 0 && (prevStatus === "owned" || prevStatus === "in_transit")) setCardStatus(card.id, "not_owned");
+                              }
+                              return <React.Fragment>
+                                <button onClick={function(){ adjust(-1); }} className="bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white font-bold leading-none px-0.5" style={{fontSize:"10px",minWidth:"12px"}} title={qty <= 1 ? "Remove" : "-1 copy"}>-</button>
+                                <span className={"font-black tabular-nums " + (qty === 0 ? "text-gray-600" : qty > 1 ? "text-green-400" : "text-cyan-300")} style={{fontSize:"10px",minWidth:"10px",textAlign:"center"}}>{qty}</span>
+                                <button onClick={function(){ adjust(1); }} className="bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white font-bold leading-none px-0.5" style={{fontSize:"10px",minWidth:"12px"}} title={qty === 0 ? "Acquire" : "+1 copy"}>+</button>
+                                {qty > 1 && <span className="text-green-400 font-black" style={{fontSize:"9px"}}>{"+"+(qty-1)}</span>}
+                              </React.Fragment>;
+                            })()}
+                          </div>
                           {/* Inline quick status buttons */}
                           <div className="flex gap-0.5 flex-shrink-0" onClick={function(e){e.stopPropagation();}}>
                             {PRIMARY_STATUSES.map(function(key) {
