@@ -399,6 +399,8 @@ function TylerBlackTracker() {
   const [filterYear, setFilterYear] = useState("all");
   const [filterProduct, setFilterProduct] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  // Collection: filter to a single WNBA player. null = all. Hidden/unused in TB mode.
+  const [filterPlayer, setFilterPlayer] = useState(null);
   const [search, setSearch] = useState("");
   const [filterCardNum, setFilterCardNum] = useState("");
   const [page, setPage] = useState(0);
@@ -1179,16 +1181,19 @@ function TylerBlackTracker() {
   }, []);
   const filteredProducts = useMemo(() => {
     let cards = ALL_CARDS;
-    if (filterYear !== "all") cards = cards.filter(c => c.product.startsWith(filterYear));
+    // Use cardYear() so WNBA cards (numeric `year` field) work, not just TB prefix-style
+    if (filterYear !== "all") cards = cards.filter(c => cardYear(c) === filterYear);
+    if (filterPlayer) cards = cards.filter(c => c.player === filterPlayer);
     return [...new Set(cards.map(c => c.product))].sort();
-  }, [filterYear]);
+  }, [filterYear, filterPlayer]);
   const filtered = useMemo(() => {
     const s = search.toLowerCase();
     const cn = filterCardNum;
     return ALL_CARDS.filter(card => {
       if (HIDDEN_DUPES.has(card.id)) return false;
       const cardStatus = statuses[card.id] || "not_owned";
-      if (filterYear !== "all" && !card.product.startsWith(filterYear)) return false;
+      if (filterYear !== "all" && cardYear(card) !== filterYear) return false;
+      if (filterPlayer && card.player !== filterPlayer) return false;
       if (filterProduct !== "all" && card.product !== filterProduct) return false;
       if (cn && card.cardNumber !== cn) return false;
       if (filterStatus === "acquired" && cardStatus !== "owned" && cardStatus !== "in_transit") return false;
@@ -1200,13 +1205,27 @@ function TylerBlackTracker() {
       else if (s && !card.product.toLowerCase().includes(s) && !card.cardSet.toLowerCase().includes(s) && !card.cardNumber.toLowerCase().includes(s)) return false;
       return true;
     });
-  }, [statuses, forSaleFlags, tcdbFlags, tcdbFixes, filterYear, filterProduct, filterCardNum, filterStatus, search]);
+  }, [statuses, forSaleFlags, tcdbFlags, tcdbFixes, filterYear, filterProduct, filterCardNum, filterStatus, search, filterPlayer]);
   const totalPages = Math.ceil(filtered.length / pageSize);
   const pageCards = filtered.slice(page * pageSize, (page + 1) * pageSize);
-  useEffect(() => { setPage(0); }, [filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize]);
-  useEffect(() => { if (filterProduct !== "all" && !filteredProducts.includes(filterProduct)) setFilterProduct("all"); }, [filterYear]);
+  useEffect(() => { setPage(0); }, [filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer]);
+  useEffect(() => { if (filterProduct !== "all" && !filteredProducts.includes(filterProduct)) setFilterProduct("all"); }, [filterYear, filterPlayer]);
   // Reset focus when page/filters change
-  useEffect(function() { setFocusIdx(-1); }, [page, filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize]);
+  useEffect(function() { setFocusIdx(-1); }, [page, filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer]);
+  // Build the WNBA active player list for filter chips. Empty in TB mode.
+  const collectionPlayerList = useMemo(function() {
+    if (trackerMode !== "wnba" || typeof window === "undefined" || !window.TEMPO_ROSTER) return [];
+    return Object.keys(window.TEMPO_ROSTER)
+      .filter(function(k) { var p = window.TEMPO_ROSTER[k]; return p.active && p.role !== "coach"; })
+      .map(function(k) { return { key: k, name: window.TEMPO_ROSTER[k].name, last: window.TEMPO_ROSTER[k].name.split(" ").pop() }; });
+  }, [trackerMode]);
+  // Lookup map for fast player-name resolution in card rows
+  const playerNameByKey = useMemo(function() {
+    if (typeof window === "undefined" || !window.TEMPO_ROSTER) return {};
+    var m = {};
+    Object.keys(window.TEMPO_ROSTER).forEach(function(k) { m[k] = window.TEMPO_ROSTER[k].name; });
+    return m;
+  }, []);
   useEffect(function() { if (!storageDiag) return; var t = setTimeout(function() { setStorageDiag(""); }, 5000); return function() { clearTimeout(t); }; }, [storageDiag]);
   // Auto-scroll focused card into view
   useEffect(function() {
@@ -1420,13 +1439,23 @@ function TylerBlackTracker() {
         <div className="mx-auto flex-1 flex flex-col min-h-0 w-full" style={{maxWidth:"min(100%, 1800px)"}}>
         {/* COLLECTION TAB */}
         <div className="flex items-center justify-between mb-1">
-          <div className="flex gap-2" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
-            <a href="https://www.tcdb.com/Person.cfm/pid/325590/Tyler-Black" target="_blank" rel="noopener noreferrer" style={{color:"#7abfff"}} className="hover:opacity-80">TCDB</a>
-            <a href="https://www.tcdb.com/ViewCollectionP.cfm/pid/325590" target="_blank" rel="noopener noreferrer" style={{color:"#7abfff"}} className="hover:opacity-80">My Collection</a>
-            <a href={COMC_PLAYER} target="_blank" rel="noopener noreferrer" style={{color:"#FFC52F"}} className="hover:opacity-80">COMC</a>
-            <a href={SPORTLOTS_PLAYER} target="_blank" rel="noopener noreferrer" style={{color:"#5b9bd5"}} className="hover:opacity-80">SportLots</a>
-            <a href={WHATNOT_SEARCH} target="_blank" rel="noopener noreferrer" style={{color:"#b8a0d8"}} className="hover:opacity-80">Whatnot</a>
-          </div>
+          {/* TB-specific external links — hidden in WNBA mode since they all hardcode Tyler Black URLs */}
+          {trackerMode !== "wnba" ? (
+            <div className="flex gap-2" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
+              <a href="https://www.tcdb.com/Person.cfm/pid/325590/Tyler-Black" target="_blank" rel="noopener noreferrer" style={{color:"#7abfff"}} className="hover:opacity-80">TCDB</a>
+              <a href="https://www.tcdb.com/ViewCollectionP.cfm/pid/325590" target="_blank" rel="noopener noreferrer" style={{color:"#7abfff"}} className="hover:opacity-80">My Collection</a>
+              <a href={COMC_PLAYER} target="_blank" rel="noopener noreferrer" style={{color:"#FFC52F"}} className="hover:opacity-80">COMC</a>
+              <a href={SPORTLOTS_PLAYER} target="_blank" rel="noopener noreferrer" style={{color:"#5b9bd5"}} className="hover:opacity-80">SportLots</a>
+              <a href={WHATNOT_SEARCH} target="_blank" rel="noopener noreferrer" style={{color:"#b8a0d8"}} className="hover:opacity-80">Whatnot</a>
+            </div>
+          ) : (
+            <div className="flex gap-2" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
+              <span className="text-purple-400 font-bold">Toronto Tempo Collection</span>
+              {filterPlayer && playerNameByKey[filterPlayer] && (
+                <span className="text-purple-300">• {playerNameByKey[filterPlayer]}</span>
+              )}
+            </div>
+          )}
           {DUPES.length > 0 && (
             <button onClick={function(){setShowDupes(!showDupes);}} className="text-gray-500 hover:text-gray-300" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
               {showDupes ? "\u25BE" : "\u25B8"} {DUPES.length} dupes
@@ -1452,6 +1481,23 @@ function TylerBlackTracker() {
           <div className="bg-pink-950/40 border border-pink-900 rounded px-2 py-0.5 mb-1 text-pink-400 flex items-center justify-between" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
             <span>{"\u26A0"} {stats.notSynced} card{stats.notSynced > 1 ? "s" : ""} not synced to TCDB</span>
             <button onClick={function() { if (confirm("Mark all " + stats.notSynced + " cards as synced to TCDB?")) markAllSynced(); }} className="px-2 py-0 rounded bg-pink-900/50 hover:bg-pink-800/60 text-pink-300 border border-pink-800/40 ml-2 flex-shrink-0">Mark All Synced</button>
+          </div>
+        )}
+        {/* WNBA-only: player filter chip row. Single click to filter Collection to one player. */}
+        {trackerMode === "wnba" && collectionPlayerList.length > 0 && (
+          <div className="flex flex-wrap gap-1 items-center mb-1 pb-1" style={{borderBottom:"1px solid #1a2d4a"}}>
+            <span className="font-bold mr-1" style={{color:"#a855f7",fontSize:"clamp(8px,0.9vw,10px)"}}>Player:</span>
+            <button onClick={function(){ setFilterPlayer(null); }}
+              className={"px-1.5 py-0.5 rounded font-semibold transition-colors "+
+                (filterPlayer===null ? "bg-purple-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700")}
+              style={{fontSize:"clamp(9px,1vw,11px)"}}>All</button>
+            {collectionPlayerList.map(function(p) {
+              return (<button key={p.key} onClick={function(){ setFilterPlayer(p.key); }}
+                className={"px-1.5 py-0.5 rounded font-semibold transition-colors "+
+                  (filterPlayer===p.key ? "bg-purple-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700")}
+                style={{fontSize:"clamp(9px,1vw,11px)"}}
+                title={p.name}>{p.last}</button>);
+            })}
           </div>
         )}
         {/* Filters */}
@@ -1498,6 +1544,12 @@ function TylerBlackTracker() {
               <div key={card.id} data-focus-idx={pageCards.indexOf(card)} className={"rounded-sm overflow-hidden " + rowBg + (isFocused ? " ring-1 ring-yellow-400/70 bg-yellow-950/20" : "")}>
                 <div className="flex items-center gap-1 cursor-pointer" style={{padding:"clamp(1px,0.2vw,3px) clamp(3px,0.5vw,8px)"}} onClick={function(){setExpandedCard(isExpanded ? null : card.id);}}>
                   <div className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + cfg.dot} />
+                  {/* WNBA-only: player name as a colored pill so user instantly sees whose card this is */}
+                  {trackerMode === "wnba" && card.player && playerNameByKey[card.player] && (
+                    <span className="font-bold px-1 py-0 rounded bg-purple-900/50 border border-purple-700 text-purple-200 whitespace-nowrap flex-shrink-0"
+                      style={{fontSize:"clamp(8px,0.9vw,10px)"}}
+                      title={playerNameByKey[card.player]}>{playerNameByKey[card.player].split(" ").pop()}</span>
+                  )}
                   <div className="flex-1 min-w-0 flex items-baseline gap-1 truncate" style={{fontSize:"clamp(9px,1.2vw,12px)"}}>
                     <span className="font-semibold text-white whitespace-nowrap">#{card.cardNumber}</span>
                     <span className="text-gray-300 truncate">{card.cardSet}</span>
