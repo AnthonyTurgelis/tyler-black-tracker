@@ -61,10 +61,11 @@ window.TEMPO_ACTIVE_PLAYERS = (function () {
 })();
 
 // ─── CARD DATA ─────────────────────────────────────────────────────────────
-// Source: hand-entered from TCDB by user (Saturday morning Apr 26 2026, ~10am)
-// preserved from /toronto_tempo_tracker__2_.html SEED_CARDS array.
+// Source: hand-entered from TCDB by user (Saturday morning Apr 26 2026).
 // 2090 real cards across 14 players.
 // Test card at id=1 — DO NOT REMOVE — used to verify storage round-trips.
+// Note: source `printRun` is emitted as `copies` (string) to match what TB
+// tracker code reads when displaying /N print run indicators.
 window.TEMPO_ALL_CARDS = [
   {
     id: 1,
@@ -93,7 +94,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms 25th Anniversary",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 4,
@@ -103,7 +104,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 5,
@@ -113,7 +114,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Gold",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 6,
@@ -123,7 +124,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Blue",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 7,
@@ -133,7 +134,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 8,
@@ -161,7 +162,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Green Pulsar",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 11,
@@ -189,7 +190,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Mojo",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 14,
@@ -199,7 +200,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Mosaic",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 15,
@@ -209,7 +210,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Orange",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 16,
@@ -219,7 +220,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 17,
@@ -229,7 +230,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 18,
@@ -266,7 +267,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 22,
@@ -285,7 +286,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 24,
@@ -295,7 +296,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 25,
@@ -305,7 +306,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 26,
@@ -315,7 +316,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 27,
@@ -343,7 +344,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 30,
@@ -371,7 +372,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 33,
@@ -381,7 +382,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 34,
@@ -391,7 +392,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 35,
@@ -401,7 +402,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 36,
@@ -411,7 +412,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 37,
@@ -421,7 +422,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 38,
@@ -476,7 +477,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cosmic",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 44,
@@ -486,7 +487,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cubic",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 45,
@@ -523,7 +524,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Impact",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 49,
@@ -533,7 +534,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lava",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 50,
@@ -543,7 +544,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Sunburst",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 51,
@@ -562,7 +563,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Shock Wave Cubic",
     player: "mabrey",
     team: "Dallas Wings",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 53,
@@ -608,7 +609,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Splitting Image Black",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 58,
@@ -618,7 +619,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Splitting Image Gold",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 59,
@@ -637,7 +638,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 61,
@@ -647,7 +648,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 62,
@@ -657,7 +658,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 63,
@@ -685,7 +686,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 35
+    copies: "35"
   },
   {
     id: 66,
@@ -704,7 +705,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Prizms",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 68,
@@ -714,7 +715,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 175
+    copies: "175"
   },
   {
     id: 69,
@@ -733,7 +734,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 71,
@@ -743,7 +744,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 72,
@@ -762,7 +763,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 74,
@@ -790,7 +791,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 77,
@@ -800,7 +801,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 78,
@@ -810,7 +811,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 79,
@@ -820,7 +821,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set Prizms",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 80,
@@ -830,7 +831,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 81,
@@ -840,7 +841,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 82,
@@ -868,7 +869,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal",
     player: "mabrey",
     team: "Chicago Sky",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 85,
@@ -896,7 +897,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Viper",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 88,
@@ -906,7 +907,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jaguar",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 89,
@@ -916,7 +917,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jungle",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 90,
@@ -926,7 +927,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Tiger",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 91,
@@ -936,7 +937,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 65
+    copies: "65"
   },
   {
     id: 92,
@@ -946,7 +947,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Viper",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 93,
@@ -956,7 +957,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jaguar",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 94,
@@ -966,7 +967,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jungle",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 95,
@@ -976,7 +977,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Tiger",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 96,
@@ -986,7 +987,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 64
+    copies: "64"
   },
   {
     id: 97,
@@ -996,7 +997,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Viper",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 98,
@@ -1006,7 +1007,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jaguar",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 99,
@@ -1016,7 +1017,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jungle",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 100,
@@ -1026,7 +1027,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Tiger",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 101,
@@ -1045,7 +1046,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Viper",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 103,
@@ -1055,7 +1056,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jaguar",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 104,
@@ -1065,7 +1066,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jungle",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 105,
@@ -1075,7 +1076,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Tiger",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 106,
@@ -1085,7 +1086,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 69
+    copies: "69"
   },
   {
     id: 107,
@@ -1095,7 +1096,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Viper",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 108,
@@ -1105,7 +1106,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jaguar",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 109,
@@ -1115,7 +1116,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jungle",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 110,
@@ -1125,7 +1126,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Tiger",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 111,
@@ -1135,7 +1136,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 73
+    copies: "73"
   },
   {
     id: 112,
@@ -1145,7 +1146,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Viper",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 113,
@@ -1155,7 +1156,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jaguar",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 114,
@@ -1165,7 +1166,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jungle",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 115,
@@ -1175,7 +1176,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Tiger",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 116,
@@ -1185,7 +1186,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 2832
+    copies: "2832"
   },
   {
     id: 117,
@@ -1204,7 +1205,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 119,
@@ -1214,7 +1215,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 120,
@@ -1224,7 +1225,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 121,
@@ -1234,7 +1235,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 122,
@@ -1244,7 +1245,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 123,
@@ -1263,7 +1264,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 125,
@@ -1282,7 +1283,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 127,
@@ -1292,7 +1293,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 128,
@@ -1302,7 +1303,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Millionaire Shimmer Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 129,
@@ -1312,7 +1313,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Boardwalk Blue Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 15
+    copies: "15"
   },
   {
     id: 130,
@@ -1322,7 +1323,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Brown Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 249
+    copies: "249"
   },
   {
     id: 131,
@@ -1377,7 +1378,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Millionaire Shimmer Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 500
+    copies: "500"
   },
   {
     id: 137,
@@ -1387,7 +1388,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 138,
@@ -1397,7 +1398,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Wave Millionaire Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 139,
@@ -1407,7 +1408,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Millionaire Shimmer Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 140,
@@ -1417,7 +1418,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 24
+    copies: "24"
   },
   {
     id: 141,
@@ -1427,7 +1428,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Light Blue Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 142,
@@ -1446,7 +1447,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Neon Green Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 144,
@@ -1456,7 +1457,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 124
+    copies: "124"
   },
   {
     id: 145,
@@ -1466,7 +1467,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Millionaire Shimmer Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 146,
@@ -1476,7 +1477,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 147,
@@ -1486,7 +1487,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Millionaire Shimmer Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 148,
@@ -1505,7 +1506,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Question Mark Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 150,
@@ -1515,7 +1516,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Millionaire Shimmer Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 100
+    copies: "100"
   },
   {
     id: 151,
@@ -1525,7 +1526,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 152,
@@ -1553,7 +1554,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Millionaire Shimmer Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 155,
@@ -1572,7 +1573,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Top Tier Prizms Blue",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 157,
@@ -1582,7 +1583,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Top Tier Prizms Blue Pulsar",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 158,
@@ -1592,7 +1593,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Top Tier Prizms Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 159,
@@ -1602,7 +1603,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Top Tier Prizms Gold Vinyl",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 160,
@@ -1621,7 +1622,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Top Tier Prizms Green Pulsar",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 162,
@@ -1631,7 +1632,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Top Tier Prizms Mojo",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 163,
@@ -1641,7 +1642,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Top Tier Prizms Orange Pulsar",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 164,
@@ -1651,7 +1652,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Top Tier Prizms Red",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 165,
@@ -1670,7 +1671,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Blue",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 167,
@@ -1680,7 +1681,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Blue Pulsar",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 168,
@@ -1690,7 +1691,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 169,
@@ -1700,7 +1701,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Gold Vinyl",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 170,
@@ -1719,7 +1720,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Green Pulsar",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 172,
@@ -1729,7 +1730,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Mojo",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 173,
@@ -1739,7 +1740,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Orange Pulsar",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 174,
@@ -1749,7 +1750,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Red",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 175,
@@ -1768,7 +1769,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Finite Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 177,
@@ -1778,7 +1779,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 178,
@@ -1788,7 +1789,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Velocity Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 39
+    copies: "39"
   },
   {
     id: 179,
@@ -1798,7 +1799,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 180,
@@ -1808,7 +1809,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Pulsar Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 181,
@@ -1836,7 +1837,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cherry Blossom FOTL Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 184,
@@ -1846,7 +1847,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 185,
@@ -1856,7 +1857,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 186,
@@ -1875,7 +1876,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 188,
@@ -1885,7 +1886,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Ice Gold Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 189,
@@ -1913,7 +1914,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Ice White Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 35
+    copies: "35"
   },
   {
     id: 192,
@@ -1923,7 +1924,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lotus Flower FOTL Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 193,
@@ -1933,7 +1934,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 194,
@@ -1943,7 +1944,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 195,
@@ -1953,7 +1954,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 196,
@@ -1972,7 +1973,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Velocity Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 79
+    copies: "79"
   },
   {
     id: 198,
@@ -1982,7 +1983,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 199,
@@ -1992,7 +1993,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pulsar Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 499
+    copies: "499"
   },
   {
     id: 200,
@@ -2002,7 +2003,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 201,
@@ -2012,7 +2013,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 202,
@@ -2022,7 +2023,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pulsar Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 203,
@@ -2050,7 +2051,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 206,
@@ -2089,7 +2090,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 75
+    copies: "75"
   },
   {
     id: 210,
@@ -2100,7 +2101,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 211,
@@ -2111,7 +2112,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 212,
@@ -2132,7 +2133,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 214,
@@ -2143,7 +2144,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 215,
@@ -2154,7 +2155,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 49
+    copies: "49"
   },
   {
     id: 216,
@@ -2165,7 +2166,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 217,
@@ -2176,7 +2177,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 35
+    copies: "35"
   },
   {
     id: 218,
@@ -2187,7 +2188,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 219,
@@ -2206,7 +2207,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Black Finite",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 221,
@@ -2216,7 +2217,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Black Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 222,
@@ -2226,7 +2227,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Black Pandora",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 8
+    copies: "8"
   },
   {
     id: 223,
@@ -2236,7 +2237,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Blue",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 224,
@@ -2246,7 +2247,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Blue Flash",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 225,
@@ -2265,7 +2266,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 227,
@@ -2275,7 +2276,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Gold Flash",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 228,
@@ -2285,7 +2286,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Gold Vinyl",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 229,
@@ -2304,7 +2305,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Tie-Dye",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 231,
@@ -2314,7 +2315,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms White Disco",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 232,
@@ -2333,7 +2334,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Finite",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 234,
@@ -2343,7 +2344,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 235,
@@ -2353,7 +2354,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Bronze Checker",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 236,
@@ -2363,7 +2364,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 237,
@@ -2373,7 +2374,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Flash",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 238,
@@ -2383,7 +2384,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Vinyl",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 239,
@@ -2402,7 +2403,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Ice Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 241,
@@ -2412,7 +2413,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Light Blue Disco",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 242,
@@ -2422,7 +2423,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Neon Green",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 243,
@@ -2441,7 +2442,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink Shimmer FOTL",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 245,
@@ -2451,7 +2452,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink and Purple",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 246,
@@ -2461,7 +2462,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple Ice",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 247,
@@ -2471,7 +2472,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 248,
@@ -2490,7 +2491,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red and Blue",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 250,
@@ -2518,7 +2519,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Tie-Dye",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 253,
@@ -2537,7 +2538,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms White",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 255,
@@ -2565,7 +2566,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Finite",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 258,
@@ -2575,7 +2576,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 259,
@@ -2585,7 +2586,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Bronze Checker",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 260,
@@ -2595,7 +2596,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 261,
@@ -2605,7 +2606,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Flash",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 262,
@@ -2615,7 +2616,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Vinyl",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 263,
@@ -2634,7 +2635,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Ice Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 265,
@@ -2644,7 +2645,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Neon Green",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 266,
@@ -2654,7 +2655,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Orange",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 267,
@@ -2673,7 +2674,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink Shimmer FOTL",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 269,
@@ -2683,7 +2684,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink and Purple",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 270,
@@ -2693,7 +2694,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 271,
@@ -2703,7 +2704,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple Ice",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 272,
@@ -2722,7 +2723,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red and Blue",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 274,
@@ -2750,7 +2751,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Tie-Dye",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 277,
@@ -2769,7 +2770,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms White",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 279,
@@ -2797,7 +2798,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Finite",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 282,
@@ -2807,7 +2808,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 283,
@@ -2817,7 +2818,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 284,
@@ -2827,7 +2828,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Flash",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 285,
@@ -2837,7 +2838,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Vinyl",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 286,
@@ -2856,7 +2857,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Ice Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 288,
@@ -2875,7 +2876,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink Shimmer FOTL",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 290,
@@ -2885,7 +2886,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple Ice",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 291,
@@ -2922,7 +2923,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Tie-Dye",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 295,
@@ -2950,7 +2951,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Road To The Finals Second Round",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 298,
@@ -2969,7 +2970,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Artist Proof",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 300,
@@ -2979,7 +2980,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Laser",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 301,
@@ -2989,7 +2990,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Holo Press Proof",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 302,
@@ -2999,7 +3000,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Shimmer",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 303,
@@ -3009,7 +3010,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Laser",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 304,
@@ -3019,7 +3020,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Shimmer",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 305,
@@ -3047,7 +3048,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Crunch Time Green Fireworks",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 308,
@@ -3057,7 +3058,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Crunch Time Holo",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 309,
@@ -3067,7 +3068,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Crunch Time Holo Black Laser",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 310,
@@ -3077,7 +3078,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Crunch Time Holo Laser",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 311,
@@ -3087,7 +3088,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Crunch Time Orange Fireworks",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 312,
@@ -3097,7 +3098,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Crunch Time Orange Laser",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 313,
@@ -3107,7 +3108,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Crunch Time Pink Fireworks",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 314,
@@ -3135,7 +3136,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Crunch Time Press Proof Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 317,
@@ -3154,7 +3155,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Crunch Time Purple Laser",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 319,
@@ -3164,7 +3165,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Crunch Time Red Holo Laser",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 320,
@@ -3192,7 +3193,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Shimmer",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 323,
@@ -3229,7 +3230,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Black Laser",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 327,
@@ -3239,7 +3240,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Gold Laser",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 328,
@@ -3249,7 +3250,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Team Logo",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 13
+    copies: "13"
   },
   {
     id: 329,
@@ -3277,7 +3278,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Light Blue Lava",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 332,
@@ -3287,7 +3288,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Laser",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 333,
@@ -3297,7 +3298,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Lava",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 334,
@@ -3307,7 +3308,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Laser",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 335,
@@ -3317,7 +3318,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Shimmer",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 336,
@@ -3327,7 +3328,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Laser",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 337,
@@ -3337,7 +3338,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Lava",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 338,
@@ -3347,7 +3348,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Shimmer",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 339,
@@ -3357,7 +3358,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Holo",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 340,
@@ -3367,7 +3368,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Lava",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 341,
@@ -3377,7 +3378,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Shimmer",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 342,
@@ -3387,7 +3388,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Laser",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 343,
@@ -3397,7 +3398,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Yellow Lava",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 344,
@@ -3416,7 +3417,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 346,
@@ -3426,7 +3427,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Green",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 30
+    copies: "30"
   },
   {
     id: 347,
@@ -3436,7 +3437,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Holo Platinum Blue",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 348,
@@ -3446,7 +3447,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Prime",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 349,
@@ -3476,7 +3477,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 5
+    copies: "5"
   },
   {
     id: 352,
@@ -3487,7 +3488,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 353,
@@ -3498,7 +3499,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 354,
@@ -3509,7 +3510,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 355,
@@ -3520,7 +3521,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 49
+    copies: "49"
   },
   {
     id: 356,
@@ -3551,7 +3552,7 @@ window.TEMPO_ALL_CARDS = [
     player: "mabrey",
     team: "Connecticut Sun",
     isAuto: true,
-    printRun: 15
+    copies: "15"
   },
   {
     id: 359,
@@ -3561,7 +3562,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 360,
@@ -3571,7 +3572,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Amethyst",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 8
+    copies: "8"
   },
   {
     id: 361,
@@ -3581,7 +3582,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 362,
@@ -3591,7 +3592,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 363,
@@ -3601,7 +3602,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Silver",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 15
+    copies: "15"
   },
   {
     id: 364,
@@ -3611,7 +3612,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Platinum",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 365,
@@ -3621,7 +3622,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Silver",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 40
+    copies: "40"
   },
   {
     id: 366,
@@ -3631,7 +3632,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 54
+    copies: "54"
   },
   {
     id: 367,
@@ -3659,7 +3660,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 69
+    copies: "69"
   },
   {
     id: 370,
@@ -3669,7 +3670,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 3655
+    copies: "3655"
   },
   {
     id: 371,
@@ -3679,7 +3680,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 372,
@@ -3689,7 +3690,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Emerald",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 373,
@@ -3699,7 +3700,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 374,
@@ -3709,7 +3710,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Platinum Blue",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 375,
@@ -3719,7 +3720,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 6
+    copies: "6"
   },
   {
     id: 376,
@@ -3729,7 +3730,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 377,
@@ -3748,7 +3749,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Finite Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 379,
@@ -3758,7 +3759,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Velocity Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 39
+    copies: "39"
   },
   {
     id: 380,
@@ -3768,7 +3769,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 381,
@@ -3778,7 +3779,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Pulsar Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 382,
@@ -3797,7 +3798,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Carolina Blue Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 384,
@@ -3816,7 +3817,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cherry Blossoms Prizms FOTL",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 386,
@@ -3826,7 +3827,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 387,
@@ -3836,7 +3837,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 388,
@@ -3855,7 +3856,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 390,
@@ -3883,7 +3884,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lime Green Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 225
+    copies: "225"
   },
   {
     id: 393,
@@ -3893,7 +3894,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lotus Flower Prizms FOTL",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 394,
@@ -3903,7 +3904,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 395,
@@ -3913,7 +3914,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 396,
@@ -3923,7 +3924,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 397,
@@ -3942,7 +3943,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 175
+    copies: "175"
   },
   {
     id: 399,
@@ -3952,7 +3953,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Velocity Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 79
+    copies: "79"
   },
   {
     id: 400,
@@ -3962,7 +3963,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 401,
@@ -3972,7 +3973,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Velocity Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 59
+    copies: "59"
   },
   {
     id: 402,
@@ -3982,7 +3983,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pandora Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 403,
@@ -3992,7 +3993,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Power Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 404,
@@ -4002,7 +4003,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 405,
@@ -4012,7 +4013,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pulsar Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 406,
@@ -4049,7 +4050,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 410,
@@ -4059,7 +4060,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "WNBA Logo Gold Prizms",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 411,
@@ -4096,7 +4097,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 415,
@@ -4106,7 +4107,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 416,
@@ -4116,7 +4117,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 417,
@@ -4126,7 +4127,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 418,
@@ -4136,7 +4137,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 419,
@@ -4146,7 +4147,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 420,
@@ -4156,7 +4157,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "mabrey",
     team: "Connecticut Sun",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 421,
@@ -4167,7 +4168,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sykes",
     team: "Atlanta Dream",
     isRookie: true,
-    printRun: 500
+    copies: "500"
   },
   {
     id: 422,
@@ -4186,7 +4187,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Platinum",
     player: "sykes",
     team: "Atlanta Dream",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 424,
@@ -4205,7 +4206,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Laser Press Proof",
     player: "sykes",
     team: "Atlanta Dream",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 426,
@@ -4215,7 +4216,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Laser Press Proof",
     player: "sykes",
     team: "Atlanta Dream",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 427,
@@ -4234,7 +4235,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Optic Gold",
     player: "sykes",
     team: "Atlanta Dream",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 429,
@@ -4244,7 +4245,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Optic Gold Vinyl",
     player: "sykes",
     team: "Atlanta Dream",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 430,
@@ -4263,7 +4264,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Press Proof",
     player: "sykes",
     team: "Atlanta Dream",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 432,
@@ -4273,7 +4274,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Silver Press Proof",
     player: "sykes",
     team: "Atlanta Dream",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 433,
@@ -4292,7 +4293,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 435,
@@ -4302,7 +4303,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 436,
@@ -4312,7 +4313,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 437,
@@ -4322,7 +4323,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 438,
@@ -4350,7 +4351,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 441,
@@ -4378,7 +4379,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 444,
@@ -4388,7 +4389,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 65
+    copies: "65"
   },
   {
     id: 445,
@@ -4398,7 +4399,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 446,
@@ -4408,7 +4409,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 275
+    copies: "275"
   },
   {
     id: 447,
@@ -4427,7 +4428,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Scope",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 449,
@@ -4446,7 +4447,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 451,
@@ -4465,7 +4466,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms 25th Anniversary",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 453,
@@ -4475,7 +4476,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 454,
@@ -4485,7 +4486,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Gold",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 455,
@@ -4495,7 +4496,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Blue",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 456,
@@ -4505,7 +4506,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 457,
@@ -4533,7 +4534,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Green Pulsar",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 460,
@@ -4561,7 +4562,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Mojo",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 463,
@@ -4571,7 +4572,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Mosaic",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 464,
@@ -4581,7 +4582,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Orange",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 465,
@@ -4591,7 +4592,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 466,
@@ -4601,7 +4602,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 467,
@@ -4638,7 +4639,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 471,
@@ -4657,7 +4658,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 473,
@@ -4667,7 +4668,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 474,
@@ -4677,7 +4678,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 475,
@@ -4687,7 +4688,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 476,
@@ -4715,7 +4716,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 479,
@@ -4743,7 +4744,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 482,
@@ -4753,7 +4754,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 483,
@@ -4763,7 +4764,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 484,
@@ -4773,7 +4774,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 485,
@@ -4783,7 +4784,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 486,
@@ -4793,7 +4794,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 487,
@@ -4848,7 +4849,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cosmic",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 493,
@@ -4858,7 +4859,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cubic",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 494,
@@ -4895,7 +4896,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Impact",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 498,
@@ -4905,7 +4906,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lava",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 499,
@@ -4915,7 +4916,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Sunburst",
     player: "sykes",
     team: "Los Angeles Sparks",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 500,
@@ -4934,7 +4935,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 502,
@@ -4944,7 +4945,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 503,
@@ -4954,7 +4955,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 504,
@@ -4982,7 +4983,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 35
+    copies: "35"
   },
   {
     id: 507,
@@ -5001,7 +5002,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 509,
@@ -5011,7 +5012,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 175
+    copies: "175"
   },
   {
     id: 510,
@@ -5030,7 +5031,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 512,
@@ -5040,7 +5041,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 513,
@@ -5059,7 +5060,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 515,
@@ -5087,7 +5088,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 518,
@@ -5097,7 +5098,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 519,
@@ -5107,7 +5108,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 520,
@@ -5117,7 +5118,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 521,
@@ -5127,7 +5128,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 522,
@@ -5137,7 +5138,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 523,
@@ -5165,7 +5166,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 526,
@@ -5193,7 +5194,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Viper",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 529,
@@ -5203,7 +5204,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jaguar",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 530,
@@ -5213,7 +5214,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jungle",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 531,
@@ -5223,7 +5224,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Tiger",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 532,
@@ -5233,7 +5234,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 59
+    copies: "59"
   },
   {
     id: 533,
@@ -5243,7 +5244,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Viper",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 534,
@@ -5253,7 +5254,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jaguar",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 535,
@@ -5263,7 +5264,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jungle",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 536,
@@ -5273,7 +5274,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Tiger",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 537,
@@ -5283,7 +5284,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 62
+    copies: "62"
   },
   {
     id: 538,
@@ -5293,7 +5294,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Viper",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 539,
@@ -5303,7 +5304,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jaguar",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 540,
@@ -5313,7 +5314,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jungle",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 541,
@@ -5323,7 +5324,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Tiger",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 542,
@@ -5342,7 +5343,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 544,
@@ -5352,7 +5353,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 545,
@@ -5362,7 +5363,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 546,
@@ -5372,7 +5373,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 547,
@@ -5382,7 +5383,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 548,
@@ -5401,7 +5402,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 550,
@@ -5420,7 +5421,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 552,
@@ -5430,7 +5431,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 553,
@@ -5440,7 +5441,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Millionaire Shimmer Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 554,
@@ -5450,7 +5451,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Boardwalk Blue Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 15
+    copies: "15"
   },
   {
     id: 555,
@@ -5460,7 +5461,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Brown Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 249
+    copies: "249"
   },
   {
     id: 556,
@@ -5515,7 +5516,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Millionaire Shimmer Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 500
+    copies: "500"
   },
   {
     id: 562,
@@ -5525,7 +5526,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 563,
@@ -5535,7 +5536,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Wave Millionaire Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 564,
@@ -5545,7 +5546,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Millionaire Shimmer Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 565,
@@ -5555,7 +5556,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 24
+    copies: "24"
   },
   {
     id: 566,
@@ -5565,7 +5566,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Light Blue Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 567,
@@ -5584,7 +5585,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Neon Green Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 569,
@@ -5594,7 +5595,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 124
+    copies: "124"
   },
   {
     id: 570,
@@ -5604,7 +5605,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Millionaire Shimmer Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 571,
@@ -5614,7 +5615,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 572,
@@ -5624,7 +5625,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Millionaire Shimmer Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 573,
@@ -5643,7 +5644,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Question Mark Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 575,
@@ -5653,7 +5654,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Millionaire Shimmer Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 100
+    copies: "100"
   },
   {
     id: 576,
@@ -5663,7 +5664,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 577,
@@ -5691,7 +5692,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Millionaire Shimmer Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 580,
@@ -5710,7 +5711,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Blue",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 582,
@@ -5720,7 +5721,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Blue Pulsar",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 583,
@@ -5730,7 +5731,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 584,
@@ -5740,7 +5741,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Gold Vinyl",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 585,
@@ -5759,7 +5760,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Green Pulsar",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 587,
@@ -5769,7 +5770,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Mojo",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 588,
@@ -5779,7 +5780,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Orange Pulsar",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 589,
@@ -5789,7 +5790,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fearless Prizms Red",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 590,
@@ -5808,7 +5809,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Finite Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 592,
@@ -5818,7 +5819,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 593,
@@ -5828,7 +5829,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Velocity Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 39
+    copies: "39"
   },
   {
     id: 594,
@@ -5838,7 +5839,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 595,
@@ -5848,7 +5849,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Pulsar Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 596,
@@ -5876,7 +5877,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cherry Blossom FOTL Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 599,
@@ -5886,7 +5887,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 600,
@@ -5896,7 +5897,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 601,
@@ -5915,7 +5916,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 603,
@@ -5925,7 +5926,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Ice Gold Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 604,
@@ -5953,7 +5954,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Ice White Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 35
+    copies: "35"
   },
   {
     id: 607,
@@ -5963,7 +5964,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lotus Flower FOTL Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 608,
@@ -5973,7 +5974,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 609,
@@ -5983,7 +5984,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 610,
@@ -5993,7 +5994,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 611,
@@ -6012,7 +6013,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Velocity Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 79
+    copies: "79"
   },
   {
     id: 613,
@@ -6022,7 +6023,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 614,
@@ -6032,7 +6033,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pulsar Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 499
+    copies: "499"
   },
   {
     id: 615,
@@ -6042,7 +6043,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 616,
@@ -6052,7 +6053,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 617,
@@ -6062,7 +6063,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pulsar Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 618,
@@ -6090,7 +6091,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 621,
@@ -6129,7 +6130,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sykes",
     team: "Washington Mystics",
     isAuto: true,
-    printRun: 75
+    copies: "75"
   },
   {
     id: 625,
@@ -6140,7 +6141,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sykes",
     team: "Washington Mystics",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 626,
@@ -6151,7 +6152,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sykes",
     team: "Washington Mystics",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 627,
@@ -6172,7 +6173,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sykes",
     team: "Washington Mystics",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 629,
@@ -6183,7 +6184,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sykes",
     team: "Washington Mystics",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 630,
@@ -6194,7 +6195,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sykes",
     team: "Washington Mystics",
     isAuto: true,
-    printRun: 49
+    copies: "49"
   },
   {
     id: 631,
@@ -6205,7 +6206,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sykes",
     team: "Washington Mystics",
     isAuto: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 632,
@@ -6216,7 +6217,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sykes",
     team: "Washington Mystics",
     isAuto: true,
-    printRun: 35
+    copies: "35"
   },
   {
     id: 633,
@@ -6227,7 +6228,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sykes",
     team: "Washington Mystics",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 634,
@@ -6246,7 +6247,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Finite",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 636,
@@ -6256,7 +6257,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 637,
@@ -6266,7 +6267,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Bronze Checker",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 638,
@@ -6276,7 +6277,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 639,
@@ -6286,7 +6287,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Flash",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 640,
@@ -6296,7 +6297,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Vinyl",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 641,
@@ -6315,7 +6316,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Ice Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 643,
@@ -6325,7 +6326,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Light Blue Disco",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 644,
@@ -6335,7 +6336,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Neon Green",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 645,
@@ -6354,7 +6355,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink Shimmer FOTL",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 647,
@@ -6364,7 +6365,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink and Purple",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 648,
@@ -6374,7 +6375,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple Ice",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 649,
@@ -6384,7 +6385,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 650,
@@ -6403,7 +6404,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red and Blue",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 652,
@@ -6431,7 +6432,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Tie-Dye",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 655,
@@ -6450,7 +6451,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms White",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 657,
@@ -6478,7 +6479,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Black Finite",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 660,
@@ -6488,7 +6489,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Black Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 661,
@@ -6498,7 +6499,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Black Pandora",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 8
+    copies: "8"
   },
   {
     id: 662,
@@ -6508,7 +6509,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Blue",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 663,
@@ -6518,7 +6519,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Blue Flash",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 664,
@@ -6537,7 +6538,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 666,
@@ -6547,7 +6548,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Gold Flash",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 667,
@@ -6557,7 +6558,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Gold Vinyl",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 668,
@@ -6576,7 +6577,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms Tie-Dye",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 670,
@@ -6586,7 +6587,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "En Fuego Prizms White Disco",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 671,
@@ -6605,7 +6606,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Finite",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 673,
@@ -6615,7 +6616,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 674,
@@ -6625,7 +6626,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Bronze Checker",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 675,
@@ -6635,7 +6636,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 676,
@@ -6645,7 +6646,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Flash",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 677,
@@ -6655,7 +6656,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Vinyl",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 678,
@@ -6674,7 +6675,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Ice Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 680,
@@ -6684,7 +6685,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Neon Green",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 681,
@@ -6694,7 +6695,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Orange",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 682,
@@ -6713,7 +6714,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink Shimmer FOTL",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 684,
@@ -6723,7 +6724,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink and Purple",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 685,
@@ -6733,7 +6734,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 686,
@@ -6743,7 +6744,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple Ice",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 687,
@@ -6762,7 +6763,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red and Blue",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 689,
@@ -6790,7 +6791,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Tie-Dye",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 692,
@@ -6809,7 +6810,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms White",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 694,
@@ -6837,7 +6838,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 697,
@@ -6847,7 +6848,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Green",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 30
+    copies: "30"
   },
   {
     id: 698,
@@ -6857,7 +6858,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Holo Platinum Blue",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 699,
@@ -6894,7 +6895,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "My House Green Fireworks",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 703,
@@ -6904,7 +6905,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "My House Holo",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 704,
@@ -6914,7 +6915,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "My House Holo Black Laser",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 705,
@@ -6924,7 +6925,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "My House Holo Laser",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 706,
@@ -6934,7 +6935,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "My House Orange Fireworks",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 707,
@@ -6944,7 +6945,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "My House Orange Laser",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 708,
@@ -6954,7 +6955,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "My House Pink Fireworks",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 709,
@@ -6982,7 +6983,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "My House Press Proof Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 712,
@@ -7001,7 +7002,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "My House Purple Laser",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 714,
@@ -7011,7 +7012,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "My House Red Holo Laser",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 715,
@@ -7030,7 +7031,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Artist Proof",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 717,
@@ -7040,7 +7041,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Laser",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 718,
@@ -7050,7 +7051,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Holo Press Proof",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 719,
@@ -7060,7 +7061,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Shimmer",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 720,
@@ -7070,7 +7071,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Laser",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 721,
@@ -7080,7 +7081,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Shimmer",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 722,
@@ -7108,7 +7109,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Shimmer",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 725,
@@ -7145,7 +7146,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Black Laser",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 729,
@@ -7155,7 +7156,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Gold Laser",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 730,
@@ -7165,7 +7166,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Team Logo",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 13
+    copies: "13"
   },
   {
     id: 731,
@@ -7193,7 +7194,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Light Blue Lava",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 734,
@@ -7203,7 +7204,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Laser",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 735,
@@ -7213,7 +7214,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Lava",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 736,
@@ -7223,7 +7224,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Laser",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 737,
@@ -7233,7 +7234,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Shimmer",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 738,
@@ -7243,7 +7244,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Laser",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 739,
@@ -7253,7 +7254,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Lava",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 740,
@@ -7263,7 +7264,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Shimmer",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 741,
@@ -7273,7 +7274,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Holo",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 742,
@@ -7283,7 +7284,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Lava",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 743,
@@ -7293,7 +7294,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Shimmer",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 744,
@@ -7303,7 +7304,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Laser",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 745,
@@ -7313,7 +7314,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Yellow Lava",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 746,
@@ -7334,7 +7335,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sykes",
     team: "Washington Mystics",
     isAuto: true,
-    printRun: 5
+    copies: "5"
   },
   {
     id: 748,
@@ -7345,7 +7346,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sykes",
     team: "Washington Mystics",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 749,
@@ -7356,7 +7357,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sykes",
     team: "Washington Mystics",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 750,
@@ -7367,7 +7368,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sykes",
     team: "Washington Mystics",
     isAuto: true,
-    printRun: 49
+    copies: "49"
   },
   {
     id: 751,
@@ -7387,7 +7388,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 753,
@@ -7397,7 +7398,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Amethyst",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 8
+    copies: "8"
   },
   {
     id: 754,
@@ -7407,7 +7408,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 755,
@@ -7417,7 +7418,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 756,
@@ -7427,7 +7428,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Silver",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 15
+    copies: "15"
   },
   {
     id: 757,
@@ -7437,7 +7438,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Platinum",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 758,
@@ -7447,7 +7448,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Silver",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 40
+    copies: "40"
   },
   {
     id: 759,
@@ -7457,7 +7458,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 58
+    copies: "58"
   },
   {
     id: 760,
@@ -7467,7 +7468,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 58
+    copies: "58"
   },
   {
     id: 761,
@@ -7477,7 +7478,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 82
+    copies: "82"
   },
   {
     id: 762,
@@ -7487,7 +7488,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1447
+    copies: "1447"
   },
   {
     id: 763,
@@ -7497,7 +7498,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 764,
@@ -7507,7 +7508,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Emerald",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 765,
@@ -7517,7 +7518,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 766,
@@ -7527,7 +7528,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Platinum Blue",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 767,
@@ -7537,7 +7538,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 6
+    copies: "6"
   },
   {
     id: 768,
@@ -7547,7 +7548,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 769,
@@ -7566,7 +7567,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Finite Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 771,
@@ -7576,7 +7577,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Velocity Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 39
+    copies: "39"
   },
   {
     id: 772,
@@ -7586,7 +7587,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 773,
@@ -7596,7 +7597,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Pulsar Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 774,
@@ -7615,7 +7616,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Carolina Blue Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 776,
@@ -7634,7 +7635,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cherry Blossoms Prizms FOTL",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 778,
@@ -7644,7 +7645,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 779,
@@ -7654,7 +7655,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 780,
@@ -7673,7 +7674,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 782,
@@ -7701,7 +7702,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lime Green Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 225
+    copies: "225"
   },
   {
     id: 785,
@@ -7711,7 +7712,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lotus Flower Prizms FOTL",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 786,
@@ -7721,7 +7722,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 787,
@@ -7731,7 +7732,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 788,
@@ -7741,7 +7742,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 789,
@@ -7760,7 +7761,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 175
+    copies: "175"
   },
   {
     id: 791,
@@ -7770,7 +7771,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Velocity Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 79
+    copies: "79"
   },
   {
     id: 792,
@@ -7780,7 +7781,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 793,
@@ -7790,7 +7791,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Velocity Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 59
+    copies: "59"
   },
   {
     id: 794,
@@ -7800,7 +7801,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pandora Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 795,
@@ -7810,7 +7811,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Power Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 796,
@@ -7820,7 +7821,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 797,
@@ -7830,7 +7831,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pulsar Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 798,
@@ -7867,7 +7868,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 802,
@@ -7877,7 +7878,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "WNBA Logo Gold Prizms",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 803,
@@ -7914,7 +7915,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 807,
@@ -7924,7 +7925,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 808,
@@ -7934,7 +7935,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 809,
@@ -7944,7 +7945,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 810,
@@ -7954,7 +7955,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 811,
@@ -7964,7 +7965,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 812,
@@ -7974,7 +7975,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "sykes",
     team: "Washington Mystics",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 813,
@@ -7993,7 +7994,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold",
     player: "allemand",
     team: "Chicago Sky",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 815,
@@ -8003,7 +8004,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "allemand",
     team: "Chicago Sky",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 816,
@@ -8013,7 +8014,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "allemand",
     team: "Chicago Sky",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 817,
@@ -8023,7 +8024,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl",
     player: "allemand",
     team: "Chicago Sky",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 818,
@@ -8051,7 +8052,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar",
     player: "allemand",
     team: "Chicago Sky",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 821,
@@ -8079,7 +8080,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo",
     player: "allemand",
     team: "Chicago Sky",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 824,
@@ -8089,7 +8090,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic",
     player: "allemand",
     team: "Chicago Sky",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 825,
@@ -8099,7 +8100,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "allemand",
     team: "Chicago Sky",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 826,
@@ -8109,7 +8110,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set",
     player: "allemand",
     team: "Chicago Sky",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 827,
@@ -8119,7 +8120,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "allemand",
     team: "Chicago Sky",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 828,
@@ -8129,7 +8130,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "allemand",
     team: "Chicago Sky",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 829,
@@ -8185,7 +8186,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Championship Ticket",
     player: "harrison",
     team: "Tennessee (NCAA)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 835,
@@ -8216,7 +8217,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 15
+    copies: "15"
   },
   {
     id: 838,
@@ -8227,7 +8228,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 839,
@@ -8238,7 +8239,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 23
+    copies: "23"
   },
   {
     id: 840,
@@ -8249,7 +8250,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 841,
@@ -8260,7 +8261,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 842,
@@ -8271,7 +8272,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 843,
@@ -8282,7 +8283,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 844,
@@ -8293,7 +8294,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 845,
@@ -8304,7 +8305,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 846,
@@ -8314,7 +8315,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "harrison",
     team: "Tennessee (NCAA)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 847,
@@ -8324,7 +8325,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Platinum",
     player: "harrison",
     team: "Tennessee (NCAA)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 848,
@@ -8334,7 +8335,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "harrison",
     team: "Tennessee (NCAA)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 849,
@@ -8345,7 +8346,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 850,
@@ -8356,7 +8357,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 5
+    copies: "5"
   },
   {
     id: 851,
@@ -8367,7 +8368,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 852,
@@ -8378,7 +8379,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 853,
@@ -8389,7 +8390,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 854,
@@ -8400,7 +8401,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 855,
@@ -8411,7 +8412,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 856,
@@ -8422,7 +8423,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 857,
@@ -8433,7 +8434,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "Tennessee (NCAA)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 858,
@@ -8452,7 +8453,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "harrison",
     team: "Tennessee (NCAA)",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 860,
@@ -8462,7 +8463,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "harrison",
     team: "Tennessee (NCAA)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 861,
@@ -8491,7 +8492,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "harrison",
     team: "San Antonio Stars",
-    printRun: 500
+    copies: "500"
   },
   {
     id: 864,
@@ -8510,7 +8511,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 866,
@@ -8520,7 +8521,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 867,
@@ -8530,7 +8531,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 868,
@@ -8540,7 +8541,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 869,
@@ -8568,7 +8569,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 872,
@@ -8596,7 +8597,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 875,
@@ -8606,7 +8607,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 65
+    copies: "65"
   },
   {
     id: 876,
@@ -8616,7 +8617,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 877,
@@ -8626,7 +8627,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 275
+    copies: "275"
   },
   {
     id: 878,
@@ -8645,7 +8646,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Scope",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 880,
@@ -8664,7 +8665,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 882,
@@ -8683,7 +8684,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms 25th Anniversary",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 884,
@@ -8693,7 +8694,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 885,
@@ -8703,7 +8704,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Gold",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 886,
@@ -8713,7 +8714,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Blue",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 887,
@@ -8723,7 +8724,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 888,
@@ -8751,7 +8752,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Green Pulsar",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 891,
@@ -8779,7 +8780,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Mojo",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 894,
@@ -8789,7 +8790,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Mosaic",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 895,
@@ -8799,7 +8800,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Orange",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 896,
@@ -8809,7 +8810,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 897,
@@ -8819,7 +8820,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 898,
@@ -8856,7 +8857,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 902,
@@ -8875,7 +8876,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 904,
@@ -8885,7 +8886,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 905,
@@ -8895,7 +8896,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 906,
@@ -8905,7 +8906,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 907,
@@ -8933,7 +8934,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 910,
@@ -8961,7 +8962,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 913,
@@ -8971,7 +8972,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 914,
@@ -8981,7 +8982,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 915,
@@ -8991,7 +8992,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 916,
@@ -9001,7 +9002,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 917,
@@ -9011,7 +9012,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 918,
@@ -9066,7 +9067,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cosmic",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 924,
@@ -9076,7 +9077,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cubic",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 925,
@@ -9113,7 +9114,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Impact",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 929,
@@ -9123,7 +9124,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lava",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 930,
@@ -9133,7 +9134,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Sunburst",
     player: "harrison",
     team: "Dallas Wings",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 931,
@@ -9152,7 +9153,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 933,
@@ -9162,7 +9163,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 934,
@@ -9172,7 +9173,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 935,
@@ -9200,7 +9201,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 35
+    copies: "35"
   },
   {
     id: 938,
@@ -9219,7 +9220,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Drip Black",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 940,
@@ -9229,7 +9230,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Drip Gold",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 941,
@@ -9248,7 +9249,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 943,
@@ -9258,7 +9259,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 175
+    copies: "175"
   },
   {
     id: 944,
@@ -9277,7 +9278,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 946,
@@ -9287,7 +9288,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 947,
@@ -9306,7 +9307,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 949,
@@ -9334,7 +9335,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 952,
@@ -9344,7 +9345,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 953,
@@ -9354,7 +9355,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 954,
@@ -9364,7 +9365,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 955,
@@ -9374,7 +9375,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 956,
@@ -9384,7 +9385,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 957,
@@ -9412,7 +9413,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 960,
@@ -9440,7 +9441,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "FoilFractor",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 963,
@@ -9459,7 +9460,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Independence Day",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 76
+    copies: "76"
   },
   {
     id: 965,
@@ -9469,7 +9470,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mother's Day Hot Pink",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 966,
@@ -9479,7 +9480,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "NGWSD",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 22
+    copies: "22"
   },
   {
     id: 967,
@@ -9489,7 +9490,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plate Black",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 968,
@@ -9499,7 +9500,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plate Cyan",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 969,
@@ -9509,7 +9510,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plate Magenta",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 970,
@@ -9519,7 +9520,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plate Yellow",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 971,
@@ -9538,7 +9539,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Royal Blue",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 973,
@@ -9568,7 +9569,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 976,
@@ -9579,7 +9580,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 977,
@@ -9590,7 +9591,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 50
+    copies: "50"
   },
   {
     id: 978,
@@ -9610,7 +9611,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 980,
@@ -9620,7 +9621,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Being Unlimited FoilFractor",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 981,
@@ -9630,7 +9631,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Being Unlimited Gold Foilboard",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 982,
@@ -9640,7 +9641,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Being Unlimited Rainbow Foilboard",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 983,
@@ -9651,7 +9652,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 984,
@@ -9662,7 +9663,7 @@ window.TEMPO_ALL_CARDS = [
     player: "harrison",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 985,
@@ -9700,7 +9701,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Drip Black",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 989,
@@ -9710,7 +9711,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Drip Gold",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 990,
@@ -9720,7 +9721,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Drip Teal",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 991,
@@ -9739,7 +9740,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 993,
@@ -9749,7 +9750,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 994,
@@ -9759,7 +9760,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 995,
@@ -9769,7 +9770,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 996,
@@ -9779,7 +9780,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 997,
@@ -9798,7 +9799,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 999,
@@ -9817,7 +9818,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1001,
@@ -9827,7 +9828,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1002,
@@ -9837,7 +9838,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Millionaire Shimmer Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1003,
@@ -9847,7 +9848,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Boardwalk Blue Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 15
+    copies: "15"
   },
   {
     id: 1004,
@@ -9857,7 +9858,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Brown Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 249
+    copies: "249"
   },
   {
     id: 1005,
@@ -9912,7 +9913,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Millionaire Shimmer Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 500
+    copies: "500"
   },
   {
     id: 1011,
@@ -9922,7 +9923,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1012,
@@ -9932,7 +9933,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Wave Millionaire Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1013,
@@ -9942,7 +9943,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Millionaire Shimmer Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 1014,
@@ -9952,7 +9953,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 24
+    copies: "24"
   },
   {
     id: 1015,
@@ -9962,7 +9963,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Light Blue Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1016,
@@ -9981,7 +9982,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Neon Green Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1018,
@@ -9991,7 +9992,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 124
+    copies: "124"
   },
   {
     id: 1019,
@@ -10001,7 +10002,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Millionaire Shimmer Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1020,
@@ -10011,7 +10012,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1021,
@@ -10021,7 +10022,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Millionaire Shimmer Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1022,
@@ -10040,7 +10041,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Question Mark Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1024,
@@ -10050,7 +10051,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Millionaire Shimmer Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 100
+    copies: "100"
   },
   {
     id: 1025,
@@ -10060,7 +10061,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1026,
@@ -10088,7 +10089,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Millionaire Shimmer Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1029,
@@ -10107,7 +10108,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Finite Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1031,
@@ -10117,7 +10118,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1032,
@@ -10127,7 +10128,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Velocity Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 39
+    copies: "39"
   },
   {
     id: 1033,
@@ -10137,7 +10138,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1034,
@@ -10147,7 +10148,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Pulsar Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1035,
@@ -10175,7 +10176,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cherry Blossom FOTL Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 1038,
@@ -10185,7 +10186,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1039,
@@ -10195,7 +10196,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1040,
@@ -10214,7 +10215,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1042,
@@ -10224,7 +10225,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Ice Gold Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1043,
@@ -10252,7 +10253,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Ice White Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 35
+    copies: "35"
   },
   {
     id: 1046,
@@ -10262,7 +10263,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lotus Flower FOTL Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1047,
@@ -10272,7 +10273,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1048,
@@ -10282,7 +10283,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1049,
@@ -10292,7 +10293,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1050,
@@ -10311,7 +10312,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Velocity Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 79
+    copies: "79"
   },
   {
     id: 1052,
@@ -10321,7 +10322,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1053,
@@ -10331,7 +10332,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pulsar Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 499
+    copies: "499"
   },
   {
     id: 1054,
@@ -10341,7 +10342,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1055,
@@ -10351,7 +10352,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1056,
@@ -10361,7 +10362,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pulsar Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1057,
@@ -10389,7 +10390,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1060,
@@ -10426,7 +10427,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Finite",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1064,
@@ -10436,7 +10437,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Gold",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1065,
@@ -10446,7 +10447,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Bronze Checker",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1066,
@@ -10456,7 +10457,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1067,
@@ -10466,7 +10467,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Flash",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1068,
@@ -10476,7 +10477,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Vinyl",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1069,
@@ -10495,7 +10496,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Ice Gold",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1071,
@@ -10505,7 +10506,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Light Blue Disco",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 1072,
@@ -10515,7 +10516,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Neon Green",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1073,
@@ -10534,7 +10535,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink Shimmer FOTL",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1075,
@@ -10544,7 +10545,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink and Purple",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1076,
@@ -10554,7 +10555,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple Ice",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1077,
@@ -10564,7 +10565,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1078,
@@ -10583,7 +10584,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red and Blue",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 1080,
@@ -10611,7 +10612,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Tie-Dye",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1083,
@@ -10630,7 +10631,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms White",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1085,
@@ -10658,7 +10659,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Finite",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1088,
@@ -10668,7 +10669,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Gold",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1089,
@@ -10678,7 +10679,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Bronze Checker",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1090,
@@ -10688,7 +10689,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1091,
@@ -10698,7 +10699,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Flash",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1092,
@@ -10708,7 +10709,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Vinyl",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1093,
@@ -10727,7 +10728,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Ice Gold",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1095,
@@ -10737,7 +10738,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Neon Green",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1096,
@@ -10747,7 +10748,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Orange",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 1097,
@@ -10766,7 +10767,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink Shimmer FOTL",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1099,
@@ -10776,7 +10777,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink and Purple",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1100,
@@ -10786,7 +10787,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1101,
@@ -10796,7 +10797,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple Ice",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1102,
@@ -10815,7 +10816,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red and Blue",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 1104,
@@ -10843,7 +10844,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Tie-Dye",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1107,
@@ -10862,7 +10863,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms White",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1109,
@@ -10890,7 +10891,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Finite Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1112,
@@ -10900,7 +10901,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Velocity Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 39
+    copies: "39"
   },
   {
     id: 1113,
@@ -10910,7 +10911,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1114,
@@ -10920,7 +10921,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Pulsar Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1115,
@@ -10939,7 +10940,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Carolina Blue Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 1117,
@@ -10958,7 +10959,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cherry Blossoms Prizms FOTL",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 1119,
@@ -10968,7 +10969,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1120,
@@ -10978,7 +10979,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1121,
@@ -10997,7 +10998,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1123,
@@ -11025,7 +11026,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lime Green Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 225
+    copies: "225"
   },
   {
     id: 1126,
@@ -11035,7 +11036,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lotus Flower Prizms FOTL",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1127,
@@ -11045,7 +11046,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1128,
@@ -11055,7 +11056,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1129,
@@ -11065,7 +11066,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1130,
@@ -11084,7 +11085,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 175
+    copies: "175"
   },
   {
     id: 1132,
@@ -11094,7 +11095,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Velocity Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 79
+    copies: "79"
   },
   {
     id: 1133,
@@ -11104,7 +11105,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1134,
@@ -11114,7 +11115,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Velocity Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 59
+    copies: "59"
   },
   {
     id: 1135,
@@ -11124,7 +11125,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pandora Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1136,
@@ -11134,7 +11135,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Power Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1137,
@@ -11144,7 +11145,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1138,
@@ -11154,7 +11155,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pulsar Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1139,
@@ -11191,7 +11192,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1143,
@@ -11201,7 +11202,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "WNBA Logo Gold Prizms",
     player: "harrison",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1144,
@@ -11238,7 +11239,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Platinum",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1148,
@@ -11257,7 +11258,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Laser Press Proof",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1150,
@@ -11267,7 +11268,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Laser Press Proof",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1151,
@@ -11286,7 +11287,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Optic Gold",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1153,
@@ -11296,7 +11297,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Optic Gold Vinyl",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1154,
@@ -11315,7 +11316,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Press Proof",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1156,
@@ -11325,7 +11326,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Silver Press Proof",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1157,
@@ -11362,7 +11363,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1161,
@@ -11372,7 +11373,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1162,
@@ -11382,7 +11383,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1163,
@@ -11392,7 +11393,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1164,
@@ -11420,7 +11421,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1167,
@@ -11448,7 +11449,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1170,
@@ -11458,7 +11459,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 65
+    copies: "65"
   },
   {
     id: 1171,
@@ -11468,7 +11469,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 1172,
@@ -11478,7 +11479,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 275
+    copies: "275"
   },
   {
     id: 1173,
@@ -11497,7 +11498,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Scope",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1175,
@@ -11527,7 +11528,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nurse",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1178,
@@ -11538,7 +11539,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nurse",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1179,
@@ -11569,7 +11570,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nurse",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1182,
@@ -11589,7 +11590,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1184,
@@ -11608,7 +11609,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms 25th Anniversary",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1186,
@@ -11618,7 +11619,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1187,
@@ -11628,7 +11629,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Gold",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1188,
@@ -11638,7 +11639,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Blue",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1189,
@@ -11648,7 +11649,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1190,
@@ -11676,7 +11677,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Green Pulsar",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1193,
@@ -11704,7 +11705,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Mojo",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1196,
@@ -11714,7 +11715,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Mosaic",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1197,
@@ -11724,7 +11725,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Orange",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1198,
@@ -11734,7 +11735,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1199,
@@ -11744,7 +11745,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1200,
@@ -11792,7 +11793,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nurse",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1205,
@@ -11803,7 +11804,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nurse",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1206,
@@ -11834,7 +11835,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nurse",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1209,
@@ -11845,7 +11846,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nurse",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1210,
@@ -11866,7 +11867,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nurse",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1212,
@@ -11876,7 +11877,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "nurse",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1213,
@@ -11895,7 +11896,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1215,
@@ -11905,7 +11906,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1216,
@@ -11915,7 +11916,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1217,
@@ -11925,7 +11926,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1218,
@@ -11953,7 +11954,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1221,
@@ -11981,7 +11982,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1224,
@@ -11991,7 +11992,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1225,
@@ -12001,7 +12002,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1226,
@@ -12011,7 +12012,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1227,
@@ -12021,7 +12022,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1228,
@@ -12031,7 +12032,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1229,
@@ -12077,7 +12078,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1234,
@@ -12087,7 +12088,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1235,
@@ -12097,7 +12098,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1236,
@@ -12125,7 +12126,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 35
+    copies: "35"
   },
   {
     id: 1239,
@@ -12144,7 +12145,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Prizms",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1241,
@@ -12154,7 +12155,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 175
+    copies: "175"
   },
   {
     id: 1242,
@@ -12173,7 +12174,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1244,
@@ -12183,7 +12184,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1245,
@@ -12202,7 +12203,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1247,
@@ -12230,7 +12231,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1250,
@@ -12240,7 +12241,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1251,
@@ -12250,7 +12251,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1252,
@@ -12260,7 +12261,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set Prizms",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1253,
@@ -12270,7 +12271,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1254,
@@ -12280,7 +12281,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1255,
@@ -12308,7 +12309,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal",
     player: "nurse",
     team: "Phoenix Mercury",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1258,
@@ -12336,7 +12337,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Viper",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1261,
@@ -12346,7 +12347,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jaguar",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1262,
@@ -12356,7 +12357,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jungle",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1263,
@@ -12366,7 +12367,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Tiger",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1264,
@@ -12385,7 +12386,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1266,
@@ -12395,7 +12396,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1267,
@@ -12405,7 +12406,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1268,
@@ -12415,7 +12416,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1269,
@@ -12425,7 +12426,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1270,
@@ -12444,7 +12445,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1272,
@@ -12463,7 +12464,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1274,
@@ -12473,7 +12474,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1275,
@@ -12483,7 +12484,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Millionaire Shimmer Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1276,
@@ -12493,7 +12494,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Boardwalk Blue Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 15
+    copies: "15"
   },
   {
     id: 1277,
@@ -12503,7 +12504,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Brown Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 249
+    copies: "249"
   },
   {
     id: 1278,
@@ -12558,7 +12559,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Millionaire Shimmer Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 500
+    copies: "500"
   },
   {
     id: 1284,
@@ -12568,7 +12569,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1285,
@@ -12578,7 +12579,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Wave Millionaire Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1286,
@@ -12588,7 +12589,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Millionaire Shimmer Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 1287,
@@ -12598,7 +12599,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 24
+    copies: "24"
   },
   {
     id: 1288,
@@ -12608,7 +12609,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Light Blue Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1289,
@@ -12627,7 +12628,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Neon Green Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1291,
@@ -12637,7 +12638,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 124
+    copies: "124"
   },
   {
     id: 1292,
@@ -12647,7 +12648,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Millionaire Shimmer Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1293,
@@ -12657,7 +12658,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1294,
@@ -12667,7 +12668,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Millionaire Shimmer Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1295,
@@ -12686,7 +12687,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Question Mark Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1297,
@@ -12696,7 +12697,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Millionaire Shimmer Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 100
+    copies: "100"
   },
   {
     id: 1298,
@@ -12706,7 +12707,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1299,
@@ -12734,7 +12735,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Millionaire Shimmer Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1302,
@@ -12753,7 +12754,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fractal Prizms Blue",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1304,
@@ -12763,7 +12764,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fractal Prizms Blue Pulsar",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1305,
@@ -12773,7 +12774,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fractal Prizms Gold",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1306,
@@ -12783,7 +12784,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fractal Prizms Gold Vinyl",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1307,
@@ -12802,7 +12803,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fractal Prizms Green Pulsar",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1309,
@@ -12812,7 +12813,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fractal Prizms Mojo",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1310,
@@ -12822,7 +12823,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fractal Prizms Orange Pulsar",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1311,
@@ -12832,7 +12833,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fractal Prizms Red",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1312,
@@ -12851,7 +12852,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Finite Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1314,
@@ -12861,7 +12862,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1315,
@@ -12871,7 +12872,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Velocity Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 39
+    copies: "39"
   },
   {
     id: 1316,
@@ -12881,7 +12882,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1317,
@@ -12891,7 +12892,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Pulsar Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1318,
@@ -12919,7 +12920,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cherry Blossom FOTL Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 1321,
@@ -12929,7 +12930,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1322,
@@ -12939,7 +12940,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1323,
@@ -12958,7 +12959,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1325,
@@ -12968,7 +12969,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Ice Gold Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1326,
@@ -12996,7 +12997,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Ice White Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 35
+    copies: "35"
   },
   {
     id: 1329,
@@ -13006,7 +13007,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lotus Flower FOTL Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1330,
@@ -13016,7 +13017,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1331,
@@ -13026,7 +13027,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1332,
@@ -13036,7 +13037,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1333,
@@ -13055,7 +13056,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Velocity Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 79
+    copies: "79"
   },
   {
     id: 1335,
@@ -13065,7 +13066,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1336,
@@ -13075,7 +13076,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pulsar Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 499
+    copies: "499"
   },
   {
     id: 1337,
@@ -13085,7 +13086,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1338,
@@ -13095,7 +13096,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1339,
@@ -13105,7 +13106,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pulsar Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1340,
@@ -13133,7 +13134,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Prizms",
     player: "nurse",
     team: "Los Angeles Sparks",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1343,
@@ -13179,7 +13180,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Artist Proof",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1348,
@@ -13189,7 +13190,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Laser",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1349,
@@ -13199,7 +13200,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Holo Press Proof",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1350,
@@ -13209,7 +13210,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Shimmer",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1351,
@@ -13219,7 +13220,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Laser",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1352,
@@ -13229,7 +13230,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Shimmer",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1353,
@@ -13257,7 +13258,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Shimmer",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1356,
@@ -13294,7 +13295,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Black Laser",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1360,
@@ -13304,7 +13305,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Gold Laser",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1361,
@@ -13314,7 +13315,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Team Logo",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 13
+    copies: "13"
   },
   {
     id: 1362,
@@ -13342,7 +13343,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Light Blue Lava",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1365,
@@ -13352,7 +13353,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Laser",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1366,
@@ -13362,7 +13363,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Lava",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1367,
@@ -13372,7 +13373,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Laser",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1368,
@@ -13382,7 +13383,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Shimmer",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1369,
@@ -13392,7 +13393,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Laser",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1370,
@@ -13402,7 +13403,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Lava",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1371,
@@ -13412,7 +13413,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Shimmer",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1372,
@@ -13422,7 +13423,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Holo",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1373,
@@ -13432,7 +13433,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Lava",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 1374,
@@ -13442,7 +13443,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Shimmer",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 1375,
@@ -13452,7 +13453,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Laser",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 1376,
@@ -13462,7 +13463,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Yellow Lava",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1377,
@@ -13481,7 +13482,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Gold",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1379,
@@ -13491,7 +13492,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Green",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 30
+    copies: "30"
   },
   {
     id: 1380,
@@ -13501,7 +13502,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Holo Platinum Blue",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1381,
@@ -13511,7 +13512,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Prime",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1382,
@@ -13530,7 +13531,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1384,
@@ -13540,7 +13541,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Amethyst",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 8
+    copies: "8"
   },
   {
     id: 1385,
@@ -13550,7 +13551,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1386,
@@ -13560,7 +13561,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Gold",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1387,
@@ -13570,7 +13571,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Silver",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 15
+    copies: "15"
   },
   {
     id: 1388,
@@ -13580,7 +13581,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Platinum",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1389,
@@ -13590,7 +13591,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Silver",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 40
+    copies: "40"
   },
   {
     id: 1390,
@@ -13601,7 +13602,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nurse",
     team: "Chicago Sky",
     isAuto: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1391,
@@ -13612,7 +13613,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nurse",
     team: "Chicago Sky",
     isAuto: true,
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1392,
@@ -13622,7 +13623,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Indelible Ink Signatures Holo Gold",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1393,
@@ -13632,7 +13633,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Indelible Ink Signatures Holo Silver",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1394,
@@ -13642,7 +13643,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Indelible Ink Signatures Platinum",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1395,
@@ -13652,7 +13653,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1396,
@@ -13662,7 +13663,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Emerald",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1397,
@@ -13672,7 +13673,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Gold",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1398,
@@ -13682,7 +13683,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Platinum Blue",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1399,
@@ -13692,7 +13693,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 6
+    copies: "6"
   },
   {
     id: 1400,
@@ -13702,7 +13703,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1401,
@@ -13721,7 +13722,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Finite Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1403,
@@ -13731,7 +13732,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Velocity Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 39
+    copies: "39"
   },
   {
     id: 1404,
@@ -13741,7 +13742,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1405,
@@ -13751,7 +13752,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Pulsar Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1406,
@@ -13770,7 +13771,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Carolina Blue Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 1408,
@@ -13789,7 +13790,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cherry Blossoms Prizms FOTL",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 1410,
@@ -13799,7 +13800,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1411,
@@ -13809,7 +13810,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1412,
@@ -13828,7 +13829,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1414,
@@ -13856,7 +13857,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lime Green Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 225
+    copies: "225"
   },
   {
     id: 1417,
@@ -13866,7 +13867,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lotus Flower Prizms FOTL",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1418,
@@ -13876,7 +13877,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1419,
@@ -13886,7 +13887,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1420,
@@ -13896,7 +13897,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1421,
@@ -13915,7 +13916,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 175
+    copies: "175"
   },
   {
     id: 1423,
@@ -13925,7 +13926,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Velocity Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 79
+    copies: "79"
   },
   {
     id: 1424,
@@ -13935,7 +13936,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1425,
@@ -13945,7 +13946,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Velocity Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 59
+    copies: "59"
   },
   {
     id: 1426,
@@ -13955,7 +13956,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pandora Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1427,
@@ -13965,7 +13966,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Power Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1428,
@@ -13975,7 +13976,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1429,
@@ -13985,7 +13986,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pulsar Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1430,
@@ -14022,7 +14023,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1434,
@@ -14032,7 +14033,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "WNBA Logo Gold Prizms",
     player: "nurse",
     team: "Chicago Sky",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1435,
@@ -14070,7 +14071,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1439,
@@ -14080,7 +14081,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1440,
@@ -14090,7 +14091,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1441,
@@ -14100,7 +14101,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1442,
@@ -14128,7 +14129,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1445,
@@ -14156,7 +14157,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1448,
@@ -14166,7 +14167,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1449,
@@ -14176,7 +14177,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1450,
@@ -14186,7 +14187,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1451,
@@ -14196,7 +14197,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1452,
@@ -14206,7 +14207,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1453,
@@ -14254,7 +14255,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1458,
@@ -14265,7 +14266,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1459,
@@ -14296,7 +14297,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1462,
@@ -14307,7 +14308,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1463,
@@ -14328,7 +14329,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1465,
@@ -14347,7 +14348,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Rookie Revolution Cubic",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1467,
@@ -14394,7 +14395,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cosmic",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1472,
@@ -14404,7 +14405,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cubic",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1473,
@@ -14441,7 +14442,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Impact",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1477,
@@ -14451,7 +14452,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lava",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1478,
@@ -14461,7 +14462,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Sunburst",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1479,
@@ -14482,7 +14483,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1481,
@@ -14493,7 +14494,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1482,
@@ -14504,7 +14505,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1483,
@@ -14515,7 +14516,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1484,
@@ -14534,7 +14535,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1486,
@@ -14544,7 +14545,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1487,
@@ -14554,7 +14555,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1488,
@@ -14582,7 +14583,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 35
+    copies: "35"
   },
   {
     id: 1491,
@@ -14592,7 +14593,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 85
+    copies: "85"
   },
   {
     id: 1492,
@@ -14602,7 +14603,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Viper",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1493,
@@ -14612,7 +14613,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jaguar",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1494,
@@ -14622,7 +14623,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jungle",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1495,
@@ -14632,7 +14633,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Tiger",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1496,
@@ -14651,7 +14652,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Art Nouveau Memorabilia Black",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1498,
@@ -14661,7 +14662,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Art Nouveau Memorabilia Blue",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1499,
@@ -14671,7 +14672,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Art Nouveau Memorabilia Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1500,
@@ -14681,7 +14682,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Art Nouveau Memorabilia Red",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1501,
@@ -14700,7 +14701,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1503,
@@ -14710,7 +14711,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1504,
@@ -14720,7 +14721,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Millionaire Shimmer Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1505,
@@ -14730,7 +14731,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Boardwalk Blue Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 15
+    copies: "15"
   },
   {
     id: 1506,
@@ -14740,7 +14741,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Brown Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 249
+    copies: "249"
   },
   {
     id: 1507,
@@ -14795,7 +14796,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Millionaire Shimmer Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 500
+    copies: "500"
   },
   {
     id: 1513,
@@ -14805,7 +14806,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1514,
@@ -14815,7 +14816,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Wave Millionaire Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1515,
@@ -14825,7 +14826,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Millionaire Shimmer Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 1516,
@@ -14835,7 +14836,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 24
+    copies: "24"
   },
   {
     id: 1517,
@@ -14845,7 +14846,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Light Blue Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1518,
@@ -14864,7 +14865,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Neon Green Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1520,
@@ -14874,7 +14875,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 124
+    copies: "124"
   },
   {
     id: 1521,
@@ -14884,7 +14885,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Millionaire Shimmer Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1522,
@@ -14894,7 +14895,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1523,
@@ -14904,7 +14905,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Millionaire Shimmer Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1524,
@@ -14923,7 +14924,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Question Mark Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1526,
@@ -14933,7 +14934,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Millionaire Shimmer Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 100
+    copies: "100"
   },
   {
     id: 1527,
@@ -14943,7 +14944,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1528,
@@ -14971,7 +14972,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Millionaire Shimmer Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1531,
@@ -14990,7 +14991,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Finite Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1533,
@@ -15000,7 +15001,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1534,
@@ -15010,7 +15011,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Velocity Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 39
+    copies: "39"
   },
   {
     id: 1535,
@@ -15020,7 +15021,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1536,
@@ -15030,7 +15031,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Pulsar Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1537,
@@ -15058,7 +15059,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cherry Blossom FOTL Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 1540,
@@ -15068,7 +15069,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1541,
@@ -15078,7 +15079,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1542,
@@ -15097,7 +15098,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1544,
@@ -15107,7 +15108,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Ice Gold Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1545,
@@ -15135,7 +15136,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Ice White Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 35
+    copies: "35"
   },
   {
     id: 1548,
@@ -15145,7 +15146,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lotus Flower FOTL Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1549,
@@ -15155,7 +15156,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1550,
@@ -15165,7 +15166,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1551,
@@ -15175,7 +15176,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1552,
@@ -15194,7 +15195,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Velocity Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 79
+    copies: "79"
   },
   {
     id: 1554,
@@ -15204,7 +15205,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Premium Box Set Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1555,
@@ -15214,7 +15215,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pulsar Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 499
+    copies: "499"
   },
   {
     id: 1556,
@@ -15224,7 +15225,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1557,
@@ -15234,7 +15235,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1558,
@@ -15244,7 +15245,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pulsar Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1559,
@@ -15272,7 +15273,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1562,
@@ -15311,7 +15312,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1566,
@@ -15322,7 +15323,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1567,
@@ -15333,7 +15334,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1568,
@@ -15354,7 +15355,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1570,
@@ -15365,7 +15366,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1571,
@@ -15376,7 +15377,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1572,
@@ -15387,7 +15388,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1573,
@@ -15398,7 +15399,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 35
+    copies: "35"
   },
   {
     id: 1574,
@@ -15409,7 +15410,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1575,
@@ -15428,7 +15429,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Select Future Prizms Black Finite",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1577,
@@ -15438,7 +15439,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Select Future Prizms Black Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1578,
@@ -15448,7 +15449,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Select Future Prizms Black Pandora",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 8
+    copies: "8"
   },
   {
     id: 1579,
@@ -15458,7 +15459,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Select Future Prizms Blue",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1580,
@@ -15468,7 +15469,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Select Future Prizms Blue Flash",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1581,
@@ -15487,7 +15488,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Select Future Prizms Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1583,
@@ -15497,7 +15498,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Select Future Prizms Gold Flash",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1584,
@@ -15507,7 +15508,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Select Future Prizms Gold Vinyl",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1585,
@@ -15526,7 +15527,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Select Future Prizms Tie-Dye",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1587,
@@ -15536,7 +15537,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Select Future Prizms White Disco",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1588,
@@ -15555,7 +15556,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Finite",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1590,
@@ -15565,7 +15566,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1591,
@@ -15575,7 +15576,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Bronze Checker",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1592,
@@ -15585,7 +15586,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1593,
@@ -15595,7 +15596,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Flash",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1594,
@@ -15605,7 +15606,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Vinyl",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1595,
@@ -15624,7 +15625,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Ice Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1597,
@@ -15634,7 +15635,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Light Blue Disco",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 1598,
@@ -15644,7 +15645,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Neon Green",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1599,
@@ -15663,7 +15664,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink Shimmer FOTL",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1601,
@@ -15673,7 +15674,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink and Purple",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1602,
@@ -15683,7 +15684,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple Ice",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1603,
@@ -15693,7 +15694,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1604,
@@ -15712,7 +15713,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red and Blue",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 1606,
@@ -15740,7 +15741,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Tie-Dye",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1609,
@@ -15759,7 +15760,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms White",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1611,
@@ -15787,7 +15788,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Finite",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1614,
@@ -15797,7 +15798,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Black Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1615,
@@ -15807,7 +15808,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Bronze Checker",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1616,
@@ -15817,7 +15818,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1617,
@@ -15827,7 +15828,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Flash",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1618,
@@ -15837,7 +15838,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Gold Vinyl",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1619,
@@ -15856,7 +15857,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Ice Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1621,
@@ -15866,7 +15867,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Neon Green",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1622,
@@ -15876,7 +15877,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Orange",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 1623,
@@ -15895,7 +15896,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink Shimmer FOTL",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1625,
@@ -15905,7 +15906,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Pink and Purple",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1626,
@@ -15915,7 +15916,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1627,
@@ -15925,7 +15926,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Purple Ice",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1628,
@@ -15944,7 +15945,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Red and Blue",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 1630,
@@ -15972,7 +15973,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms Tie-Dye",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1633,
@@ -15991,7 +15992,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Prizms White",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1635,
@@ -16021,7 +16022,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1638,
@@ -16032,7 +16033,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1639,
@@ -16043,7 +16044,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1640,
@@ -16054,7 +16055,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1641,
@@ -16065,7 +16066,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1642,
@@ -16076,7 +16077,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1643,
@@ -16097,7 +16098,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1645,
@@ -16108,7 +16109,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1646,
@@ -16119,7 +16120,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1647,
@@ -16130,7 +16131,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1648,
@@ -16151,7 +16152,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1650,
@@ -16162,7 +16163,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1651,
@@ -16173,7 +16174,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1652,
@@ -16184,7 +16185,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1653,
@@ -16195,7 +16196,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1654,
@@ -16206,7 +16207,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1655,
@@ -16227,7 +16228,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1657,
@@ -16238,7 +16239,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1658,
@@ -16249,7 +16250,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1659,
@@ -16260,7 +16261,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1660,
@@ -16279,7 +16280,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Selective Swatches Prizms Black Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1662,
@@ -16289,7 +16290,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Selective Swatches Prizms Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1663,
@@ -16299,7 +16300,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Selective Swatches Prizms Gold Vinyl",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1664,
@@ -16309,7 +16310,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Selective Swatches Prizms Purple",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1665,
@@ -16319,7 +16320,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Selective Swatches Prizms Tie-Dye",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1666,
@@ -16338,7 +16339,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1668,
@@ -16348,7 +16349,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Green",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 30
+    copies: "30"
   },
   {
     id: 1669,
@@ -16358,7 +16359,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Holo Platinum Blue",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1670,
@@ -16368,7 +16369,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Jersey Series Prime",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1671,
@@ -16387,7 +16388,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Championship Moments",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1673,
@@ -16406,7 +16407,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Artist Proof",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1675,
@@ -16416,7 +16417,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold Laser",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1676,
@@ -16426,7 +16427,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Holo Press Proof",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1677,
@@ -16436,7 +16437,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Shimmer",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1678,
@@ -16446,7 +16447,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Laser",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1679,
@@ -16456,7 +16457,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Shimmer",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1680,
@@ -16484,7 +16485,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Shimmer",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1683,
@@ -16521,7 +16522,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Black Laser",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1687,
@@ -16531,7 +16532,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Gold Laser",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1688,
@@ -16541,7 +16542,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Team Logo",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 13
+    copies: "13"
   },
   {
     id: 1689,
@@ -16569,7 +16570,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Light Blue Lava",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1692,
@@ -16579,7 +16580,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Laser",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1693,
@@ -16589,7 +16590,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Lava",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1694,
@@ -16599,7 +16600,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Laser",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1695,
@@ -16609,7 +16610,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Shimmer",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1696,
@@ -16619,7 +16620,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Laser",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1697,
@@ -16629,7 +16630,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Lava",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1698,
@@ -16639,7 +16640,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Shimmer",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1699,
@@ -16649,7 +16650,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Holo",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1700,
@@ -16659,7 +16660,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Lava",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 1701,
@@ -16669,7 +16670,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Shimmer",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 1702,
@@ -16679,7 +16680,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Laser",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 1703,
@@ -16689,7 +16690,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Yellow Lava",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1704,
@@ -16710,7 +16711,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1706,
@@ -16721,7 +16722,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1707,
@@ -16732,7 +16733,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1708,
@@ -16743,7 +16744,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1709,
@@ -16754,7 +16755,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1710,
@@ -16785,7 +16786,7 @@ window.TEMPO_ALL_CARDS = [
     player: "sabally",
     team: "New York Liberty",
     isAuto: true,
-    printRun: 15
+    copies: "15"
   },
   {
     id: 1713,
@@ -16795,7 +16796,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1714,
@@ -16805,7 +16806,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Amethyst",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 8
+    copies: "8"
   },
   {
     id: 1715,
@@ -16815,7 +16816,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1716,
@@ -16825,7 +16826,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1717,
@@ -16835,7 +16836,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Silver",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 15
+    copies: "15"
   },
   {
     id: 1718,
@@ -16845,7 +16846,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Platinum",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1719,
@@ -16855,7 +16856,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Silver",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 40
+    copies: "40"
   },
   {
     id: 1720,
@@ -16865,7 +16866,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 86
+    copies: "86"
   },
   {
     id: 1721,
@@ -16875,7 +16876,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1722,
@@ -16885,7 +16886,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Emerald",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1723,
@@ -16895,7 +16896,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Gold",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1724,
@@ -16905,7 +16906,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Platinum Blue",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1725,
@@ -16915,7 +16916,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 6
+    copies: "6"
   },
   {
     id: 1726,
@@ -16925,7 +16926,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1727,
@@ -16944,7 +16945,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Finite Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1729,
@@ -16954,7 +16955,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Velocity Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 39
+    copies: "39"
   },
   {
     id: 1730,
@@ -16964,7 +16965,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1731,
@@ -16974,7 +16975,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Pulsar Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1732,
@@ -16993,7 +16994,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Carolina Blue Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 1734,
@@ -17012,7 +17013,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cherry Blossoms Prizms FOTL",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 1736,
@@ -17022,7 +17023,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1737,
@@ -17032,7 +17033,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1738,
@@ -17051,7 +17052,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1740,
@@ -17079,7 +17080,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lime Green Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 225
+    copies: "225"
   },
   {
     id: 1743,
@@ -17089,7 +17090,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lotus Flower Prizms FOTL",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1744,
@@ -17099,7 +17100,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1745,
@@ -17109,7 +17110,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1746,
@@ -17119,7 +17120,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1747,
@@ -17138,7 +17139,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 175
+    copies: "175"
   },
   {
     id: 1749,
@@ -17148,7 +17149,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Velocity Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 79
+    copies: "79"
   },
   {
     id: 1750,
@@ -17158,7 +17159,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1751,
@@ -17168,7 +17169,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Velocity Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 59
+    copies: "59"
   },
   {
     id: 1752,
@@ -17178,7 +17179,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pandora Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1753,
@@ -17188,7 +17189,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Power Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1754,
@@ -17198,7 +17199,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1755,
@@ -17208,7 +17209,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pulsar Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1756,
@@ -17245,7 +17246,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1760,
@@ -17255,7 +17256,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "WNBA Logo Gold Prizms",
     player: "sabally",
     team: "New York Liberty",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1761,
@@ -17412,7 +17413,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nye",
     team: "Alabama (NCAA)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1778,
@@ -17423,7 +17424,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nye",
     team: "Alabama (NCAA)",
     isAuto: true,
-    printRun: 9
+    copies: "9"
   },
   {
     id: 1779,
@@ -17434,7 +17435,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nye",
     team: "Alabama (NCAA)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1780,
@@ -17445,7 +17446,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nye",
     team: "Alabama (NCAA)",
     isAuto: true,
-    printRun: 9
+    copies: "9"
   },
   {
     id: 1781,
@@ -17456,7 +17457,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nye",
     team: "Las Vegas Aces",
     isRookie: true,
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1782,
@@ -17466,7 +17467,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Amethyst",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 8
+    copies: "8"
   },
   {
     id: 1783,
@@ -17476,7 +17477,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1784,
@@ -17486,7 +17487,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Gold",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1785,
@@ -17496,7 +17497,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Silver",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 15
+    copies: "15"
   },
   {
     id: 1786,
@@ -17506,7 +17507,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Platinum",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1787,
@@ -17516,7 +17517,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Silver",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 40
+    copies: "40"
   },
   {
     id: 1788,
@@ -17526,7 +17527,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 196
+    copies: "196"
   },
   {
     id: 1789,
@@ -17536,7 +17537,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 59
+    copies: "59"
   },
   {
     id: 1790,
@@ -17546,7 +17547,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 90
+    copies: "90"
   },
   {
     id: 1791,
@@ -17556,7 +17557,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 2467
+    copies: "2467"
   },
   {
     id: 1792,
@@ -17567,7 +17568,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nye",
     team: "Las Vegas Aces",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1793,
@@ -17578,7 +17579,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nye",
     team: "Las Vegas Aces",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1794,
@@ -17589,7 +17590,7 @@ window.TEMPO_ALL_CARDS = [
     player: "nye",
     team: "Las Vegas Aces",
     isRookie: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1795,
@@ -17599,7 +17600,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Emerald",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1796,
@@ -17609,7 +17610,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Gold",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1797,
@@ -17619,7 +17620,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Holo Platinum Blue",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1798,
@@ -17629,7 +17630,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 6
+    copies: "6"
   },
   {
     id: 1799,
@@ -17639,7 +17640,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1800,
@@ -17659,7 +17660,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Finite Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1802,
@@ -17669,7 +17670,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Velocity Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 39
+    copies: "39"
   },
   {
     id: 1803,
@@ -17679,7 +17680,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1804,
@@ -17689,7 +17690,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Pulsar Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1805,
@@ -17708,7 +17709,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Carolina Blue Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 1807,
@@ -17727,7 +17728,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Cherry Blossoms Prizms FOTL",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 20
+    copies: "20"
   },
   {
     id: 1809,
@@ -17737,7 +17738,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1810,
@@ -17747,7 +17748,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Vinyl Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1811,
@@ -17766,7 +17767,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1813,
@@ -17794,7 +17795,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lime Green Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 225
+    copies: "225"
   },
   {
     id: 1816,
@@ -17804,7 +17805,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lotus Flower Prizms FOTL",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1817,
@@ -17814,7 +17815,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1818,
@@ -17824,7 +17825,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mosaic Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 3
+    copies: "3"
   },
   {
     id: 1819,
@@ -17834,7 +17835,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1820,
@@ -17853,7 +17854,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 175
+    copies: "175"
   },
   {
     id: 1822,
@@ -17863,7 +17864,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Velocity Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 79
+    copies: "79"
   },
   {
     id: 1823,
@@ -17873,7 +17874,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1824,
@@ -17883,7 +17884,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Velocity Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 59
+    copies: "59"
   },
   {
     id: 1825,
@@ -17893,7 +17894,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pandora Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1826,
@@ -17903,7 +17904,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Power Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1827,
@@ -17913,7 +17914,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1828,
@@ -17923,7 +17924,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Pulsar Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1829,
@@ -17960,7 +17961,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Teal Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 49
+    copies: "49"
   },
   {
     id: 1833,
@@ -17970,7 +17971,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "WNBA Logo Gold Prizms",
     player: "nye",
     team: "Las Vegas Aces",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1834,
@@ -18008,7 +18009,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "laksa",
     team: "Seattle Storm",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1838,
@@ -18018,7 +18019,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Gold",
     player: "laksa",
     team: "Seattle Storm",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1839,
@@ -18028,7 +18029,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "laksa",
     team: "Seattle Storm",
-    printRun: 149
+    copies: "149"
   },
   {
     id: 1840,
@@ -18038,7 +18039,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "laksa",
     team: "Seattle Storm",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1841,
@@ -18066,7 +18067,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Pulsar",
     player: "laksa",
     team: "Seattle Storm",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1844,
@@ -18094,7 +18095,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mojo",
     player: "laksa",
     team: "Seattle Storm",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1847,
@@ -18104,7 +18105,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "laksa",
     team: "Seattle Storm",
-    printRun: 65
+    copies: "65"
   },
   {
     id: 1848,
@@ -18114,7 +18115,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "laksa",
     team: "Seattle Storm",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 1849,
@@ -18124,7 +18125,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "laksa",
     team: "Seattle Storm",
-    printRun: 275
+    copies: "275"
   },
   {
     id: 1850,
@@ -18143,7 +18144,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Scope",
     player: "laksa",
     team: "Seattle Storm",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1852,
@@ -18162,7 +18163,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "laksa",
     team: "Seattle Storm",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1854,
@@ -18172,7 +18173,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "laksa",
     team: "Phoenix Mercury",
-    printRun: 62
+    copies: "62"
   },
   {
     id: 1855,
@@ -18182,7 +18183,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "held",
     team: "Indiana Fever",
-    printRun: 102
+    copies: "102"
   },
   {
     id: 1856,
@@ -18192,7 +18193,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "held",
     team: "Indiana Fever",
-    printRun: 2467
+    copies: "2467"
   },
   {
     id: 1857,
@@ -18249,7 +18250,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Masterpieces",
     player: "brondello",
     team: "Detroit Shock",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1863,
@@ -18259,7 +18260,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Platinum Medallion",
     player: "brondello",
     team: "Detroit Shock",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1864,
@@ -18314,7 +18315,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Front Row",
     player: "brondello",
     team: "Miami Sol",
-    printRun: 100
+    copies: "100"
   },
   {
     id: 1870,
@@ -18389,7 +18390,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Rookies",
     player: "wright",
     team: "Minnesota Lynx",
-    printRun: 250
+    copies: "250"
   },
   {
     id: 1878,
@@ -18399,7 +18400,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Base",
     player: "wright",
     team: "Minnesota Lynx",
-    printRun: 225
+    copies: "225"
   },
   {
     id: 1879,
@@ -18436,7 +18437,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Aqua Lava Refractors",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1883,
@@ -18446,7 +18447,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Refractors",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 150
+    copies: "150"
   },
   {
     id: 1884,
@@ -18456,7 +18457,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Lava Refractors",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1885,
@@ -18466,7 +18467,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Refractors",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1886,
@@ -18476,7 +18477,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Mini-Diamond Refractors",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1887,
@@ -18486,7 +18487,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Refractors",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1888,
@@ -18496,7 +18497,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Mini-Diamond Refractors",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1889,
@@ -18506,7 +18507,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Refractors",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1890,
@@ -18516,7 +18517,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Lava Refractors",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 100
+    copies: "100"
   },
   {
     id: 1891,
@@ -18526,7 +18527,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Refractors",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 250
+    copies: "250"
   },
   {
     id: 1892,
@@ -18536,7 +18537,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Lava Refractors",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1893,
@@ -18546,7 +18547,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Refractors",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1894,
@@ -18574,7 +18575,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Superfractors",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1897,
@@ -18595,7 +18596,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 150
+    copies: "150"
   },
   {
     id: 1899,
@@ -18606,7 +18607,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1900,
@@ -18617,7 +18618,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1901,
@@ -18628,7 +18629,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1902,
@@ -18639,7 +18640,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1903,
@@ -18650,7 +18651,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1904,
@@ -18661,7 +18662,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1905,
@@ -18672,7 +18673,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1906,
@@ -18683,7 +18684,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1907,
@@ -18694,7 +18695,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1908,
@@ -18715,7 +18716,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1910,
@@ -18726,7 +18727,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1911,
@@ -18745,7 +18746,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Aqua",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1913,
@@ -18755,7 +18756,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Aqua Wave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1914,
@@ -18765,7 +18766,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Shimmer",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1915,
@@ -18775,7 +18776,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1916,
@@ -18785,7 +18786,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue RayWave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1917,
@@ -18806,7 +18807,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1919,
@@ -18817,7 +18818,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1920,
@@ -18828,7 +18829,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1921,
@@ -18839,7 +18840,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1922,
@@ -18850,7 +18851,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1923,
@@ -18861,7 +18862,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1924,
@@ -18872,7 +18873,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1925,
@@ -18883,7 +18884,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1926,
@@ -18894,7 +18895,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 499
+    copies: "499"
   },
   {
     id: 1927,
@@ -18905,7 +18906,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1928,
@@ -18916,7 +18917,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1929,
@@ -18926,7 +18927,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fuchsia Mini-Diamond",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 150
+    copies: "150"
   },
   {
     id: 1930,
@@ -18936,7 +18937,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1931,
@@ -18946,7 +18947,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Shimmer",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1932,
@@ -18956,7 +18957,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1933,
@@ -18966,7 +18967,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Lava",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1934,
@@ -18976,7 +18977,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Shimmer",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1935,
@@ -18986,7 +18987,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1936,
@@ -18996,7 +18997,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Shimmer",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1937,
@@ -19015,7 +19016,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Pink Wave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 125
+    copies: "125"
   },
   {
     id: 1939,
@@ -19025,7 +19026,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 1940,
@@ -19035,7 +19036,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple Mini-Diamond",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 1941,
@@ -19054,7 +19055,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "RayWave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 100
+    copies: "100"
   },
   {
     id: 1943,
@@ -19064,7 +19065,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1944,
@@ -19074,7 +19075,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Shimmer",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1945,
@@ -19093,7 +19094,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "SuperFractor",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1947,
@@ -19103,7 +19104,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Yellow",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1948,
@@ -19122,7 +19123,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Aqua Foil V1",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1950,
@@ -19132,7 +19133,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Aqua Foil V2",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1951,
@@ -19142,7 +19143,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black Foil",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1952,
@@ -19152,7 +19153,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Foil V1",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1953,
@@ -19162,7 +19163,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Foil V2",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1954,
@@ -19173,7 +19174,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1955,
@@ -19183,7 +19184,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "FoilFractor",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1956,
@@ -19193,7 +19194,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fuschia Foil",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1957,
@@ -19203,7 +19204,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Foil V1",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1958,
@@ -19213,7 +19214,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold Foil V2",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1959,
@@ -19223,7 +19224,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Green Foil",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1960,
@@ -19233,7 +19234,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Foil",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1961,
@@ -19243,7 +19244,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plates Black",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1962,
@@ -19253,7 +19254,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plates Cyan",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1963,
@@ -19263,7 +19264,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plates Magenta",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1964,
@@ -19273,7 +19274,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plates Yellow",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1965,
@@ -19283,7 +19284,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Foil V1",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1966,
@@ -19293,7 +19294,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red Foil V2",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1967,
@@ -19314,7 +19315,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1969,
@@ -19325,7 +19326,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1970,
@@ -19336,7 +19337,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1971,
@@ -19347,7 +19348,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1972,
@@ -19358,7 +19359,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1973,
@@ -19369,7 +19370,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1974,
@@ -19380,7 +19381,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1975,
@@ -19399,7 +19400,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Aqua Wave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 1977,
@@ -19409,7 +19410,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 1978,
@@ -19419,7 +19420,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1979,
@@ -19429,7 +19430,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Mini-Diamond",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 1980,
@@ -19439,7 +19440,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fuchsia",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 150
+    copies: "150"
   },
   {
     id: 1981,
@@ -19449,7 +19450,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1982,
@@ -19459,7 +19460,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold RayWave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 1983,
@@ -19469,7 +19470,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lava",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 1984,
@@ -19488,7 +19489,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1986,
@@ -19498,7 +19499,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Basketball",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 1987,
@@ -19508,7 +19509,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plates Black",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1988,
@@ -19518,7 +19519,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plates Cyan",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1989,
@@ -19528,7 +19529,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plates Magenta",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1990,
@@ -19538,7 +19539,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plates Yellow",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1991,
@@ -19548,7 +19549,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 1992,
@@ -19567,7 +19568,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1994,
@@ -19577,7 +19578,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red RayWave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 1995,
@@ -19596,7 +19597,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "SuperFractor",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 1997,
@@ -19606,7 +19607,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Yellow",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 1998,
@@ -19625,7 +19626,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Aqua Wave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 2000,
@@ -19635,7 +19636,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 2001,
@@ -19645,7 +19646,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 2002,
@@ -19655,7 +19656,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Mini-Diamond",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 2003,
@@ -19665,7 +19666,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fuchsia",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 150
+    copies: "150"
   },
   {
     id: 2004,
@@ -19675,7 +19676,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 2005,
@@ -19685,7 +19686,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold RayWave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 2006,
@@ -19695,7 +19696,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Lava",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 399
+    copies: "399"
   },
   {
     id: 2007,
@@ -19714,7 +19715,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 2009,
@@ -19724,7 +19725,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Basketball",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 2010,
@@ -19734,7 +19735,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plates Black",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2011,
@@ -19744,7 +19745,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plates Cyan",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2012,
@@ -19754,7 +19755,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plates Magenta",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2013,
@@ -19764,7 +19765,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Printing Plates Yellow",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2014,
@@ -19774,7 +19775,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 2015,
@@ -19793,7 +19794,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 2017,
@@ -19803,7 +19804,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red RayWave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 2018,
@@ -19822,7 +19823,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "SuperFractor",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2020,
@@ -19832,7 +19833,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Yellow",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 2021,
@@ -19851,7 +19852,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Aqua Wave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 2023,
@@ -19861,7 +19862,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 2024,
@@ -19871,7 +19872,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 2025,
@@ -19881,7 +19882,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Mini-Diamond",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 2026,
@@ -19891,7 +19892,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fuchsia",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 150
+    copies: "150"
   },
   {
     id: 2027,
@@ -19901,7 +19902,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 2028,
@@ -19911,7 +19912,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold RayWave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 2029,
@@ -19930,7 +19931,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 2031,
@@ -19940,7 +19941,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Basketball",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 2032,
@@ -19950,7 +19951,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 2033,
@@ -19969,7 +19970,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 2035,
@@ -19979,7 +19980,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red RayWave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 2036,
@@ -19998,7 +19999,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "SuperFractor",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2038,
@@ -20008,7 +20009,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Yellow",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 2039,
@@ -20027,7 +20028,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Aqua Wave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 199
+    copies: "199"
   },
   {
     id: 2041,
@@ -20037,7 +20038,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Black",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 2042,
@@ -20047,7 +20048,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 2043,
@@ -20057,7 +20058,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Blue Mini-Diamond",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 99
+    copies: "99"
   },
   {
     id: 2044,
@@ -20067,7 +20068,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Fuchsia",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 150
+    copies: "150"
   },
   {
     id: 2045,
@@ -20077,7 +20078,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 2046,
@@ -20087,7 +20088,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Gold RayWave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 2047,
@@ -20106,7 +20107,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 2049,
@@ -20116,7 +20117,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Orange Basketball",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 2050,
@@ -20126,7 +20127,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Purple",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 299
+    copies: "299"
   },
   {
     id: 2051,
@@ -20145,7 +20146,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 2053,
@@ -20155,7 +20156,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red RayWave",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 2054,
@@ -20174,7 +20175,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "SuperFractor",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2056,
@@ -20184,7 +20185,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Yellow",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 75
+    copies: "75"
   },
   {
     id: 2057,
@@ -20194,7 +20195,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Red 'n' Gold Vibrations",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 10
+    copies: "10"
   },
   {
     id: 2058,
@@ -20213,7 +20214,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "2006 Topps McDonald's All American Gold",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 2060,
@@ -20223,7 +20224,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "2006 Topps McDonald's All American Orange Basketball",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 2061,
@@ -20233,7 +20234,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "2006 Topps McDonald's All American Printing Plates Black",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2062,
@@ -20243,7 +20244,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "2006 Topps McDonald's All American Printing Plates Cyan",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2063,
@@ -20253,7 +20254,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "2006 Topps McDonald's All American Printing Plates Magenta",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2064,
@@ -20263,7 +20264,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "2006 Topps McDonald's All American Printing Plates Yellow",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2065,
@@ -20273,7 +20274,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "2006 Topps McDonald's All American Red",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 2066,
@@ -20292,7 +20293,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "2006 Topps McDonald's All American SuperFractor",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2068,
@@ -20313,7 +20314,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 99
+    copies: "99"
   },
   {
     id: 2070,
@@ -20324,7 +20325,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 50
+    copies: "50"
   },
   {
     id: 2071,
@@ -20335,7 +20336,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 50
+    copies: "50"
   },
   {
     id: 2072,
@@ -20346,7 +20347,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 25
+    copies: "25"
   },
   {
     id: 2073,
@@ -20357,7 +20358,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2074,
@@ -20368,7 +20369,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2075,
@@ -20379,7 +20380,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2076,
@@ -20390,7 +20391,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2077,
@@ -20401,7 +20402,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 5
+    copies: "5"
   },
   {
     id: 2078,
@@ -20412,7 +20413,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2079,
@@ -20423,7 +20424,7 @@ window.TEMPO_ALL_CARDS = [
     player: "rice",
     team: "UCLA / McD All-American (HS)",
     isAuto: true,
-    printRun: 75
+    copies: "75"
   },
   {
     id: 2080,
@@ -20442,7 +20443,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Hoopers Gold",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 50
+    copies: "50"
   },
   {
     id: 2082,
@@ -20452,7 +20453,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Hoopers Orange Basketball",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 25
+    copies: "25"
   },
   {
     id: 2083,
@@ -20462,7 +20463,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Hoopers Printing Plates Black",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2084,
@@ -20472,7 +20473,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Hoopers Printing Plates Cyan",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2085,
@@ -20482,7 +20483,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Hoopers Printing Plates Magenta",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2086,
@@ -20492,7 +20493,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Hoopers Printing Plates Yellow",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2087,
@@ -20502,7 +20503,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Hoopers Red",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 5
+    copies: "5"
   },
   {
     id: 2088,
@@ -20512,7 +20513,7 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "Hoopers SuperFractor",
     player: "rice",
     team: "UCLA / McD All-American (HS)",
-    printRun: 1
+    copies: "1"
   },
   {
     id: 2089,
