@@ -103,131 +103,49 @@ function getLowestScannerPrice(card) {
 var TCDB_USER_FIXES = {}; // Populated from localStorage at runtime -- overrides TCDB_LINKS
 var COMC_OVERRIDES = {}; // Populated from localStorage - persistent COMC match overrides
 var PRICE_HISTORY = {}; // Populated from localStorage - historical pricing data by card ID
-function loadPriceHistory() { try { return JSON.parse(localStorage.getItem("tb-price-history-v1") || "{}"); } catch(e) { return {}; } }
-function savePriceHistory(obj) { localStorage.setItem("tb-price-history-v1", JSON.stringify(obj)); try { window.storage.set("tb-price-history-v1", JSON.stringify(obj)); } catch(e) {} PRICE_HISTORY = obj; }
+// ─── TEMPO MODE HELPERS (added by WNBA patch) ─────────────────────────────
+// Returns the storage key for the current mode. tb-* in TB mode, tempo-* in WNBA mode.
+// window.MODE is managed by storage-shim.js and defaults to "tb" on every page load.
+function tbk(suffix) {
+  return ((typeof window !== "undefined" && window.MODE === "wnba") ? "tempo-" : "tb-") + suffix;
+}
+// React hook: subscribes to modechange events from storage-shim
+function useTrackerMode() {
+  const [mode, setMode] = useState((typeof window !== "undefined" && window.MODE) || "tb");
+  useEffect(function() {
+    function onChange(e) { setMode(e.detail.mode); }
+    window.addEventListener("modechange", onChange);
+    return function() { window.removeEventListener("modechange", onChange); };
+  }, []);
+  return mode;
+}
+// React hook: subscribes to authchange events
+function useIsOwner() {
+  const [isOwner, setIsOwner] = useState(
+    !!(typeof window !== "undefined" && window.trackerAuth && window.trackerAuth.isOwner())
+  );
+  useEffect(function() {
+    function onAuth(e) { setIsOwner(!!e.detail.isOwner); }
+    window.addEventListener("authchange", onAuth);
+    return function() { window.removeEventListener("authchange", onAuth); };
+  }, []);
+  return isOwner;
+}
+// ──────────────────────────────────────────────────────────────────────────
+
+function loadPriceHistory() { try { return JSON.parse(localStorage.getItem(tbk("price-history-v1")) || "{}"); } catch(e) { return {}; } }
+function savePriceHistory(obj) { var k = tbk("price-history-v1"); localStorage.setItem(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} PRICE_HISTORY = obj; }
 var TCDB_FLAGS = {}; // Populated from localStorage -- flagged bad links
 var EBAY_BLOCKED = {}; // Populated from localStorage -- blocked eBay listings
-function loadEbayBlocked() { try { return JSON.parse(localStorage.getItem("tb-ebay-blocked-v1") || "{}"); } catch(e) { return {}; } }
-function saveEbayBlocked(obj) { localStorage.setItem("tb-ebay-blocked-v1", JSON.stringify(obj)); try { window.storage.set("tb-ebay-blocked-v1", JSON.stringify(obj)); } catch(e) {} EBAY_BLOCKED = obj; }
-function loadEbayBids() { try { return JSON.parse(localStorage.getItem("tb-ebay-bids-v1") || "{}"); } catch(e) { return {}; } }
-function saveEbayBids(obj) { localStorage.setItem("tb-ebay-bids-v1", JSON.stringify(obj)); try { window.storage.set("tb-ebay-bids-v1", JSON.stringify(obj)); } catch(e) {} }
-function loadTargets() { try { return JSON.parse(localStorage.getItem("tb-targets-v1") || "{}"); } catch(e) { return {}; } }
-function saveTargets(obj) { localStorage.setItem("tb-targets-v1", JSON.stringify(obj)); try { window.storage.set("tb-targets-v1", JSON.stringify(obj)); } catch(e) {} }
+function loadEbayBlocked() { try { return JSON.parse(localStorage.getItem(tbk("ebay-blocked-v1")) || "{}"); } catch(e) { return {}; } }
+function saveEbayBlocked(obj) { var k = tbk("ebay-blocked-v1"); localStorage.setItem(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} EBAY_BLOCKED = obj; }
+function loadEbayBids() { try { return JSON.parse(localStorage.getItem(tbk("ebay-bids-v1")) || "{}"); } catch(e) { return {}; } }
+function saveEbayBids(obj) { var k = tbk("ebay-bids-v1"); localStorage.setItem(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} }
+function loadTargets() { try { return JSON.parse(localStorage.getItem(tbk("targets-v1")) || "{}"); } catch(e) { return {}; } }
+function saveTargets(obj) { var k = tbk("targets-v1"); localStorage.setItem(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} }
 function globalPriceKey(card) {
   if (!card) return null;
   return card.product.slice(0,4) + "|" + card.product + "|" + card.cardNumber + "|" + (card.cardSet || "Base");
-}
-// === CARD IMAGE SYSTEM ===
-var IMAGE_SOURCES = {
-  comc: { label: "COMC", color: "#f97316", bg: "bg-orange-950/60", border: "border-orange-700", text: "text-orange-400" },
-  personal: { label: "Mine", color: "#3b82f6", bg: "bg-blue-950/60", border: "border-blue-700", text: "text-blue-400" },
-  ebay: { label: "eBay", color: "#eab308", bg: "bg-yellow-950/60", border: "border-yellow-700", text: "text-yellow-400" },
-  other: { label: "Other", color: "#6b7280", bg: "bg-gray-800/60", border: "border-gray-600", text: "text-gray-400" }
-};
-function compressImage(file, maxW, quality) {
-  maxW = maxW || 200; quality = quality || 0.45;
-  return new Promise(function(resolve, reject) {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      var img = new Image();
-      img.onload = function() {
-        var w = img.width, h = img.height;
-        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
-        var canvas = document.createElement("canvas");
-        canvas.width = w; canvas.height = h;
-        var ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.onerror = function() { reject(new Error("Failed to load image")); };
-      img.src = e.target.result;
-    };
-    reader.onerror = function() { reject(new Error("Failed to read file")); };
-    reader.readAsDataURL(file);
-  });
-}
-function detectImageSource(url) {
-  if (!url) return "other";
-  if (url.indexOf("img.comc.com") !== -1 || url.indexOf("comc.com") !== -1) return "comc";
-  if (url.indexOf("ebay") !== -1 || url.indexOf("i.ebayimg") !== -1) return "ebay";
-  if (url.indexOf("data:image") === 0) return "personal";
-  return "other";
-}
-function CardImageSection({ cardId, cardDetails, updateCardDetail }) {
-  var d = cardDetails[cardId] || {};
-  var imgUrl = d.imageUrl || "";
-  var imgSrc = d.imageSource || (imgUrl ? detectImageSource(imgUrl) : "");
-  var srcCfg = IMAGE_SOURCES[imgSrc] || IMAGE_SOURCES.other;
-  var [showPanel, setShowPanel] = useState(false);
-  var [pasteUrl, setPasteUrl] = useState("");
-  var [pasteSrc, setPasteSrc] = useState("comc");
-  var [uploading, setUploading] = useState(false);
-  var [showFull, setShowFull] = useState(false);
-  var fileRef = useRef(null);
-  function handlePasteUrl() {
-    if (!pasteUrl.trim()) return;
-    var detected = detectImageSource(pasteUrl.trim());
-    updateCardDetail(cardId, "imageUrl", pasteUrl.trim());
-    updateCardDetail(cardId, "imageSource", pasteSrc || detected);
-    setPasteUrl(""); setShowPanel(false);
-  }
-  function handleFileUpload(e) {
-    var file = e.target.files && e.target.files[0];
-    if (!file) return;
-    setUploading(true);
-    compressImage(file, 250, 0.5).then(function(dataUrl) {
-      updateCardDetail(cardId, "imageUrl", dataUrl);
-      updateCardDetail(cardId, "imageSource", "personal");
-      setUploading(false); setShowPanel(false);
-    }).catch(function() { setUploading(false); alert("Failed to process image"); });
-  }
-  function removeImage() {
-    updateCardDetail(cardId, "imageUrl", "");
-    updateCardDetail(cardId, "imageSource", "");
-    setShowFull(false);
-  }
-  return React.createElement("div", { className: "mt-1.5 pt-1 border-t border-gray-800" },
-    React.createElement("div", { className: "text-gray-600 text-[8px] font-bold mb-0.5 tracking-wider flex items-center justify-between" },
-      React.createElement("span", null, "CARD IMAGE"),
-      React.createElement("div", { className: "flex gap-1" },
-        imgUrl && React.createElement("button", { onClick: removeImage, className: "text-red-500 hover:text-red-400 text-[8px]" }, "\u2715 Remove"),
-        React.createElement("button", { onClick: function() { setShowPanel(!showPanel); }, className: "text-cyan-500 hover:text-cyan-400 text-[8px]" }, showPanel ? "Cancel" : (imgUrl ? "Change" : "+ Add"))
-      )
-    ),
-    imgUrl && React.createElement("div", { className: "flex gap-2 items-start mb-1" },
-      React.createElement("div", { className: "relative cursor-pointer flex-shrink-0", onClick: function() { setShowFull(!showFull); } },
-        React.createElement("img", { src: imgUrl, alt: "Card", className: "rounded border border-gray-700 object-cover", style: { width: showFull ? "160px" : "60px", height: "auto", maxHeight: showFull ? "220px" : "84px", transition: "all 0.2s" }, onError: function(e) { e.target.style.display = "none"; } }),
-        React.createElement("div", { className: "absolute top-0 right-0 px-1 rounded-bl text-[7px] font-bold", style: { backgroundColor: srcCfg.color + "dd", color: "#fff" } }, srcCfg.label)
-      ),
-      !showFull && React.createElement("div", { className: "text-[9px] text-gray-500" },
-        React.createElement("div", null, "Source: ", React.createElement("span", { className: srcCfg.text + " font-bold" }, srcCfg.label)),
-        React.createElement("div", { className: "text-gray-700" }, "Click to expand")
-      )
-    ),
-    showPanel && React.createElement("div", { className: "p-1.5 bg-gray-950 rounded border border-gray-700 space-y-1.5", onClick: function(e) { e.stopPropagation(); } },
-      React.createElement("div", null,
-        React.createElement("div", { className: "text-[8px] text-gray-500 mb-0.5" }, "Paste image URL (COMC, eBay, etc.)"),
-        React.createElement("div", { className: "flex gap-1" },
-          React.createElement("input", { type: "text", value: pasteUrl, onChange: function(e) { setPasteUrl(e.target.value); var det = detectImageSource(e.target.value); if (det !== "personal") setPasteSrc(det); }, placeholder: "https://img.comc.com/...", className: "flex-1 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-[10px] outline-none focus:border-cyan-600 text-white" }),
-          React.createElement("select", { value: pasteSrc, onChange: function(e) { setPasteSrc(e.target.value); }, className: "bg-gray-900 border border-gray-700 rounded px-1 py-0.5 text-[10px] text-gray-300" },
-            React.createElement("option", { value: "comc" }, "COMC"),
-            React.createElement("option", { value: "ebay" }, "eBay"),
-            React.createElement("option", { value: "other" }, "Other")
-          ),
-          React.createElement("button", { onClick: handlePasteUrl, disabled: !pasteUrl.trim(), className: "px-2 py-0.5 rounded text-[10px] font-bold " + (pasteUrl.trim() ? "bg-cyan-800 hover:bg-cyan-700 text-white" : "bg-gray-800 text-gray-600") }, "Save")
-        )
-      ),
-      React.createElement("div", { className: "flex items-center gap-2 text-[8px] text-gray-600" },
-        React.createElement("div", { className: "flex-1 border-t border-gray-800" }), "or", React.createElement("div", { className: "flex-1 border-t border-gray-800" })
-      ),
-      React.createElement("div", { className: "flex gap-1" },
-        React.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: handleFileUpload, className: "hidden" }),
-        React.createElement("button", { onClick: function() { if (fileRef.current) { fileRef.current.removeAttribute("capture"); fileRef.current.click(); } }, disabled: uploading, className: "flex-1 px-2 py-1 rounded text-[10px] font-bold bg-blue-900/60 border border-blue-700 text-blue-300 hover:bg-blue-800/60" }, uploading ? "Processing..." : "Upload Photo"),
-        React.createElement("button", { onClick: function() { if (fileRef.current) { fileRef.current.setAttribute("capture", "environment"); fileRef.current.click(); } }, disabled: uploading, className: "flex-1 px-2 py-1 rounded text-[10px] font-bold bg-green-900/60 border border-green-700 text-green-300 hover:bg-green-800/60" }, uploading ? "..." : "Camera")
-      ),
-      React.createElement("div", { className: "text-[7px] text-gray-600" }, "Photos auto-compressed to ~5KB. COMC images allowed with attribution.")
-    )
-  );
 }
 function Sparkline({ card, width, height }) {
   var pk = globalPriceKey(card);
@@ -336,10 +254,32 @@ function pt130Url(card) {
   var q = "tyler black " + yr + " " + card.cardNumber + " " + prodNoYear;
   return "https://130point.com/sales/?search=" + encodeURIComponent(q.trim());
 }
-let ALL_CARDS = expandData(RAW_DATA).filter(function(c) { return c.id !== 1; });
+let TB_ALL_CARDS = expandData(RAW_DATA).filter(function(c) { return c.id !== 1; });
+let ALL_CARDS = TB_ALL_CARDS;
+// Swap card source on mode change. WNBA mode loads window.TEMPO_ALL_CARDS (without test card).
+if (typeof window !== "undefined") {
+  window.addEventListener("modechange", function(e) {
+    if (e.detail.mode === "wnba" && window.TEMPO_ALL_CARDS) {
+      ALL_CARDS = window.TEMPO_ALL_CARDS.filter(function(c) { return !c.isTestCard; });
+    } else {
+      ALL_CARDS = TB_ALL_CARDS;
+    }
+    // Rebuild CARD_BY_ID to match new ALL_CARDS
+    if (typeof CARD_BY_ID === "object") {
+      Object.keys(CARD_BY_ID).forEach(function(k) { delete CARD_BY_ID[k]; });
+      ALL_CARDS.forEach(function(c) { CARD_BY_ID[c.id] = c; });
+    }
+  });
+}
 
 // Custom cards added by user via COMC Scanner "Add to DB" feature
-var CUSTOM_CARDS_KEY = "tb-custom-cards-v1";
+var CUSTOM_CARDS_KEY = (typeof window !== "undefined" && window.MODE === "wnba") ? "tempo-custom-cards-v1" : "tb-custom-cards-v1";
+// Refresh CUSTOM_CARDS_KEY on mode change (used by load/save below)
+if (typeof window !== "undefined") {
+  window.addEventListener("modechange", function() {
+    CUSTOM_CARDS_KEY = (window.MODE === "wnba") ? "tempo-custom-cards-v1" : "tb-custom-cards-v1";
+  });
+}
 function loadCustomCards() {
   try {
     var stored = localStorage.getItem(CUSTOM_CARDS_KEY);
@@ -421,6 +361,8 @@ const SYNC_DATA = {};
 function TylerBlackTracker() {
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
+  // WNBA Tempo mode subscription — fires re-render on modechange events from storage-shim
+  var trackerMode = useTrackerMode();
   useEffect(function() {
     var iv = setInterval(function() {
       try {
@@ -496,11 +438,11 @@ function TylerBlackTracker() {
   // Save TCDB fixes to storage
   const saveTcdbFixes = useCallback(async (newFixes) => {
     setTcdbFixes(newFixes);
-    try { await window.storage.set("tb-tcdb-fixes-v1", JSON.stringify(newFixes)); } catch(e) {}
+    try { await window.storage.set(tbk("tcdb-fixes-v1"), JSON.stringify(newFixes)); } catch(e) {}
   }, []);
   const saveTcdbFlags = useCallback(async (newFlags) => {
     setTcdbFlags(newFlags);
-    try { await window.storage.set("tb-tcdb-flags-v1", JSON.stringify(newFlags)); } catch(e) {}
+    try { await window.storage.set(tbk("tcdb-flags-v1"), JSON.stringify(newFlags)); } catch(e) {}
   }, []);
   function flagTcdbLink(cardId) {
     var nf = { ...tcdbFlags, [cardId]: Date.now() };
@@ -568,9 +510,9 @@ function TylerBlackTracker() {
         allDataRef.current._saveTimestamp = Date.now();
         var payload = JSON.stringify(allDataRef.current);
         // localStorage is SYNC - guaranteed to complete before unload
-        try { localStorage.setItem("tb-alldata-backup-v1", payload); } catch (e) {}
+        try { localStorage.setItem(tbk("alldata-backup-v1"), payload); } catch (e) {}
         // window.storage is ASYNC - may not complete, but try anyway
-        try { window.storage.set("tb-alldata-v1", payload); } catch (e) {}
+        try { window.storage.set(tbk("alldata-v1"), payload); } catch (e) {}
       }
     }
     function handleVisibilityChange() {
@@ -578,8 +520,8 @@ function TylerBlackTracker() {
       if (document.hidden && loadComplete.current && allDataRef.current._migrationComplete) {
         allDataRef.current._saveTimestamp = Date.now();
         var payload = JSON.stringify(allDataRef.current);
-        try { localStorage.setItem("tb-alldata-backup-v1", payload); } catch (e) {}
-        try { window.storage.set("tb-alldata-v1", payload); } catch (e) {}
+        try { localStorage.setItem(tbk("alldata-backup-v1"), payload); } catch (e) {}
+        try { window.storage.set(tbk("alldata-v1"), payload); } catch (e) {}
       }
     }
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -594,9 +536,9 @@ function TylerBlackTracker() {
       allDataRef.current._saveTimestamp = Date.now();
       var payload = JSON.stringify(allDataRef.current);
       try {
-        window.storage.set("tb-alldata-v1", payload);
+        window.storage.set(tbk("alldata-v1"), payload);
       } catch (e) { console.error("Backup flush failed:", e); }
-      try { localStorage.setItem("tb-alldata-backup-v1", payload); } catch(e) {}
+      try { localStorage.setItem(tbk("alldata-backup-v1"), payload); } catch(e) {}
     }
     var initialTimer = setTimeout(doBackup, 30000);
     var interval = setInterval(doBackup, 5 * 60 * 1000);
@@ -632,7 +574,7 @@ function TylerBlackTracker() {
     var ok = false;
     for (var attempt = 0; attempt < 3 && !ok; attempt++) {
       try {
-        var result = await window.storage.set("tb-alldata-v1", JSON.stringify(allDataRef.current));
+        var result = await window.storage.set(tbk("alldata-v1"), JSON.stringify(allDataRef.current));
         if (result) ok = true; else await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
       } catch (e) {
         await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
@@ -643,12 +585,12 @@ function TylerBlackTracker() {
       flashSave("OK Saved");
       setStorageDiag("Saved at " + new Date().toLocaleTimeString());
       // BACKUP: Also write to localStorage in case window.storage fails on next load
-      try { localStorage.setItem("tb-alldata-backup-v1", JSON.stringify(allDataRef.current)); } catch(e) {}
+      try { localStorage.setItem(tbk("alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
     } else {
       flashSave("WARN Save FAILED");
       setStorageDiag("SAVE FAILED at " + new Date().toLocaleTimeString());
       // Even if window.storage fails, try localStorage as emergency backup
-      try { localStorage.setItem("tb-alldata-backup-v1", JSON.stringify(allDataRef.current)); } catch(e) {}
+      try { localStorage.setItem(tbk("alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
     }
   }, [flashSave]);
 
@@ -663,7 +605,7 @@ function TylerBlackTracker() {
     allDataRef.current[field] = value;
     allDataRef.current._saveTimestamp = Date.now();
     // IMMEDIATE sync backup to localStorage on every change (sync = guaranteed)
-    try { localStorage.setItem("tb-alldata-backup-v1", JSON.stringify(allDataRef.current)); } catch(e) {}
+    try { localStorage.setItem(tbk("alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
     scheduleSave();
   }, [scheduleSave]);
 
@@ -696,7 +638,7 @@ function TylerBlackTracker() {
       let allData = null;
       // Try consolidated key first (single read)
       try {
-        var result = await window.storage.get("tb-alldata-v1");
+        var result = await window.storage.get(tbk("alldata-v1"));
         if (result && result.value) {
           allData = JSON.parse(result.value);
           diagParts.push("Loaded consolidated data");
@@ -707,7 +649,7 @@ function TylerBlackTracker() {
       // ALWAYS check localStorage backup and compare timestamps - use whichever is newer
       var lsData = null;
       try {
-        var lsBackup = localStorage.getItem("tb-alldata-backup-v1");
+        var lsBackup = localStorage.getItem(tbk("alldata-backup-v1"));
         if (lsBackup) { lsData = JSON.parse(lsBackup); }
       } catch(e2) {}
       if (allData && lsData) {
@@ -726,7 +668,7 @@ function TylerBlackTracker() {
       // FALLBACK: If window.storage returned nothing, try localStorage backup
       if (!allData) {
         try {
-          var lsBackup = localStorage.getItem("tb-alldata-backup-v1");
+          var lsBackup = localStorage.getItem(tbk("alldata-backup-v1"));
           if (lsBackup) {
             allData = JSON.parse(lsBackup);
             diagParts.push("Restored from localStorage backup");
@@ -736,7 +678,7 @@ function TylerBlackTracker() {
       // FALLBACK: If window.storage returned nothing, try localStorage backup
       if (!allData) {
         try {
-          var lsBackup = localStorage.getItem("tb-alldata-backup-v1");
+          var lsBackup = localStorage.getItem(tbk("alldata-backup-v1"));
           if (lsBackup) {
             allData = JSON.parse(lsBackup);
             diagParts.push("Restored from localStorage backup");
@@ -746,7 +688,7 @@ function TylerBlackTracker() {
       // FALLBACK: If window.storage returned nothing, try localStorage backup
       if (!allData) {
         try {
-          var lsBackup = localStorage.getItem("tb-alldata-backup-v1");
+          var lsBackup = localStorage.getItem(tbk("alldata-backup-v1"));
           if (lsBackup) {
             allData = JSON.parse(lsBackup);
             diagParts.push("Restored from localStorage backup");
@@ -785,7 +727,7 @@ function TylerBlackTracker() {
           diagParts.push("Migrated " + migratedCount + " legacy keys");
           // Save consolidated immediately so migration only happens once
           try {
-            await window.storage.set("tb-alldata-v1", JSON.stringify(allData));
+            await window.storage.set(tbk("alldata-v1"), JSON.stringify(allData));
             diagParts.push("Migration saved");
           } catch (e) { diagParts.push("Migration save failed: " + e.message); }
         } else if (Object.keys(allData.statuses || {}).length === 0) {
@@ -835,11 +777,11 @@ function TylerBlackTracker() {
       setChangelog(changelogArr);
       // Load TCDB fixes and flags (separate small storage)
       try {
-        var tcdbFixesResult = await window.storage.get("tb-tcdb-fixes-v1");
+        var tcdbFixesResult = await window.storage.get(tbk("tcdb-fixes-v1"));
         if (tcdbFixesResult && tcdbFixesResult.value) setTcdbFixes(JSON.parse(tcdbFixesResult.value));
       } catch(e) {}
       try {
-        var tcdbFlagsResult = await window.storage.get("tb-tcdb-flags-v1");
+        var tcdbFlagsResult = await window.storage.get(tbk("tcdb-flags-v1"));
         if (tcdbFlagsResult && tcdbFlagsResult.value) setTcdbFlags(JSON.parse(tcdbFlagsResult.value));
       } catch(e) {}
       // Store initial state for undo-all
@@ -1343,6 +1285,26 @@ function TylerBlackTracker() {
             >
               {superSearchMode ? "* SUPER" : "E"}
             </button>
+            {/* WNBA Tempo mode toggle — owner only */}
+            {isOwner && (
+              <button
+                onClick={function() {
+                  if (typeof window !== "undefined" && window.setMode) {
+                    window.setMode(trackerMode === "tb" ? "wnba" : "tb");
+                  }
+                }}
+                title={trackerMode === "tb" ? "Switch to Toronto Tempo (WNBA)" : "Switch to Tyler Black"}
+                className="px-2 py-0.5 rounded transition-colors font-bold border"
+                style={{
+                  fontSize: "clamp(8px,0.9vw,10px)",
+                  background: trackerMode === "wnba" ? "#7c2d92" : "transparent",
+                  borderColor: trackerMode === "wnba" ? "#a855f7" : "#374151",
+                  color: trackerMode === "wnba" ? "#fff" : "#9ca3af"
+                }}
+              >
+                {trackerMode === "wnba" ? "T" : "W"}
+              </button>
+            )}
             {isOwner && <button 
               onClick={function() { setHidePrices(!hidePrices); }} 
               className={"px-1 py-0 rounded transition-colors " + (hidePrices ? "text-gray-600 hover:text-gray-400" : "text-gray-500 hover:text-gray-300 bg-gray-700/50")}
@@ -1456,7 +1418,6 @@ function TylerBlackTracker() {
               <div key={card.id} data-focus-idx={pageCards.indexOf(card)} className={"rounded-sm overflow-hidden " + rowBg + (isFocused ? " ring-1 ring-yellow-400/70 bg-yellow-950/20" : "")}>
                 <div className="flex items-center gap-1 cursor-pointer" style={{padding:"clamp(1px,0.2vw,3px) clamp(3px,0.5vw,8px)"}} onClick={function(){setExpandedCard(isExpanded ? null : card.id);}}>
                   <div className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + cfg.dot} />
-                  {details.imageUrl && <div className="flex-shrink-0 rounded overflow-hidden border border-gray-700" style={{width:"18px",height:"24px"}} title={"Image: " + (IMAGE_SOURCES[details.imageSource] || IMAGE_SOURCES.other).label}><img src={details.imageUrl} alt="" className="w-full h-full object-cover" onError={function(e){e.target.parentElement.style.display="none";}} /></div>}
                   <div className="flex-1 min-w-0 flex items-baseline gap-1 truncate" style={{fontSize:"clamp(9px,1.2vw,12px)"}}>
                     <span className="font-semibold text-white whitespace-nowrap">#{card.cardNumber}</span>
                     <span className="text-gray-300 truncate">{card.cardSet}</span>
@@ -1547,7 +1508,6 @@ function TylerBlackTracker() {
                         </div>
                       )}
                     </div>
-                    <div className="col-span-2"><CardImageSection cardId={card.id} cardDetails={cardDetails} updateCardDetail={updateCardDetail} /></div>
                   </div>
                 )}
               </div>
@@ -2450,7 +2410,6 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
               <button onClick={function() { setDetailedProductFilter(selectedCard.product); setDetailedCardNumFilter(null); setDetailedStatusFilter("all"); setDetailedSnFilter("all"); setActiveTab("detailed"); }} className="py-0.5 px-1.5 rounded bg-gray-800/60 border border-gray-700 text-gray-400 hover:bg-gray-700/50 font-bold" title="View full set in Detailed tab">Full Set</button>
             </div>
           </div>
-          <CardImageSection cardId={selectedCard.id} cardDetails={cardDetails} updateCardDetail={updateCardDetail} />
         </div>
       )}
     </div>
@@ -2515,6 +2474,7 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
   var filtered = useMemo(function() {
     var s = dSearch.toLowerCase();
     return ALL_CARDS.filter(function(card) {
+      if (HIDDEN_DUPES.has(card.id)) return false;
       var cs = statuses[card.id] || "not_owned";
       var cardDetail = cardDetails[card.id] || {};
       
@@ -3000,7 +2960,6 @@ function CleanupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, 
                     <a href={variantOnlyUrl(card)} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-0.5 bg-purple-900/40 border border-purple-700 text-purple-300 rounded hover:bg-purple-800/40" title="Search this variant without player name">Variant</a>
                     <a href={pt130Url(card)} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-0.5 bg-teal-900/40 border border-teal-700 text-teal-300 rounded hover:bg-teal-800/40">130pt</a>
                   </div>
-                  <CardImageSection cardId={card.id} cardDetails={cardDetails} updateCardDetail={updateCardDetail} />
                 </div>
               )}
             </div>
@@ -3376,7 +3335,7 @@ function COMCScannerPanel(props) {
   }, [rawInput, parsed, applied, mode, shopFilter, scanTags, scanCardNo, shopSort, expanded, showInput]);
 
   // --- COMC Persistent Match Overrides ---
-  function loadComcOverrides() { try { return JSON.parse(localStorage.getItem("tb-comc-overrides-v1") || "{}"); } catch(e) { return {}; } }
+  function loadComcOverrides() { try { return JSON.parse(localStorage.getItem(tbk("comc-overrides-v1")) || "{}"); } catch(e) { return {}; } }
   // cardKey: canonical grouping key for price history across duplicate card IDs
   // Cards with same (year, product, cardNumber, variant) share price data
   function priceKey(card) {
@@ -3430,7 +3389,7 @@ function COMCScannerPanel(props) {
     if (ph[pk].length > 365) ph[pk] = ph[pk].slice(-365);
     if (!batchPH) savePriceHistory(ph); // only save immediately if not batching
   }
-  function saveComcOverrides(obj) { localStorage.setItem("tb-comc-overrides-v1", JSON.stringify(obj)); try { window.storage.set("tb-comc-overrides-v1", JSON.stringify(obj)); } catch(e) {} COMC_OVERRIDES = obj; }
+  function saveComcOverrides(obj) { var k = tbk("comc-overrides-v1"); localStorage.setItem(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} COMC_OVERRIDES = obj; }
   var _cov = useState(function(){ var o = loadComcOverrides(); COMC_OVERRIDES = o; return o; });
   useState(function(){ PRICE_HISTORY = loadPriceHistory(); });
   var comcOverrides = _cov[0], setComcOverrides = _cov[1];
@@ -5622,7 +5581,7 @@ function COMCScannerPanel(props) {
       }
       setParsed(deduped);
       // Save last COMC paste for quick reload
-      try { localStorage.setItem("tb-last-comc-paste-v1", rawInput); } catch(e) {}
+      try { localStorage.setItem(tbk("last-comc-paste-v1"), rawInput); } catch(e) {}
     } else if (effectiveMode === "csv") {
       var rows = parseCSV(rawInput);
       var results = rows.map(function(row) {
@@ -5675,7 +5634,7 @@ function COMCScannerPanel(props) {
       savePriceHistory(ebayBatchPH);
       setParsed(results2);
       // Save last eBay paste for quick reload
-      try { localStorage.setItem("tb-last-ebay-paste-v1", rawInput); } catch(e) {}
+      try { localStorage.setItem(tbk("last-ebay-paste-v1"), rawInput); } catch(e) {}
     } else if (effectiveMode === "sportlots") {
       var slItems = parseSportLotsText(rawInput);
       var slResults = slItems.map(function(p) {
@@ -5709,7 +5668,7 @@ function COMCScannerPanel(props) {
       }
       setParsed(slDeduped);
       // Save last SportLots paste for quick reload
-      try { localStorage.setItem("tb-last-sportlots-paste-v1", rawInput); } catch(e) {}
+      try { localStorage.setItem(tbk("last-sportlots-paste-v1"), rawInput); } catch(e) {}
     } else if (effectiveMode === "whatnot") {
       var wnItems = parseWhatnotText(rawInput);
       var wnResults = wnItems.map(function(p) {
@@ -5743,7 +5702,7 @@ function COMCScannerPanel(props) {
       }
       setParsed(wnDeduped);
       // Save last Whatnot paste for quick reload
-      try { localStorage.setItem("tb-last-whatnot-paste-v1", rawInput); } catch(e) {}
+      try { localStorage.setItem(tbk("last-whatnot-paste-v1"), rawInput); } catch(e) {}
     } else if (effectiveMode === "130pt") {
       setPt130Filter("sold");
       var ptItems = parse130PointText(rawInput).concat(parse130PointForSale(rawInput));
@@ -7977,7 +7936,6 @@ function TaskBoardPanel() {
 }
 function VersionLogPanel() {
   var VERSION_HISTORY = [
-    { date: "2026-03-12 20:00", change: "CARD IMAGE SYSTEM: Add images to any card via URL paste (COMC, eBay) or camera/upload from phone. Photos auto-compressed to ~5KB thumbnails stored in cardDetails via Supabase. Source badges: COMC (orange), Mine (blue), eBay (yellow), Other (gray). Auto-detects source from URL. Image section in Collection expanded detail, Lookup detail, Detailed panel. Tiny thumbnail in card rows when image exists.", verified: false },
     { date: "2026-02-22 01:00", change: "TCDB COMPARISON SCANNER: New 'TCDB' mode in Scanner tab. (1) Paste your TCDB collection page (Have/Want/In-Transit) — auto-detects which list from header text. (2) Parses card lines by year+product+variant+cardNumber pattern. (3) Matches to tracker DB using existing matchToCards engine. (4) Compares TCDB status vs tracker status, highlighting mismatches. (5) Filter by Mismatch/Match/Unmatched/All. (6) Individual 'Fix' buttons update tracker status to match TCDB. (7) Bulk 'Fix All' button for mass mismatch resolution. (8) Deduplicates matched cards. Also: removed card preview images (TCDB blocks embedding), removed t18 from backlog.", verified: false },
     { date: "2026-02-21 18:30", change: "TCDB PASTE AND VERIFY: New Paste and Verify mode in Sync tab. Paste TCDB collection page text (tab-separated tables, checklist views, plain text). Parser extracts card numbers with set context headers. Fuzzy matcher finds cards by (cardNumber, year, product) with variant tiebreaker. Bulk Verify All or individual verify buttons. Already-synced cards show green checkmarks. Unmatched lines listed for manual review. Verified cards removed from Sync queue. Player-agnostic parser foundation for V2/V3.", verified: false },
     { date: "2026-02-21 03:00", change: "BREWERS COLOR THEME: Complete visual overhaul inspired by Milwaukee Brewers palette. (1) Navy-dark backgrounds (#0a1628 base, #111a2e panels) replace pure gray. (2) Brewers gold (#FFC52F) replaces green for owned status, title, progress bar, tab accents, header stats. (3) Blue (#5b9bd5) for in-transit. (4) Summary panel text brightened throughout — headers gold, labels cream/slate, counts visible. (5) Collection card rows: gold border-left for owned, brighter variant text, brighter product names. (6) Gauge arc gold, bar tracks navy instead of dark red. (7) Scanner header gold. (8) $ toggle defaults hidden, ultra-subtle. (9) Price history readers fixed for flat array format.", verified: false },
@@ -8505,10 +8463,10 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
           setCardDetails(newDetails);
           setForSaleFlags(newForSale);
           var payload = JSON.stringify(allDataRef.current);
-          try { localStorage.setItem("tb-alldata-v1", payload); } catch(e2) {}
-          try { localStorage.setItem("tb-alldata-backup-v1", payload); } catch(e2) {}
+          try { localStorage.setItem(tbk("alldata-v1"), payload); } catch(e2) {}
+          try { localStorage.setItem(tbk("alldata-backup-v1"), payload); } catch(e2) {}
           setExportMsg("Saving " + statCount + " statuses + " + detailCount + " details to cloud...");
-          try { await window.storage.set("tb-alldata-v1", payload); } catch(e2) {}
+          try { await window.storage.set(tbk("alldata-v1"), payload); } catch(e2) {}
           setExportMsg("Restored " + statCount + " statuses + " + detailCount + " card details!");
           setTimeout(function() { setExportMsg(""); }, 5000);
         } else {

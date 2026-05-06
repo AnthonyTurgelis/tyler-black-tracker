@@ -1,27 +1,19 @@
 /**
- * Storage Shim for Tyler Black Tracker — Supabase Edition
+ * Storage Shim — Tyler Black Tracker + Tempo (WNBA) Mode
+ * Modified version of your existing shim. ADDITIONS only — no existing logic removed.
  *
- * PRIMARY:  Supabase (cloud database — survives cache clears, works cross-device)
- * CACHE:    localStorage (fast reads, offline fallback)
+ * Routing: tb-* keys → collection_kv table | tempo-* keys → tempo_collection_kv table
+ * Mode: window.MODE defaults to 'tb' on every load. WNBA mode owner-only, never persisted.
  *
- * Flow:
- *   STARTUP: Supabase hydrates localStorage cache, then tracker loads from cache
- *   SAVE:    Supabase (async) + localStorage (sync) simultaneously
- *   READ:    localStorage cache first (instant), cloud is source of truth
- *
- * Auth:
- *   Visitors: read-only from Supabase (RLS allows SELECT for anon)
- *   Owner:    read-write after Supabase Auth login
- *
- * Must be loaded AFTER supabase-js CDN and BEFORE tracker.jsx.
+ * MODIFIED LINES tagged with `// + TEMPO` so you can diff against your original.
  */
 (function () {
   // ── Config (set in index.html before this script loads) ──
   var SUPABASE_URL = window.SUPABASE_URL || "";
   var SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || "";
 
-  // Keys that sync to Supabase (critical collection data)
-  var CLOUD_KEYS = [
+  // ── Cloud keys split by mode (was a single CLOUD_KEYS array) ── // + TEMPO
+  var TB_CLOUD_KEYS = [
     "tb-alldata-v1",
     "tb-targets-v1",
     "tb-price-history-v1",
@@ -33,10 +25,43 @@
     "tb-custom-cards-v1",
     "tb-linked-tweets-v1"
   ];
+  var TEMPO_CLOUD_KEYS = [                                          // + TEMPO
+    "tempo-alldata-v1",
+    "tempo-targets-v1",
+    "tempo-price-history-v1",
+    "tempo-tcdb-fixes-v1",
+    "tempo-tcdb-flags-v1",
+    "tempo-ebay-blocked-v1",
+    "tempo-ebay-bids-v1",
+    "tempo-comc-overrides-v1",
+    "tempo-custom-cards-v1"
+  ];
+  var CLOUD_KEYS = TB_CLOUD_KEYS.concat(TEMPO_CLOUD_KEYS);          // + TEMPO
 
   function isCloudKey(key) {
     return CLOUD_KEYS.indexOf(key) !== -1;
   }
+
+  // Route key to its Supabase table.                               // + TEMPO
+  function tableForKey(key) {                                        // + TEMPO
+    if (typeof key === "string" && key.indexOf("tempo-") === 0) {    // + TEMPO
+      return "tempo_collection_kv";                                  // + TEMPO
+    }                                                                // + TEMPO
+    return "collection_kv";                                          // + TEMPO
+  }                                                                  // + TEMPO
+
+  // ── Mode (TB default; WNBA owner-only; never persisted) ──        // + TEMPO
+  window.MODE = "tb";                                                 // + TEMPO
+  window.setMode = function (m) {                                     // + TEMPO
+    if (m === "wnba" && !isOwner) {                                   // + TEMPO
+      console.warn("[storage] WNBA mode requires owner login");      // + TEMPO
+      return false;                                                   // + TEMPO
+    }                                                                 // + TEMPO
+    if (m !== "tb" && m !== "wnba") return false;                    // + TEMPO
+    window.MODE = m;                                                  // + TEMPO
+    window.dispatchEvent(new CustomEvent("modechange", { detail: { mode: m } })); // + TEMPO
+    return true;                                                      // + TEMPO
+  };                                                                  // + TEMPO
 
   // ── State ──
   var supabase = null;
@@ -67,6 +92,10 @@
         if (result.error) return { error: result.error.message };
         isOwner = true;
         console.log("[storage] Owner logged in");
+        window.dispatchEvent(new CustomEvent("authchange", { detail: { isOwner: true } })); // + TEMPO
+        // Re-hydrate now that we have access to tempo keys                                  // + TEMPO
+        hydrated = false;                                                                   // + TEMPO
+        hydrateFromCloud();                                                                 // + TEMPO
         return { success: true };
       } catch (e) {
         return { error: e.message };
@@ -77,6 +106,12 @@
       if (!supabase) return;
       await supabase.auth.signOut();
       isOwner = false;
+      // If we were in WNBA mode, force back to TB on logout            // + TEMPO
+      if (window.MODE === "wnba") {                                     // + TEMPO
+        window.MODE = "tb";                                              // + TEMPO
+        window.dispatchEvent(new CustomEvent("modechange", { detail: { mode: "tb" } })); // + TEMPO
+      }                                                                  // + TEMPO
+      window.dispatchEvent(new CustomEvent("authchange", { detail: { isOwner: false } })); // + TEMPO
       console.log("[storage] Logged out");
     },
 
@@ -107,7 +142,7 @@
           if (val !== null) {
             var jsonVal;
             try { jsonVal = JSON.parse(val); } catch (e) { jsonVal = val; }
-            var result = await supabase.from("collection_kv").upsert(
+            var result = await supabase.from(tableForKey(key)).upsert(  // + TEMPO routed
               { key: key, value: jsonVal },
               { onConflict: "key" }
             );
@@ -127,22 +162,38 @@
   };
 
   // ── Hydrate: pull ALL cloud data into localStorage on startup ──
+  // Now queries BOTH tables. Tempo table only queried if owner is logged in     // + TEMPO
+  // (anon SELECT is denied on tempo_collection_kv anyway).                       // + TEMPO
   async function hydrateFromCloud() {
     if (!supabase || hydrated) return;
     try {
-      var result = await supabase.from("collection_kv").select("key, value, updated_at");
-      if (result.error) {
-        console.error("[storage] Hydration failed:", result.error.message);
-        return;
+      // Pull TB rows from collection_kv (was the only query)
+      var tbResult = await supabase.from("collection_kv").select("key, value, updated_at");
+      var rows = [];
+      if (tbResult.error) {
+        console.error("[storage] TB hydration failed:", tbResult.error.message);
+      } else {
+        rows = tbResult.data || [];
       }
-      var rows = result.data || [];
+
+      // Pull Tempo rows from tempo_collection_kv ONLY when owner is logged in   // + TEMPO
+      if (isOwner) {                                                              // + TEMPO
+        var tempoResult = await supabase.from("tempo_collection_kv").select("key, value, updated_at"); // + TEMPO
+        if (tempoResult.error) {                                                  // + TEMPO
+          console.warn("[storage] Tempo hydration failed:", tempoResult.error.message); // + TEMPO
+        } else if (tempoResult.data) {                                            // + TEMPO
+          rows = rows.concat(tempoResult.data);                                   // + TEMPO
+        }                                                                          // + TEMPO
+      }                                                                            // + TEMPO
+
       console.log("[storage] Hydrating " + rows.length + " keys from cloud");
       for (var i = 0; i < rows.length; i++) {
         var row = rows[i];
         try {
           var cloudVal = typeof row.value === "string" ? row.value : JSON.stringify(row.value);
-          // For alldata key, compare timestamps — don't overwrite newer local data
-          if (row.key === "tb-alldata-v1") {
+          // For alldata keys, compare timestamps — don't overwrite newer local data
+          // Apply same logic to BOTH tb-alldata-v1 and tempo-alldata-v1            // + TEMPO
+          if (row.key === "tb-alldata-v1" || row.key === "tempo-alldata-v1") {     // + TEMPO modified condition
             var localVal = localStorage.getItem(row.key);
             if (localVal) {
               try {
@@ -168,7 +219,7 @@
           }
           // For non-alldata keys: only hydrate if localStorage doesn't already have data
           // This prevents cloud (which may be stale) from overwriting fresh local writes
-          if (row.key !== "tb-alldata-v1") {
+          if (row.key !== "tb-alldata-v1" && row.key !== "tempo-alldata-v1") {     // + TEMPO modified condition
             var existingLocal = localStorage.getItem(row.key);
             if (existingLocal && existingLocal.length > 2) {
               console.log("[storage] Keeping local " + row.key + " (" + existingLocal.length + " chars, cloud has " + cloudVal.length + " chars)");
@@ -191,12 +242,13 @@
   // ── Cloud write (async, with one retry) ──
   async function writeToCloud(key, value) {
     if (!supabase || !isOwner) return;
+    var table = tableForKey(key);                                       // + TEMPO
     try {
       var jsonVal;
       try { jsonVal = typeof value === "string" ? JSON.parse(value) : value; }
       catch (e) { jsonVal = value; }
 
-      var result = await supabase.from("collection_kv").upsert(
+      var result = await supabase.from(table).upsert(                  // + TEMPO routed (was "collection_kv")
         { key: key, value: jsonVal },
         { onConflict: "key" }
       );
@@ -205,7 +257,7 @@
         // One retry after 2s
         setTimeout(async function () {
           try {
-            await supabase.from("collection_kv").upsert(
+            await supabase.from(table).upsert(                          // + TEMPO routed (was "collection_kv")
               { key: key, value: jsonVal },
               { onConflict: "key" }
             );
@@ -223,7 +275,7 @@
   async function deleteFromCloud(key) {
     if (!supabase || !isOwner) return;
     try {
-      await supabase.from("collection_kv").delete().eq("key", key);
+      await supabase.from(tableForKey(key)).delete().eq("key", key);   // + TEMPO routed (was "collection_kv")
     } catch (e) {
       console.error("[storage] Cloud delete error:", e);
     }
@@ -241,7 +293,7 @@
       // Cache miss + cloud key → try Supabase directly
       if (supabase && isCloudKey(key)) {
         try {
-          var r = await supabase.from("collection_kv")
+          var r = await supabase.from(tableForKey(key))                // + TEMPO routed (was "collection_kv")
             .select("value").eq("key", key).single();
           if (r.data) {
             var cv = typeof r.data.value === "string"
@@ -293,7 +345,7 @@
       await window.trackerAuth.checkSession();
       await hydrateFromCloud();
     }
-    console.log("[storage] Ready. Owner:", isOwner, "| Cloud:", !!supabase, "| Hydrated:", hydrated);
+    console.log("[storage] Ready. Owner:", isOwner, "| Cloud:", !!supabase, "| Hydrated:", hydrated, "| Mode:", window.MODE);
   })();
 
 })();
