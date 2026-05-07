@@ -1861,11 +1861,11 @@ function TylerBlackTracker() {
         ) : activeTab === "cleanup" ? (
           <CleanupPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} hidePrices={hidePrices} />
         ) : activeTab === "detailed" ? (
-          <DetailedPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} needsSync={needsSync} initialSnFilter={detailedSnFilter} initialStatusFilter={detailedStatusFilter} initialCardId={detailedCardId} setDetailedCardId={setDetailedCardId} initialProductFilter={detailedProductFilter} setDetailedProductFilter={setDetailedProductFilter} initialCardNumFilter={detailedCardNumFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} editCustomCardById={editCustomCardById} customEditVer={customEditVer} targetByCardId={targetByCardId} setActiveTab={setActiveTab} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
+          <DetailedPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} needsSync={needsSync} initialSnFilter={detailedSnFilter} initialStatusFilter={detailedStatusFilter} initialCardId={detailedCardId} setDetailedCardId={setDetailedCardId} initialProductFilter={detailedProductFilter} setDetailedProductFilter={setDetailedProductFilter} initialCardNumFilter={detailedCardNumFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} editCustomCardById={editCustomCardById} customEditVer={customEditVer} targetByCardId={targetByCardId} setActiveTab={setActiveTab} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
         ) : activeTab === "summary" ? (
           <SummaryPanel statuses={statuses} setActiveTab={setActiveTab} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} />
         ) : activeTab === "lookup" ? (
-          <CardLookupPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} needsSync={needsSync} setActiveTab={setActiveTab} setDetailedProductFilter={setDetailedProductFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} setPricesSearchFilter={setPricesSearchFilter} superSearchMode={superSearchMode} targetByCardId={targetByCardId} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
+          <CardLookupPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} needsSync={needsSync} setActiveTab={setActiveTab} setDetailedProductFilter={setDetailedProductFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} setPricesSearchFilter={setPricesSearchFilter} superSearchMode={superSearchMode} targetByCardId={targetByCardId} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
         ) : null}
         </div>
         )}
@@ -2418,7 +2418,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
     </div>
   );
 }
-function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, forSaleFlags, toggleForSale, needsSync, setActiveTab, setDetailedProductFilter, setDetailedCardNumFilter, setDetailedStatusFilter, setDetailedSnFilter, setPricesSearchFilter, superSearchMode, targetByCardId, setTargetCardFilter, hidePrices }) {
+function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, forSaleFlags, toggleForSale, needsSync, setActiveTab, setDetailedProductFilter, setDetailedCardNumFilter, setDetailedStatusFilter, setDetailedSnFilter, setPricesSearchFilter, superSearchMode, targetByCardId, setTargetCardFilter, hidePrices }) {
   var trackerMode = useTrackerMode();
   // Build a quick player-key → display name map. Empty in TB mode.
   var playerNameByKey = useMemo(function() {
@@ -2801,7 +2801,7 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
     </div>
   );
 }
-function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, needsSync, initialSnFilter, initialStatusFilter, initialCardId = null, setDetailedCardId, initialProductFilter = null, setDetailedProductFilter, initialCardNumFilter = null, setDetailedCardNumFilter, editCustomCardById, customEditVer, targetByCardId, setActiveTab, setTargetCardFilter, hidePrices }) {
+function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, needsSync, initialSnFilter, initialStatusFilter, initialCardId = null, setDetailedCardId, initialProductFilter = null, setDetailedProductFilter, initialCardNumFilter = null, setDetailedCardNumFilter, editCustomCardById, customEditVer, targetByCardId, setActiveTab, setTargetCardFilter, hidePrices }) {
   var [dFilter, setDFilter] = useState(initialStatusFilter || "all");
   var [dYear, setDYear] = useState("all");
   var [dProduct, setDProduct] = useState(initialProductFilter || "all");
