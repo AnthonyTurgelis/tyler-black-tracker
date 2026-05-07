@@ -187,6 +187,63 @@ function getCardQty(cardDetails, statuses, cardId) {
   var s = statuses && statuses[cardId];
   return (s === "owned" || s === "in_transit") ? 1 : 0;
 }
+// COLOR_PALETTE: keywords found in card variants → background tint + text color.
+// Includes literal colors plus parallel-pattern names (ice, holo, mojo, etc).
+// Used by the color slicer chips and to tint the cardSet cell in card rows.
+const COLOR_PALETTE = {
+  // Pure colors
+  red:      {bg:"#ef4444", text:"#fff"},
+  blue:     {bg:"#3b82f6", text:"#fff"},
+  green:    {bg:"#22c55e", text:"#fff"},
+  purple:   {bg:"#a855f7", text:"#fff"},
+  pink:     {bg:"#ec4899", text:"#fff"},
+  orange:   {bg:"#f97316", text:"#fff"},
+  yellow:   {bg:"#eab308", text:"#000"},
+  gold:     {bg:"#d4af37", text:"#000"},
+  black:    {bg:"#1e293b", text:"#fff"},
+  white:    {bg:"#e2e8f0", text:"#000"},
+  silver:   {bg:"#94a3b8", text:"#000"},
+  aqua:     {bg:"#06b6d4", text:"#fff"},
+  cyan:     {bg:"#0891b2", text:"#fff"},
+  teal:     {bg:"#14b8a6", text:"#fff"},
+  lime:     {bg:"#84cc16", text:"#000"},
+  magenta:  {bg:"#d946ef", text:"#fff"},
+  navy:     {bg:"#1e3a8a", text:"#fff"},
+  ruby:     {bg:"#dc2626", text:"#fff"},
+  emerald:  {bg:"#10b981", text:"#fff"},
+  sapphire: {bg:"#1e40af", text:"#fff"},
+  amethyst: {bg:"#9333ea", text:"#fff"},
+  bronze:   {bg:"#b45309", text:"#fff"},
+  platinum: {bg:"#cbd5e1", text:"#000"},
+  amber:    {bg:"#f59e0b", text:"#000"},
+  rose:     {bg:"#fb7185", text:"#fff"},
+  indigo:   {bg:"#6366f1", text:"#fff"},
+  violet:   {bg:"#8b5cf6", text:"#fff"},
+  // Parallel pattern names — use representative color
+  ice:      {bg:"#7dd3fc", text:"#000"},
+  holo:     {bg:"#a78bfa", text:"#fff"},
+  shimmer:  {bg:"#c4b5fd", text:"#000"},
+  pulsar:   {bg:"#f472b6", text:"#fff"},
+  mojo:     {bg:"#a855f7", text:"#fff"},
+  wave:     {bg:"#38bdf8", text:"#000"},
+  sparkle:  {bg:"#fde047", text:"#000"},
+  laser:    {bg:"#22d3ee", text:"#000"},
+  velocity: {bg:"#fb923c", text:"#fff"},
+  pandora:  {bg:"#f9a8d4", text:"#000"},
+  scope:    {bg:"#65a30d", text:"#fff"},
+  refractor:{bg:"#9ca3af", text:"#000"}
+};
+const COLOR_KEYS = Object.keys(COLOR_PALETTE);
+// extractColors: find all palette keywords in a cardSet string. Order is by appearance.
+function extractColors(cardSet) {
+  if (!cardSet) return [];
+  var lower = cardSet.toLowerCase();
+  var found = [];
+  COLOR_KEYS.forEach(function(c) {
+    if (new RegExp("\\b" + c + "\\b", "i").test(lower)) found.push(c);
+  });
+  return found;
+}
 function tcdbUrl(card) {
   // Priority 1: user-corrected links
   var fix = card && TCDB_USER_FIXES[card.id];
@@ -416,6 +473,8 @@ function TylerBlackTracker() {
   const [filterStatus, setFilterStatus] = useState("all");
   // Collection: filter to a single WNBA player. null = all. Hidden/unused in TB mode.
   const [filterPlayer, setFilterPlayer] = useState(null);
+  // Collection: filter by extracted color/parallel keyword. null = all.
+  const [filterColor, setFilterColor] = useState(null);
   const [search, setSearch] = useState("");
   const [filterCardNum, setFilterCardNum] = useState("");
   const [page, setPage] = useState(0);
@@ -1221,6 +1280,7 @@ function TylerBlackTracker() {
       const cardStatus = statuses[card.id] || "not_owned";
       if (filterYear !== "all" && cardYear(card) !== filterYear) return false;
       if (filterPlayer && card.player !== filterPlayer) return false;
+      if (filterColor && !extractColors(card.cardSet).includes(filterColor)) return false;
       if (filterProduct !== "all" && card.product !== filterProduct) return false;
       if (cn && card.cardNumber !== cn) return false;
       if (filterStatus === "acquired" && cardStatus !== "owned" && cardStatus !== "in_transit") return false;
@@ -1232,15 +1292,17 @@ function TylerBlackTracker() {
       else if (s && !card.product.toLowerCase().includes(s) && !card.cardSet.toLowerCase().includes(s) && !card.cardNumber.toLowerCase().includes(s)) return false;
       return true;
     });
-  }, [statuses, forSaleFlags, tcdbFlags, tcdbFixes, filterYear, filterProduct, filterCardNum, filterStatus, search, filterPlayer]);
+  }, [statuses, forSaleFlags, tcdbFlags, tcdbFixes, filterYear, filterProduct, filterCardNum, filterStatus, search, filterPlayer, filterColor]);
   const totalPages = Math.ceil(filtered.length / pageSize);
   const pageCards = filtered.slice(page * pageSize, (page + 1) * pageSize);
-  useEffect(() => { setPage(0); }, [filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer]);
+  useEffect(() => { setPage(0); }, [filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer, filterColor]);
   useEffect(() => { if (filterProduct !== "all" && !filteredProducts.includes(filterProduct)) setFilterProduct("all"); }, [filterYear, filterPlayer]);
   // Auto-reset year if it's no longer valid for the new player
   useEffect(() => { if (filterYear !== "all" && !years.includes(filterYear)) setFilterYear("all"); }, [filterPlayer, filterProduct]);
   // Auto-reset card# if it's no longer valid for current filters
   useEffect(() => { if (filterCardNum && !cardNumbers.includes(filterCardNum)) setFilterCardNum(""); }, [filterPlayer, filterYear, filterProduct]);
+  // Auto-reset color if no longer present in current context
+  useEffect(() => { if (filterColor && !colorFrequencies.some(function(e){return e[0]===filterColor;})) setFilterColor(null); }, [filterPlayer, filterYear, filterProduct]);
   // Reset focus when page/filters change
   useEffect(function() { setFocusIdx(-1); }, [page, filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer]);
   // Build the WNBA active player list for filter chips. Empty in TB mode.
@@ -1257,6 +1319,24 @@ function TylerBlackTracker() {
     Object.keys(window.TEMPO_ROSTER).forEach(function(k) { m[k] = window.TEMPO_ROSTER[k].name; });
     return m;
   }, []);
+  // Color slicer: compute keyword frequency from cards matching all OTHER filters
+  // (excluding the color filter itself, so the chips reflect what's available to pick).
+  const colorFrequencies = useMemo(function() {
+    var ctx = ALL_CARDS.filter(function(c) {
+      if (HIDDEN_DUPES.has(c.id)) return false;
+      if (filterPlayer && c.player !== filterPlayer) return false;
+      if (filterYear !== "all" && cardYear(c) !== filterYear) return false;
+      if (filterProduct !== "all" && c.product !== filterProduct) return false;
+      return true;
+    });
+    var freq = {};
+    ctx.forEach(function(c) {
+      extractColors(c.cardSet).forEach(function(col) {
+        freq[col] = (freq[col] || 0) + 1;
+      });
+    });
+    return Object.entries(freq).sort(function(a, b) { return b[1] - a[1]; });
+  }, [filterPlayer, filterYear, filterProduct, statuses]);
   useEffect(function() { if (!storageDiag) return; var t = setTimeout(function() { setStorageDiag(""); }, 5000); return function() { clearTimeout(t); }; }, [storageDiag]);
   // Auto-scroll focused card into view
   useEffect(function() {
@@ -1531,6 +1611,42 @@ function TylerBlackTracker() {
             })}
           </div>
         )}
+        {/* Year row slicer — single horizontal row, no wrap, scroll if too many. */}
+        {years.length > 1 && (
+          <div className="flex gap-1 items-center mb-1 pb-1 overflow-x-auto" style={{borderBottom:"1px solid #1a2d4a",scrollbarWidth:"thin"}}>
+            <span className="font-bold mr-1 flex-shrink-0" style={{color:"#fbbf24",fontSize:"clamp(8px,0.9vw,10px)"}}>Year:</span>
+            <button onClick={function(){ setFilterYear("all"); }}
+              className={"px-1.5 py-0.5 rounded font-semibold transition-colors flex-shrink-0 "+
+                (filterYear==="all" ? "bg-yellow-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700")}
+              style={{fontSize:"clamp(9px,1vw,11px)"}}>All</button>
+            {years.map(function(y) {
+              return (<button key={y} onClick={function(){ setFilterYear(y); }}
+                className={"px-1.5 py-0.5 rounded font-semibold transition-colors flex-shrink-0 "+
+                  (filterYear===y ? "bg-yellow-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700")}
+                style={{fontSize:"clamp(9px,1vw,11px)"}}>{y}</button>);
+            })}
+          </div>
+        )}
+        {/* Color/keyword slicer — chips colored to match the keyword. Top-N by frequency. */}
+        {colorFrequencies.length > 0 && (
+          <div className="flex gap-1 items-center mb-1 pb-1 overflow-x-auto" style={{borderBottom:"1px solid #1a2d4a",scrollbarWidth:"thin"}}>
+            <span className="font-bold mr-1 flex-shrink-0" style={{color:"#9ca3af",fontSize:"clamp(8px,0.9vw,10px)"}}>Color:</span>
+            <button onClick={function(){ setFilterColor(null); }}
+              className={"px-1.5 py-0.5 rounded font-semibold transition-colors flex-shrink-0 "+
+                (filterColor===null ? "bg-gray-500 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700")}
+              style={{fontSize:"clamp(9px,1vw,11px)"}}>All</button>
+            {colorFrequencies.slice(0, 14).map(function(entry) {
+              var col = entry[0], count = entry[1];
+              var p = COLOR_PALETTE[col];
+              var active = filterColor === col;
+              return (<button key={col} onClick={function(){ setFilterColor(active ? null : col); }}
+                className={"px-1.5 py-0.5 rounded font-semibold transition-colors flex-shrink-0 capitalize "+
+                  (active ? "ring-2 ring-white" : "hover:opacity-90")}
+                style={{fontSize:"clamp(9px,1vw,11px)", background: p ? p.bg : "#374151", color: p ? p.text : "#fff"}}
+                title={col + " — " + count + " card" + (count !== 1 ? "s" : "")}>{col} <span className="font-normal opacity-80">{count}</span></button>);
+            })}
+          </div>
+        )}
         {/* Filters */}
         <div className="flex gap-1 mb-1 flex-wrap" style={{fontSize:"clamp(9px,1.1vw,11px)"}}>
           <select value={filterYear} onChange={function(e){setFilterYear(e.target.value);}} className="bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5">
@@ -1564,13 +1680,19 @@ function TylerBlackTracker() {
         </div>
         {/* Card list - ultra dense */}
         <div className="flex-1 overflow-y-auto min-h-0 space-y-px">
-          {pageCards.map(function(card) {
+          {pageCards.map(function(card, rowIdx) {
             var status = statuses[card.id] || "not_owned";
             var cfg = STATUS_CONFIG[status];
             var details = cardDetails[card.id] || {};
             var isExpanded = expandedCard === card.id;
-            var rowBg = status === "owned" ? "bg-green-950/30 border-l-2 border-l-green-600" : status === "in_transit" ? "bg-emerald-950/30 border-l-2 border-l-emerald-400" : "bg-gray-900/40 border-l-2 border-l-gray-800";
+            // Alternating row shading. Status owned/transit gets its color tint as background;
+            // not-owned alternates between light and dark gray for visual line tracking.
+            var altBg = rowIdx % 2 === 0 ? "bg-gray-950/50" : "bg-gray-900/30";
+            var rowBg = status === "owned" ? "bg-green-950/30 border-l-2 border-l-green-600" : status === "in_transit" ? "bg-emerald-950/30 border-l-2 border-l-emerald-400" : (altBg + " border-l-2 border-l-gray-800");
             var isFocused = focusIdx === pageCards.indexOf(card);
+            // Extract color keywords for cell tinting
+            var cardSetColors = extractColors(card.cardSet);
+            var primaryColor = cardSetColors.length > 0 ? COLOR_PALETTE[cardSetColors[0]] : null;
             return (
               <div key={card.id} data-focus-idx={pageCards.indexOf(card)} className={"rounded-sm overflow-hidden " + rowBg + (isFocused ? " ring-1 ring-yellow-400/70 bg-yellow-950/20" : "")}>
                 <div className="flex items-center gap-1 cursor-pointer" style={{padding:"clamp(1px,0.2vw,3px) clamp(3px,0.5vw,8px)"}} onClick={function(){setExpandedCard(isExpanded ? null : card.id);}}>
@@ -1583,7 +1705,11 @@ function TylerBlackTracker() {
                   )}
                   <div className="flex-1 min-w-0 flex items-baseline gap-1 truncate" style={{fontSize:"clamp(9px,1.2vw,12px)"}}>
                     <span className="font-semibold text-white whitespace-nowrap">#{card.cardNumber}</span>
-                    <span className="text-gray-300 truncate">{card.cardSet}</span>
+                    {primaryColor ? (
+                      <span className="truncate font-semibold px-1 rounded" style={{color: primaryColor.bg, background: primaryColor.bg + "26"}}>{card.cardSet}</span>
+                    ) : (
+                      <span className="text-gray-300 truncate">{card.cardSet}</span>
+                    )}
                     {sspBadge(card.cardSet)}
                     {(card.copies || (details.printRun && details.printRun !== "?")) ? <span className="text-yellow-400 font-black whitespace-nowrap" style={{fontSize:"clamp(9px,1vw,12px)"}}>/{details.printRun && details.printRun !== "?" ? details.printRun : card.copies}</span> : null}
                     {isMissingSN(card, cardDetails) && <span className="text-orange-400 font-bold text-[8px] whitespace-nowrap ml-0.5" title="SN but print run unknown">SN?</span>}
@@ -2293,6 +2419,14 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
   );
 }
 function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, forSaleFlags, toggleForSale, needsSync, setActiveTab, setDetailedProductFilter, setDetailedCardNumFilter, setDetailedStatusFilter, setDetailedSnFilter, setPricesSearchFilter, superSearchMode, targetByCardId, setTargetCardFilter, hidePrices }) {
+  var trackerMode = useTrackerMode();
+  // Build a quick player-key → display name map. Empty in TB mode.
+  var playerNameByKey = useMemo(function() {
+    if (typeof window === "undefined" || !window.TEMPO_ROSTER) return {};
+    var m = {};
+    Object.keys(window.TEMPO_ROSTER).forEach(function(k) { m[k] = window.TEMPO_ROSTER[k].name; });
+    return m;
+  }, []);
   var [numSearch, setNumSearch] = useState("");
   var [selectedNum, setSelectedNum] = useState(null);
   var [selectedCard, setSelectedCard] = useState(null);
@@ -2507,20 +2641,43 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
                 {/* Variant list */}
                 {showOpen && (
                   <div className="ml-2 mt-0.5 border-l border-gray-800 pl-1">
-                    {visibleCards.map(function(card) {
+                    {visibleCards.map(function(card, vIdx) {
                       var cs = statuses[card.id] || "not_owned";
                       var cfg = STATUS_CONFIG[cs];
                       var isSelected = selectedCard && selectedCard.id === card.id;
                       var pv = parseVariant(card);
                       var highlightColor = getVariantColor(pv.highlight);
+                      var dd = cardDetails[card.id] || {};
+                      var yr = cardYear(card);
+                      var lookupColors = extractColors(card.cardSet);
+                      var lookupPrimary = lookupColors.length > 0 ? COLOR_PALETTE[lookupColors[0]] : null;
+                      // Alternating row bg for scan-ability. Owned/in_transit get status color.
+                      var altRowBg = vIdx % 2 === 0 ? "bg-gray-950/30" : "bg-transparent";
+                      var statusBg = cs === "owned" ? "bg-green-950/40" : cs === "in_transit" ? "bg-emerald-950/40" : altRowBg;
                       return (
-                        <div key={card.id} onClick={function(){setSelectedCard(card);}} className={"flex items-center gap-1.5 px-1.5 py-0.5 rounded cursor-pointer " + (isSelected ? "bg-purple-950/50 border border-purple-700" : "hover:bg-gray-800/60 border border-transparent")}>
+                        <div key={card.id} onClick={function(){setSelectedCard(card);}} className={"flex items-center gap-1 px-1.5 py-0.5 rounded cursor-pointer " + (isSelected ? "bg-purple-950/60 border border-purple-700" : statusBg + " hover:bg-gray-800/60 border border-transparent")}>
                           <div className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + cfg.dot} />
+                          {/* Card # — first thing user expects to see */}
+                          <span className="font-bold text-white text-[10px] flex-shrink-0 bg-gray-800/60 rounded px-1" title="Card number">#{card.cardNumber}</span>
+                          {/* Year badge */}
+                          {yr && <span className="text-gray-400 font-mono text-[9px] flex-shrink-0">{yr}</span>}
+                          {/* Player name pill — WNBA only */}
+                          {trackerMode === "wnba" && card.player && playerNameByKey[card.player] && (
+                            <span className="font-bold px-1 py-0 rounded bg-purple-900/50 border border-purple-700 text-purple-200 whitespace-nowrap flex-shrink-0 text-[9px]"
+                              title={playerNameByKey[card.player]}>{playerNameByKey[card.player].split(" ").pop()}</span>
+                          )}
                           <div className="flex-1 min-w-0 flex items-baseline gap-1 truncate">
                             {pv.prefix && <span className="text-gray-500 text-[9px] truncate flex-shrink">{pv.prefix}</span>}
-                            <span className="font-bold text-[12px] truncate" style={highlightColor ? {color: highlightColor} : {color: cs === "owned" ? "#86efac" : cs === "in_transit" ? "#93c5fd" : "#e5e7eb"}}>{pv.highlight}</span>
+                            {/* Variant highlight — now with bg tint matching the color, like Collection */}
+                            {lookupPrimary ? (
+                              <span className="font-bold text-[12px] truncate px-1 rounded" style={{color: lookupPrimary.bg, background: lookupPrimary.bg + "26"}}>{pv.highlight}</span>
+                            ) : (
+                              <span className="font-bold text-[12px] truncate" style={highlightColor ? {color: highlightColor} : {color: cs === "owned" ? "#86efac" : cs === "in_transit" ? "#93c5fd" : "#e5e7eb"}}>{pv.highlight}</span>
+                            )}
                           </div>
-                          {card.copies && <span className="text-gray-600 text-[9px] flex-shrink-0">/{card.copies}</span>}
+                          {card.copies && <span className="text-yellow-400 font-black text-[10px] flex-shrink-0">/{card.copies}</span>}
+                          {/* User-entered serial number — yellow when present */}
+                          {dd.serial && <span className="text-yellow-300 font-black text-[10px] flex-shrink-0" title="Your serial number">#{dd.serial}</span>}
                           {sspBadge(card.cardSet)}
                           {card.isAuto === "Yes" && <span className="text-yellow-500 text-[8px] font-bold flex-shrink-0 bg-yellow-950/40 px-0.5 rounded">A</span>}
                           {card.isMem === "Yes" && <span className="text-purple-500 text-[8px] font-bold flex-shrink-0 bg-purple-950/40 px-0.5 rounded">M</span>}
