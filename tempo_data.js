@@ -20543,6 +20543,1889 @@ window.TEMPO_ALL_CARDS = [
     player: "key",
     team: "Toronto Tempo",
     isRookie: true
+  },// ═══════════════════════════════════════════════════════════════════════
+  // ── ADDED 2026-05-06: Temi Fagbenle (193 cards) + Nurse White Sparkle (1)
+  // ── IDs 2092-2285 — APPENDED to preserve existing positional IDs
+  // ═══════════════════════════════════════════════════════════════════════
+  {
+    id: 2092,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Base",
+    player: "fagbenle",
+    team: "Minnesota Lynx",
+    isRookie: true
+  },
+  {
+    id: 2093,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Black",
+    player: "fagbenle",
+    team: "Minnesota Lynx",
+    copies: "1"
+  },
+  {
+    id: 2094,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Black Gold",
+    player: "fagbenle",
+    team: "Minnesota Lynx",
+    copies: "5"
+  },
+  {
+    id: 2095,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Blue",
+    player: "fagbenle",
+    team: "Minnesota Lynx",
+    copies: "149"
+  },
+  {
+    id: 2096,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Gold",
+    player: "fagbenle",
+    team: "Minnesota Lynx",
+    copies: "10"
+  },
+  {
+    id: 2097,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Green",
+    player: "fagbenle",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2098,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Green Ice",
+    player: "fagbenle",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2099,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Green Pulsar",
+    player: "fagbenle",
+    team: "Minnesota Lynx",
+    copies: "25"
+  },
+  {
+    id: 2100,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Hyper",
+    player: "fagbenle",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2101,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Ice",
+    player: "fagbenle",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2102,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Mojo",
+    player: "fagbenle",
+    team: "Minnesota Lynx",
+    copies: "25"
+  },
+  {
+    id: 2103,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Orange",
+    player: "fagbenle",
+    team: "Minnesota Lynx",
+    copies: "65"
+  },
+  {
+    id: 2104,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Purple",
+    player: "fagbenle",
+    team: "Minnesota Lynx",
+    copies: "125"
+  },
+  {
+    id: 2105,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Red",
+    player: "fagbenle",
+    team: "Minnesota Lynx",
+    copies: "275"
+  },
+  {
+    id: 2106,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Ruby Wave",
+    player: "fagbenle",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2107,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Scope",
+    player: "fagbenle",
+    team: "Minnesota Lynx",
+    copies: "99"
+  },
+  {
+    id: 2108,
+    year: 2020,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Silver",
+    player: "fagbenle",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2109,
+    year: 2020,
+    product: "Panini Prizm WNBA Premium",
+    cardNumber: "28",
+    cardSet: "Base",
+    player: "fagbenle",
+    team: "Minnesota Lynx",
+    copies: "99"
+  },
+  {
+    id: 2110,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Base",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2111,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Black Gold Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "5"
+  },
+  {
+    id: 2112,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Black Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "1"
+  },
+  {
+    id: 2113,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Blue Millionaire Shimmer Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "10"
+  },
+  {
+    id: 2114,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Boardwalk Blue Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "15"
+  },
+  {
+    id: 2115,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Brown Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "249"
+  },
+  {
+    id: 2116,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Classic Icons Red Prizm",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2117,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Deal Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2118,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Dice Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2119,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Free Parking Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2120,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Go Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2121,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Gold Millionaire Shimmer Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "500"
+  },
+  {
+    id: 2122,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Gold Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "49"
+  },
+  {
+    id: 2123,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Gold Wave Millionaire Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "10"
+  },
+  {
+    id: 2124,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Green Millionaire Shimmer Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "20"
+  },
+  {
+    id: 2125,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Green Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "24"
+  },
+  {
+    id: 2126,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Light Blue Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "199"
+  },
+  {
+    id: 2127,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Monopoly Man Black and White Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2128,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Neon Green Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "10"
+  },
+  {
+    id: 2129,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Orange Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "124"
+  },
+  {
+    id: 2130,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Pink Millionaire Shimmer Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "5"
+  },
+  {
+    id: 2131,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Pink Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "149"
+  },
+  {
+    id: 2132,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Purple Millionaire Shimmer Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "50"
+  },
+  {
+    id: 2133,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Purple Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2134,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Question Mark Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "25"
+  },
+  {
+    id: 2135,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Red Millionaire Shimmer Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "100"
+  },
+  {
+    id: 2136,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Red Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "99"
+  },
+  {
+    id: 2137,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Silver Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2138,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "Tiger Stripe Boardwalk Blue Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2139,
+    year: 2024,
+    product: "Panini Prizm Monopoly WNBA",
+    cardNumber: "26",
+    cardSet: "White Millionaire Shimmer Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "1"
+  },
+  {
+    id: 2140,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Base",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2141,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Black Finite Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "1"
+  },
+  {
+    id: 2142,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Black Gold Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "5"
+  },
+  {
+    id: 2143,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Black Velocity Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "39"
+  },
+  {
+    id: 2144,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Blue Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "199"
+  },
+  {
+    id: 2145,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Blue Pulsar Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "199"
+  },
+  {
+    id: 2146,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Blue Velocity Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2147,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Checkerboard Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2148,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Cherry Blossom FOTL Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "20"
+  },
+  {
+    id: 2149,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Gold Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "10"
+  },
+  {
+    id: 2150,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Gold Vinyl Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "1"
+  },
+  {
+    id: 2151,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Green Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2152,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Green Pulsar Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "25"
+  },
+  {
+    id: 2153,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Ice Gold Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "10"
+  },
+  {
+    id: 2154,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Ice Orange Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2155,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Ice Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2156,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Ice White Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "35"
+  },
+  {
+    id: 2157,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Lotus Flower FOTL Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "3"
+  },
+  {
+    id: 2158,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Mojo Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "25"
+  },
+  {
+    id: 2159,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Mosaic Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "3"
+  },
+  {
+    id: 2160,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Orange Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "99"
+  },
+  {
+    id: 2161,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Orange Velocity Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2162,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Pink Velocity Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "79"
+  },
+  {
+    id: 2163,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Premium Box Set Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "99"
+  },
+  {
+    id: 2164,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Pulsar Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "499"
+  },
+  {
+    id: 2165,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Purple Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "149"
+  },
+  {
+    id: 2166,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Red Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "299"
+  },
+  {
+    id: 2167,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Red Pulsar Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "299"
+  },
+  {
+    id: 2168,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Silver Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2169,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Snakeskin Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2170,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "Teal Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "49"
+  },
+  {
+    id: 2171,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "White Sparkle Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2172,
+    year: 2024,
+    product: "Panini Prizm WNBA",
+    cardNumber: "136",
+    cardSet: "WNBA Logo Prizms",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2173,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Base",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2174,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Black Finite",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "1"
+  },
+  {
+    id: 2175,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Black Gold",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "5"
+  },
+  {
+    id: 2176,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Bronze Checker",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "49"
+  },
+  {
+    id: 2177,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Gold",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "10"
+  },
+  {
+    id: 2178,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Gold Flash",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "10"
+  },
+  {
+    id: 2179,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Gold Vinyl",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "1"
+  },
+  {
+    id: 2180,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Green Ice",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2181,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Ice Gold",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "10"
+  },
+  {
+    id: 2182,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Neon Green",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "75"
+  },
+  {
+    id: 2183,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Orange",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "125"
+  },
+  {
+    id: 2184,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Pink and Purple",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "99"
+  },
+  {
+    id: 2185,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Pink Ice",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2186,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Pink Shimmer FOTL",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "3"
+  },
+  {
+    id: 2187,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Purple",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "149"
+  },
+  {
+    id: 2188,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Purple Ice",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "149"
+  },
+  {
+    id: 2189,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Red and Blue",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "399"
+  },
+  {
+    id: 2190,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Red Ice",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2191,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Silver",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2192,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Silver Flash",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2193,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Tie-Dye",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "25"
+  },
+  {
+    id: 2194,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Tiger",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2195,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms White",
+    player: "fagbenle",
+    team: "Indiana Fever",
+    copies: "99"
+  },
+  {
+    id: 2196,
+    year: 2024,
+    product: "Panini Select WNBA",
+    cardNumber: "168",
+    cardSet: "Prizms Zebra",
+    player: "fagbenle",
+    team: "Indiana Fever"
+  },
+  {
+    id: 2197,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Base",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2198,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Artist Proof",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "25"
+  },
+  {
+    id: 2199,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Black Gold Laser",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "5"
+  },
+  {
+    id: 2200,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Black Holo Press Proof",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "1"
+  },
+  {
+    id: 2201,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Black Shimmer",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "1"
+  },
+  {
+    id: 2202,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Blue Laser",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "49"
+  },
+  {
+    id: 2203,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Blue Shimmer",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "49"
+  },
+  {
+    id: 2204,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Cubic",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2205,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Dragon",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2206,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Gold Shimmer",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "10"
+  },
+  {
+    id: 2207,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Green Laser",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2208,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Green Shimmer",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2209,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Holo",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2210,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Holo Black Laser",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "1"
+  },
+  {
+    id: 2211,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Holo Gold Laser",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "10"
+  },
+  {
+    id: 2212,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Holo Team Logo",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "13"
+  },
+  {
+    id: 2213,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Holo WNBA Logo",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2214,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Lava",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2215,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Light Blue Lava",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "75"
+  },
+  {
+    id: 2216,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Orange Laser",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "199"
+  },
+  {
+    id: 2217,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Orange Lava",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "199"
+  },
+  {
+    id: 2218,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Pink Laser",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "25"
+  },
+  {
+    id: 2219,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Pink Shimmer",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "25"
+  },
+  {
+    id: 2220,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Purple Laser",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "99"
+  },
+  {
+    id: 2221,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Purple Lava",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "99"
+  },
+  {
+    id: 2222,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Purple Shimmer",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "99"
+  },
+  {
+    id: 2223,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Red Holo",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "299"
+  },
+  {
+    id: 2224,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Red Lava",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "399"
+  },
+  {
+    id: 2225,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Red Shimmer",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "399"
+  },
+  {
+    id: 2226,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Teal Laser",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "125"
+  },
+  {
+    id: 2227,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "58",
+    cardSet: "Yellow Lava",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "5"
+  },
+  {
+    id: 2228,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "7",
+    cardSet: "Jersey Series",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2229,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "7",
+    cardSet: "Jersey Series Gold",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "10"
+  },
+  {
+    id: 2230,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "7",
+    cardSet: "Jersey Series Green",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "30"
+  },
+  {
+    id: 2231,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "7",
+    cardSet: "Jersey Series Holo Platinum Blue",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "1"
+  },
+  {
+    id: 2232,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "7",
+    cardSet: "Jersey Series Prime",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "25"
+  },
+  {
+    id: 2233,
+    year: 2025,
+    product: "Donruss WNBA",
+    cardNumber: "7",
+    cardSet: "Jersey Series Red",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2234,
+    year: 2025,
+    product: "Panini Impeccable WNBA",
+    cardNumber: "25",
+    cardSet: "Base",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "75"
+  },
+  {
+    id: 2235,
+    year: 2025,
+    product: "Panini Impeccable WNBA",
+    cardNumber: "25",
+    cardSet: "Amethyst",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "8"
+  },
+  {
+    id: 2236,
+    year: 2025,
+    product: "Panini Impeccable WNBA",
+    cardNumber: "25",
+    cardSet: "Gold",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "25"
+  },
+  {
+    id: 2237,
+    year: 2025,
+    product: "Panini Impeccable WNBA",
+    cardNumber: "25",
+    cardSet: "Holo Gold",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "10"
+  },
+  {
+    id: 2238,
+    year: 2025,
+    product: "Panini Impeccable WNBA",
+    cardNumber: "25",
+    cardSet: "Holo Silver",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "15"
+  },
+  {
+    id: 2239,
+    year: 2025,
+    product: "Panini Impeccable WNBA",
+    cardNumber: "25",
+    cardSet: "Platinum",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "1"
+  },
+  {
+    id: 2240,
+    year: 2025,
+    product: "Panini Impeccable WNBA",
+    cardNumber: "25",
+    cardSet: "Silver",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "40"
+  },
+  {
+    id: 2241,
+    year: 2025,
+    product: "Panini Instant WNBA",
+    cardNumber: "266",
+    cardSet: "Base",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2242,
+    year: 2025,
+    product: "Panini One and One WNBA",
+    cardNumber: "31",
+    cardSet: "Base",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "99"
+  },
+  {
+    id: 2243,
+    year: 2025,
+    product: "Panini One and One WNBA",
+    cardNumber: "31",
+    cardSet: "Holo Emerald",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "5"
+  },
+  {
+    id: 2244,
+    year: 2025,
+    product: "Panini One and One WNBA",
+    cardNumber: "31",
+    cardSet: "Holo Gold",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "10"
+  },
+  {
+    id: 2245,
+    year: 2025,
+    product: "Panini One and One WNBA",
+    cardNumber: "31",
+    cardSet: "Holo Platinum Blue",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "1"
+  },
+  {
+    id: 2246,
+    year: 2025,
+    product: "Panini One and One WNBA",
+    cardNumber: "31",
+    cardSet: "Pink",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "6"
+  },
+  {
+    id: 2247,
+    year: 2025,
+    product: "Panini One and One WNBA",
+    cardNumber: "31",
+    cardSet: "Purple",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "25"
+  },
+  {
+    id: 2248,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Base",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2249,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Black Finite Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "1"
+  },
+  {
+    id: 2250,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Black Velocity Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "39"
+  },
+  {
+    id: 2251,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Blue Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "199"
+  },
+  {
+    id: 2252,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Blue Pulsar Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "199"
+  },
+  {
+    id: 2253,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Blue Velocity Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2254,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Carolina Blue Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "125"
+  },
+  {
+    id: 2255,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Checkerboard Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2256,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Cherry Blossoms Prizms FOTL",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "20"
+  },
+  {
+    id: 2257,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Gold Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "10"
+  },
+  {
+    id: 2258,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Gold Vinyl Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "1"
+  },
+  {
+    id: 2259,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Green Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2260,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Green Pulsar Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "25"
+  },
+  {
+    id: 2261,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Ice Orange Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2262,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Ice Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2263,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Lime Green Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "225"
+  },
+  {
+    id: 2264,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Lotus Flower Prizms FOTL",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "3"
+  },
+  {
+    id: 2265,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Mojo Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "25"
+  },
+  {
+    id: 2266,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Mosaic Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "3"
+  },
+  {
+    id: 2267,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Orange Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "99"
+  },
+  {
+    id: 2268,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Pandora Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2269,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Pink Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "175"
+  },
+  {
+    id: 2270,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Pink Velocity Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "79"
+  },
+  {
+    id: 2271,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Purple Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "149"
+  },
+  {
+    id: 2272,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Purple Velocity Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "59"
+  },
+  {
+    id: 2273,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Red Pandora Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "199"
+  },
+  {
+    id: 2274,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Red Power Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "75"
+  },
+  {
+    id: 2275,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Red Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "299"
+  },
+  {
+    id: 2276,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Red Pulsar Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "299"
+  },
+  {
+    id: 2277,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Silver Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2278,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Snakeskin Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2279,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Swirl Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2280,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "Teal Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "49"
+  },
+  {
+    id: 2281,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "White Seismic Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2282,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "White Sparkle Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2283,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "WNBA Logo Gold Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries",
+    copies: "10"
+  },
+  {
+    id: 2284,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "68",
+    cardSet: "WNBA Logo Prizms",
+    player: "fagbenle",
+    team: "Golden State Valkyries"
+  },
+  {
+    id: 2285,
+    year: 2025,
+    product: "Panini Prizm WNBA",
+    cardNumber: "24",
+    cardSet: "White Sparkle Prizms",
+    player: "nurse",
+    team: "Chicago Sky"
   }
 ];
 
