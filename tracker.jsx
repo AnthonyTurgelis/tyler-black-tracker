@@ -1305,12 +1305,20 @@ function TylerBlackTracker() {
   useEffect(() => { if (filterColor && !colorFrequencies.some(function(e){return e[0]===filterColor;})) setFilterColor(null); }, [filterPlayer, filterYear, filterProduct]);
   // Reset focus when page/filters change
   useEffect(function() { setFocusIdx(-1); }, [page, filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer]);
-  // Build the WNBA active player list for filter chips. Empty in TB mode.
+  // Build the WNBA player list for filter chips. Derived from actual cards in DB so
+  // anyone with at least one card appears (including waived / inactive / non-roster
+  // players). TEMPO_ROSTER is consulted only to look up display names.
   const collectionPlayerList = useMemo(function() {
-    if (trackerMode !== "wnba" || typeof window === "undefined" || !window.TEMPO_ROSTER) return [];
-    return Object.keys(window.TEMPO_ROSTER)
-      .filter(function(k) { var p = window.TEMPO_ROSTER[k]; return p.active && p.role !== "coach"; })
-      .map(function(k) { return { key: k, name: window.TEMPO_ROSTER[k].name, last: window.TEMPO_ROSTER[k].name.split(" ").pop() }; });
+    if (trackerMode !== "wnba") return [];
+    var roster = (typeof window !== "undefined" && window.TEMPO_ROSTER) ? window.TEMPO_ROSTER : {};
+    var keysSeen = {};
+    ALL_CARDS.forEach(function(card) {
+      if (card.player && !keysSeen[card.player]) keysSeen[card.player] = true;
+    });
+    return Object.keys(keysSeen).map(function(k) {
+      var name = (roster[k] && roster[k].name) ? roster[k].name : (k.charAt(0).toUpperCase() + k.slice(1));
+      return { key: k, name: name, last: name.split(" ").pop() };
+    }).sort(function(a, b) { return a.last.localeCompare(b.last); });
   }, [trackerMode]);
   // Lookup map for fast player-name resolution in card rows
   const playerNameByKey = useMemo(function() {
@@ -1991,12 +1999,23 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
   var [rookieOnly, setRookieOnly] = useState(false);
   // WNBA-only: filter stats to a single player. null = all players.
   var [selectedPlayer, setSelectedPlayer] = useState(null);
-  // Build the active player list once. Only relevant in WNBA mode.
+  // Build the WNBA player list. Derived from actual cards in DB so anyone with at
+  // least one card appears (including waived / inactive / non-roster players).
+  // TEMPO_ROSTER is consulted only to look up display names.
   var playerList = useMemo(function() {
-    if (trackerMode !== "wnba" || typeof window === "undefined" || !window.TEMPO_ROSTER) return [];
-    return Object.keys(window.TEMPO_ROSTER)
-      .filter(function(k) { var p = window.TEMPO_ROSTER[k]; return p.active && p.role !== "coach"; })
-      .map(function(k) { return { key: k, name: window.TEMPO_ROSTER[k].name }; });
+    if (trackerMode !== "wnba") return [];
+    var roster = (typeof window !== "undefined" && window.TEMPO_ROSTER) ? window.TEMPO_ROSTER : {};
+    var keysSeen = {};
+    ALL_CARDS.forEach(function(card) {
+      if (card.player && !keysSeen[card.player]) keysSeen[card.player] = true;
+    });
+    return Object.keys(keysSeen).map(function(k) {
+      var name = (roster[k] && roster[k].name) ? roster[k].name : (k.charAt(0).toUpperCase() + k.slice(1));
+      return { key: k, name: name };
+    }).sort(function(a, b) {
+      var la = a.name.split(" ").pop(); var lb = b.name.split(" ").pop();
+      return la.localeCompare(lb);
+    });
   }, [trackerMode]);
 
   var PRESETS = [
@@ -2026,7 +2045,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
 
   function calcStats(cards, sts, minSN, inclBlank, ex1of1, unnumOnly, spOnly) {
     var owned=0,transit=0,total=0,sps=0,spsAcq=0,ssps=0,sspsAcq=0;
-    var byYear={},byBrand={},byProduct={},cardsByProduct={};
+    var byYear={},byBrand={},byProduct={},byPlayer={},cardsByProduct={};
     cards.forEach(function(card) {
       // WNBA player filter — only include cards for the selected player when one is chosen
       if (selectedPlayer && card.player !== selectedPlayer) return;
@@ -2049,10 +2068,11 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
         if (s==="in_transit") map[key].transit++;
       }
       add(byYear, year); add(byBrand, brand); add(byProduct, prod);
+      if (card.player) add(byPlayer, card.player);
       if (!cardsByProduct[prod]) cardsByProduct[prod] = [];
       cardsByProduct[prod].push(card);
     });
-    return {owned:owned,transit:transit,total:total,sps:sps,spsAcq:spsAcq,ssps:ssps,sspsAcq:sspsAcq,byYear:byYear,byBrand:byBrand,byProduct:byProduct,cardsByProduct:cardsByProduct};
+    return {owned:owned,transit:transit,total:total,sps:sps,spsAcq:spsAcq,ssps:ssps,sspsAcq:sspsAcq,byYear:byYear,byBrand:byBrand,byProduct:byProduct,byPlayer:byPlayer,cardsByProduct:cardsByProduct};
   }
 
   var stats = useMemo(function() {
@@ -2187,28 +2207,65 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
               </div>
               {stats.ssps > 0 && <div className="flex items-center gap-1 mt-0.5" style={{fontSize:"clamp(7px,0.8vw,9px)"}}><span className="text-red-400 font-bold text-[8px] bg-red-900/60 px-1 rounded">SSP</span><span className="text-amber-200">{stats.sspsAcq}/{stats.ssps}</span></div>}
             </div>
-            {/* By Year */}
+            {/* By Year (TB mode) / By Player (WNBA mode) */}
             <div className="rounded-lg px-2 py-1.5 flex-1 min-w-0" style={{background:"#111a2e"}}>
-              <div className="font-bold mb-0.5" style={{color:"#FFC52F",fontSize:"clamp(7px,0.8vw,9px)"}}>By Year</div>
+              <div className="font-bold mb-0.5" style={{color:"#FFC52F",fontSize:"clamp(7px,0.8vw,9px)"}}>{trackerMode === "wnba" ? "By Player" : "By Year"}</div>
               <div className="space-y-px">
-                {Object.keys(stats.byYear).sort().map(function(year) {
-                  var d = stats.byYear[year];
-                  var yp = d.total ? (d.owned+d.transit)/d.total*100 : 0;
-                  var needPct = d.total ? (d.total-d.owned-d.transit)/d.total*100 : 0;
-                  return (
-                    <div key={year} className="flex items-center gap-1" style={{fontSize:"clamp(9px,1vw,11px)"}}>
-                      <span className="font-bold w-8 text-right" style={{color:"#FFC52F"}}>{year}</span>
-                      <div className="flex-1 rounded-full h-2 overflow-hidden" style={{background:"#1a2d4a"}}>
-                        <div className="h-full flex">
-                          <div className="transition-all" style={{width:(d.total?d.owned/d.total*100:0)+"%",background:"#22c55e"}}/>
-                          <div className="transition-all" style={{width:(d.total?d.transit/d.total*100:0)+"%",background:"#86efac"}}/>
+                {trackerMode === "wnba" ? (
+                  // By Player breakdown for WNBA mode. Rows are sorted by last name and
+                  // clickable — tapping a row toggles the selectedPlayer filter (same
+                  // state used by the player chips above).
+                  (function() {
+                    var roster = (typeof window !== "undefined" && window.TEMPO_ROSTER) ? window.TEMPO_ROSTER : {};
+                    var rows = Object.keys(stats.byPlayer).map(function(pkey) {
+                      var name = (roster[pkey] && roster[pkey].name) ? roster[pkey].name : (pkey.charAt(0).toUpperCase() + pkey.slice(1));
+                      return { key: pkey, name: name, last: name.split(" ").pop(), d: stats.byPlayer[pkey] };
+                    }).sort(function(a, b) { return a.last.localeCompare(b.last); });
+                    if (rows.length === 0) {
+                      return <div className="text-gray-500 italic px-1" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>No player data yet</div>;
+                    }
+                    return rows.map(function(p) {
+                      var d = p.d;
+                      var yp = d.total ? (d.owned+d.transit)/d.total*100 : 0;
+                      var isSelected = selectedPlayer === p.key;
+                      return (
+                        <div key={p.key} onClick={function(){ setSelectedPlayer(isSelected ? null : p.key); }}
+                          className="flex items-center gap-1 cursor-pointer hover:bg-gray-800/50 rounded px-0.5 transition-colors"
+                          style={{fontSize:"clamp(9px,1vw,11px)"}}
+                          title={isSelected ? "Click to clear filter" : ("Click to filter to " + p.name)}>
+                          <span className={"font-bold w-14 text-right truncate flex-shrink-0 " + (isSelected ? "text-purple-300" : "")} style={!isSelected ? {color:"#FFC52F"} : {}}>{p.last}</span>
+                          <div className="flex-1 rounded-full h-2 overflow-hidden" style={{background:"#1a2d4a"}}>
+                            <div className="h-full flex">
+                              <div className="transition-all" style={{width:(d.total?d.owned/d.total*100:0)+"%",background:"#22c55e"}}/>
+                              <div className="transition-all" style={{width:(d.total?d.transit/d.total*100:0)+"%",background:"#86efac"}}/>
+                            </div>
+                          </div>
+                          <span className={"w-9 text-right font-bold flex-shrink-0 " + (yp>=75?"text-yellow-300":yp>=50?"text-yellow-500":yp>0?"text-orange-300":"text-red-400")}>{yp.toFixed(0)}%</span>
+                          <span className="w-14 text-right flex-shrink-0" style={{color:"#8ba3c4",fontSize:"clamp(7px,0.8vw,9px)"}}>{d.owned+d.transit}/{d.total}</span>
                         </div>
+                      );
+                    });
+                  })()
+                ) : (
+                  Object.keys(stats.byYear).sort().map(function(year) {
+                    var d = stats.byYear[year];
+                    var yp = d.total ? (d.owned+d.transit)/d.total*100 : 0;
+                    var needPct = d.total ? (d.total-d.owned-d.transit)/d.total*100 : 0;
+                    return (
+                      <div key={year} className="flex items-center gap-1" style={{fontSize:"clamp(9px,1vw,11px)"}}>
+                        <span className="font-bold w-8 text-right" style={{color:"#FFC52F"}}>{year}</span>
+                        <div className="flex-1 rounded-full h-2 overflow-hidden" style={{background:"#1a2d4a"}}>
+                          <div className="h-full flex">
+                            <div className="transition-all" style={{width:(d.total?d.owned/d.total*100:0)+"%",background:"#22c55e"}}/>
+                            <div className="transition-all" style={{width:(d.total?d.transit/d.total*100:0)+"%",background:"#86efac"}}/>
+                          </div>
+                        </div>
+                        <span className={"w-9 text-right font-bold flex-shrink-0 " + (yp>=75?"text-yellow-300":yp>=50?"text-yellow-500":yp>0?"text-orange-300":"text-red-400")}>{yp.toFixed(0)}%</span>
+                        <span className="w-14 text-right flex-shrink-0" style={{color:"#8ba3c4",fontSize:"clamp(7px,0.8vw,9px)"}}>{d.owned+d.transit}/{d.total}</span>
                       </div>
-                      <span className={"w-9 text-right font-bold flex-shrink-0 " + (yp>=75?"text-yellow-300":yp>=50?"text-yellow-500":yp>0?"text-orange-300":"text-red-400")}>{yp.toFixed(0)}%</span>
-                      <span className="w-14 text-right flex-shrink-0" style={{color:"#8ba3c4",fontSize:"clamp(7px,0.8vw,9px)"}}>{d.owned+d.transit}/{d.total}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
