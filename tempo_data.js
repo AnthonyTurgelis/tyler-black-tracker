@@ -22426,6 +22426,385 @@ window.TEMPO_ALL_CARDS = [
     cardSet: "White Sparkle Prizms",
     player: "nurse",
     team: "Chicago Sky"
+  },
+  // ══════════════════════════════════════════════════════════════════════
+  // ── ADDED 2026-05-07: Nikolina Milic (39 cards) — Minnesota Lynx ─
+  // ── IDs 2286-2324 — APPENDED to preserve existing positional IDs
+  // ══════════════════════════════════════════════════════════════════════
+  {
+    id: 2286,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Base",
+    player: "milic",
+    team: "Minnesota Lynx",
+    isRookie: true
+  },
+  {
+    id: 2287,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Black Gold",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "5"
+  },
+  {
+    id: 2288,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Blue",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "149"
+  },
+  {
+    id: 2289,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Gold",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "10"
+  },
+  {
+    id: 2290,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Gold Vinyl",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "1"
+  },
+  {
+    id: 2291,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Green",
+    player: "milic",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2292,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Green Ice",
+    player: "milic",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2293,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Green Pulsar",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "25"
+  },
+  {
+    id: 2294,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Hyper",
+    player: "milic",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2295,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Ice",
+    player: "milic",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2296,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Mojo",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "25"
+  },
+  {
+    id: 2297,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Mosaic",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "3"
+  },
+  {
+    id: 2298,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Orange",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "49"
+  },
+  {
+    id: 2299,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Premium Box Set",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "99"
+  },
+  {
+    id: 2300,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Purple",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "99"
+  },
+  {
+    id: 2301,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Red",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "199"
+  },
+  {
+    id: 2302,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Ruby Wave",
+    player: "milic",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2303,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "Silver",
+    player: "milic",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2304,
+    year: 2022,
+    product: "Panini Prizm WNBA",
+    cardNumber: "25",
+    cardSet: "White Sparkle",
+    player: "milic",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2305,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Base",
+    player: "milic",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2306,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Black Gold Prizms",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "5"
+  },
+  {
+    id: 2307,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Blue",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "175"
+  },
+  {
+    id: 2308,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Blue Wave",
+    player: "milic",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2309,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Gold",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "10"
+  },
+  {
+    id: 2310,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Gold Vinyl",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "1"
+  },
+  {
+    id: 2311,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Green",
+    player: "milic",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2312,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Green Pulsar",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "25"
+  },
+  {
+    id: 2313,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Hyper",
+    player: "milic",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2314,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Ice",
+    player: "milic",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2315,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Mojo",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "25"
+  },
+  {
+    id: 2316,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Mosaic",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "3"
+  },
+  {
+    id: 2317,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Orange",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "99"
+  },
+  {
+    id: 2318,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Premium Box Set Prizms",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "99"
+  },
+  {
+    id: 2319,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Purple",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "149"
+  },
+  {
+    id: 2320,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Red",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "199"
+  },
+  {
+    id: 2321,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Ruby Wave",
+    player: "milic",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2322,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Silver",
+    player: "milic",
+    team: "Minnesota Lynx"
+  },
+  {
+    id: 2323,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "Teal",
+    player: "milic",
+    team: "Minnesota Lynx",
+    copies: "49"
+  },
+  {
+    id: 2324,
+    year: 2023,
+    product: "Panini Prizm WNBA",
+    cardNumber: "28",
+    cardSet: "White Sparkle Prizms",
+    player: "milic",
+    team: "Minnesota Lynx"
   }
 ];
 
