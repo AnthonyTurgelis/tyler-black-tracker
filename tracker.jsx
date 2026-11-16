@@ -8812,8 +8812,10 @@ function ChangelogPanel({ changelog }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [hasMore, setHasMore] = useState(false);
+  const [auditTotal, setAuditTotal] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
   const [shown, setShown] = useState(100);
-  const [filter, setFilter] = useState("movement");
+  const [filter, setFilter] = useState("backend");
   const [search, setSearch] = useState("");
   const [desc, setDesc] = useState(true);
 
@@ -8828,6 +8830,7 @@ function ChangelogPanel({ changelog }) {
       if (!result.ok) throw new Error(result.error || "Unable to read backend activity.");
       setAuditRows(previous => append ? previous.concat(result.rows) : result.rows);
       setHasMore(result.hasMore);
+      setAuditTotal(result.total);
       setAuditReady(true);
       setError("");
     } catch(e) { setError(e.message || "Unable to load activity."); if (!append) setAuditReady(false); }
@@ -8916,7 +8919,7 @@ function ChangelogPanel({ changelog }) {
       </select>
       <button onClick={function(){setShown(100);refresh(0,false);}}
         className="border border-slate-700 rounded px-2 py-1 text-xs hover:bg-slate-800" disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
-      <span className="text-[10px] text-slate-500 tabular-nums">{matches.length}{auditReady && hasMore ? "+" : ""} loaded</span>
+      <span className="text-[10px] text-slate-400 tabular-nums">{auditReady && auditTotal !== null ? auditTotal.toLocaleString() : matches.length + (hasMore ? "+" : "")} entries</span>
     </div>
     {error && <p role="status" className="text-xs text-amber-300 mb-2">{error}{!auditReady ? " · Local history shown." : ""}</p>}
     <div className="overflow-auto max-h-[67vh] border border-slate-800 rounded">
@@ -8935,9 +8938,9 @@ function ChangelogPanel({ changelog }) {
           {visible.map(function(row,index) {
             var name = describe(row);
             var oldText = val(row,row.from), newText = val(row,row.to);
-            return <tr key={row.id+"-"+index} className="border-b border-slate-800/70 hover:bg-slate-800/60 even:bg-slate-900/20">
+            return <React.Fragment key={row.id+"-"+index}><tr className="border-b border-slate-800/70 hover:bg-slate-800/60 even:bg-slate-900/20">
               <td className="px-1.5 py-[3px] tabular-nums text-slate-500 whitespace-nowrap">{when(row.ts)}</td>
-              <td className="px-1.5 py-[3px] truncate font-medium" title={name + (row.evidence ? " · " + row.evidence : "")}>{name}</td>
+              <td className="px-1.5 py-[3px] truncate font-medium cursor-pointer" title="Tap for evidence" onClick={function(){setExpandedId(expandedId === row.id ? null : row.id);}}>{name}</td>
               <td className="px-1.5 py-[3px] text-slate-400 truncate" title={row.field + (row.evidenceLevel ? " · " + row.evidenceLevel : "")}>{row.field}</td>
               <td className="px-1.5 py-[3px] truncate" title={oldText+" → "+newText}>
                 <span className="text-slate-500">{oldText}</span><span className="mx-1 text-slate-600">→</span><span className="text-emerald-300">{newText}</span>
@@ -8947,7 +8950,16 @@ function ChangelogPanel({ changelog }) {
                 {row.actor === "Historic" ? "Past" : row.actor}
                 {row.sourceUrl && /^https:\/\//i.test(row.sourceUrl) ? <a href={row.sourceUrl} target="_blank" rel="noreferrer" className="ml-1 text-sky-400" title="View original source" onClick={function(e){e.stopPropagation();}}>↗</a> : null}
               </td>
-            </tr>;
+              </tr>
+              {expandedId === row.id && <tr className="border-b border-slate-700 bg-slate-800/70">
+                <td colSpan={5} className="px-2 py-2 text-[11px] text-slate-300">
+                  <span className="font-semibold text-slate-100">{row.actor} · {row.type}</span>
+                  {row.evidenceLevel && <span className="text-slate-400"> · {row.evidenceLevel}</span>}
+                  <span className="ml-2">{row.evidence || "Recorded change"}</span>
+                  {row.sourceUrl && /^https:\/\//i.test(row.sourceUrl) && <a href={row.sourceUrl} target="_blank" rel="noreferrer" className="ml-2 text-sky-300 underline">Source</a>}
+                </td>
+              </tr>}
+              </React.Fragment>;
           })}
         </tbody>
       </table>
