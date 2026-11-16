@@ -14,6 +14,7 @@ var TCDB_PLAYER = "https://www.tcdb.com/Person.cfm/pid/325590/Tyler-Black";
 // SSP = Super Short Print, SP = Short Print
 var SSP_TAGS = {
   "Golden Mirror SP": "SSP",
+  "Golden Mirror Variation": "SSP",
   "Let's Go!": "SSP",
   "Members Only": "SSP",
   "Starfractor": "SSP",
@@ -145,6 +146,7 @@ function loadTargets() { try { return JSON.parse(localStorage.getItem(tbk("targe
 function saveTargets(obj) { var k = tbk("targets-v1"); localStorage.setItem(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} }
 function globalPriceKey(card) {
   if (!card) return null;
+  if (card.priceKey) return card.priceKey;
   return card.product.slice(0,4) + "|" + card.product + "|" + card.cardNumber + "|" + (card.cardSet || "Base");
 }
 function Sparkline({ card, width, height }) {
@@ -333,7 +335,7 @@ function pt130Url(card) {
   var q = "tyler black " + yr + " " + card.cardNumber + " " + prodNoYear;
   return "https://130point.com/sales/?search=" + encodeURIComponent(q.trim());
 }
-let TB_ALL_CARDS = expandData(RAW_DATA).filter(function(c) { return c.id !== 1; });
+let TB_ALL_CARDS = expandData(RAW_DATA).filter(function(c) { return c.id !== 1; }).concat(window.TB_CATALOG_UPDATES || []);
 let ALL_CARDS = TB_ALL_CARDS;
 // Swap card source on mode change. WNBA mode loads window.TEMPO_ALL_CARDS (without test card).
 if (typeof window !== "undefined") {
@@ -362,39 +364,78 @@ if (typeof window !== "undefined") {
 function loadCustomCards() {
   try {
     var stored = localStorage.getItem(CUSTOM_CARDS_KEY);
-    return stored ? JSON.parse(stored) : [];
+    return window.CardCatalog.normalizeCustomCards(stored ? JSON.parse(stored) : []);
   } catch(e) { return []; }
 }
-function saveCustomCards(cards) {
-  try { localStorage.setItem(CUSTOM_CARDS_KEY, JSON.stringify(cards)); } catch(e) {}
-  try { window.storage.set(CUSTOM_CARDS_KEY, JSON.stringify(cards)); } catch(e) {}
+async function saveCustomCards(cards) {
+  if (!window.trackerAuth || !window.trackerAuth.isOwner()) return {localSaved:false,cloudSaved:false,error:"Sign in to edit your collection."};
+  var payload = JSON.stringify(window.CardCatalog.normalizeCustomCards(cards));
+  var result;
+  try { result = await window.storage.set(CUSTOM_CARDS_KEY, payload); }
+  catch(e) { result = {localSaved:false,cloudSaved:false,error:String(e)}; }
+  mergeCustomCards();
+  window.dispatchEvent(new CustomEvent("catalogchange"));
+  return result;
+}
+function loadCatalogMeta() {
+  if (window.MODE === "wnba") return {};
+  try { return JSON.parse(localStorage.getItem("tb-catalog-meta-v1") || "{}"); } catch(e) { return {}; }
+}
+function applyCatalogMeta() {
+  var metadata = loadCatalogMeta();
+  ALL_CARDS.forEach(function(card) { card.catalogMeta = metadata[card.id] || null; });
+}
+function inChecklist(card) {
+  return window.MODE === "wnba" ? !card.isCustom : window.CardCatalog.isChecklistCard(card);
+}
+function matchesCatalogScope(card, scope) {
+  return window.MODE === "wnba" || window.CardCatalog.matchesScope(card, scope);
+}
+function catalogBadge(card) {
+  if (window.MODE === "wnba") return null;
+  var info = window.CardCatalog.getInfo(card);
+  if (info.issueType === "standard" && info.verification !== "unverified") return null;
+  var label = window.CardCatalog.isProof(card) ? "Proof" : info.issueType === "custom" ? "Custom" : "Review";
+  return React.createElement("span", {className:"ml-1 inline-block rounded px-1 text-[9px] text-violet-300 bg-violet-950/70",title:window.CardCatalog.kindLabel(info.issueType)}, label);
+}
+function CatalogScopeSelect({value, onChange}) {
+  if (window.MODE === "wnba") return null;
+  return <label className="inline-flex items-center gap-1 text-[11px] text-gray-400">Show <select aria-label="Card category" value={value} onChange={function(e){onChange(e.target.value);}} className="bg-gray-900 border border-gray-700 text-gray-200 rounded px-1 py-1"><option value="checklist">Checklist</option><option value="proofs">Proofs & prototypes</option><option value="custom">Custom / fantasy</option><option value="review">Needs review</option><option value="all">All cards</option></select></label>;
+}
+function useCatalogRevision() {
+  var [revision, setRevision] = useState(0);
+  useEffect(function() {
+    function refresh() { setRevision(function(value) { return value + 1; }); }
+    window.addEventListener("catalogchange", refresh);
+    return function() { window.removeEventListener("catalogchange", refresh); };
+  }, []);
+  return revision;
+}
+function canSyncCardToTcdb(cardId) {
+  var card = CARD_BY_ID[cardId];
+  if (!card) return false;
+  if (window.MODE === "wnba") return !NOT_ON_TCDB.has(cardId) && !MISSING_FROM_TCDB.has(cardId);
+  return inChecklist(card) && !HIDDEN_DUPES.has(cardId) && !MISSING_FROM_TCDB.has(cardId) && !!(TCDB_LINKS[cardId] || TCDB_USER_FIXES[cardId]);
 }
 function mergeCustomCards() {
   var custom = loadCustomCards();
-  // Remove any previously merged custom cards (id >= 10000) - mutate in place
+  // Explicit IDs preserve every legacy status, target and detail when a card is archived.
   for (var ri = ALL_CARDS.length - 1; ri >= 0; ri--) {
-    if (ALL_CARDS[ri].id >= 10000) ALL_CARDS.splice(ri, 1);
+    if (ALL_CARDS[ri].isCustom) ALL_CARDS.splice(ri, 1);
   }
-  custom.forEach(function(cc, idx) {
-    ALL_CARDS.push({
-      id: 10000 + idx,
-      product: cc.product,
-      cardNumber: cc.cardNumber,
-      cardSet: cc.cardSet,
-      copies: cc.copies || null,
-      isAuto: cc.isAuto || "",
-      isMem: cc.isMem || "",
-      isRC: cc.isRC || "",
-      isCustom: true,
-      addedDate: cc.addedDate || ""
-    });
+  custom.forEach(function(cc) {
+    if (cc.archived) return;
+    ALL_CARDS.push(Object.assign({}, cc, {copies:cc.copies == null ? "" : String(cc.copies),isCustom:true}));
   });
+  applyCatalogMeta();
   // Rebuild lookup map if it exists (not on first call during init)
   if (typeof CARD_BY_ID !== "undefined") {
+    Object.keys(CARD_BY_ID).forEach(function(id) { delete CARD_BY_ID[id]; });
     ALL_CARDS.forEach(function(c) { CARD_BY_ID[c.id] = c; });
   }
 }
 mergeCustomCards();
+window.addEventListener("modechange", function() { mergeCustomCards(); });
 // Cards whose variant consists entirely of player-name/noise words (e.g. "Black", "First Card")
 // can NEVER be reliably auto-matched from eBay titles since "Tyler Black" appears in every listing.
 // Used to block eBay price recording and auto-purge stale data.
@@ -471,6 +512,7 @@ function TylerBlackTracker() {
   const [filterYear, setFilterYear] = useState("all");
   const [filterProduct, setFilterProduct] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [catalogScope, setCatalogScope] = useState("checklist");
   // Collection: filter to a single WNBA player. null = all. Hidden/unused in TB mode.
   const [filterPlayer, setFilterPlayer] = useState(null);
   // Collection: filter by extracted color/parallel keyword. null = all.
@@ -501,6 +543,12 @@ function TylerBlackTracker() {
   const [isSavingCheckpoint, setIsSavingCheckpoint] = useState(false);
   const [sessionChanges, setSessionChanges] = useState(0);
   const [customEditVer, setCustomEditVer] = useState(0);
+  const [catalogEditId, setCatalogEditId] = useState(null);
+  useEffect(function() {
+    function refreshCatalog() { setCustomEditVer(function(v) { return v + 1; }); }
+    window.addEventListener("catalogchange", refreshCatalog);
+    return function() { window.removeEventListener("catalogchange", refreshCatalog); };
+  }, []);
   const [editingCustom, setEditingCustom] = useState(null); // {idx, product, cardSet, cardNumber, copies}
   const [storageDiag, setStorageDiag] = useState("");
   const exportCsvRef = useRef(null);
@@ -562,8 +610,9 @@ function TylerBlackTracker() {
   }
   // Flush pending saves on tab close
   function editCustomCardById(cardId) {
+    if (window.MODE !== "wnba") { setCatalogEditId(cardId); setActiveTab("catalog"); return; }
     if (cardId < 10000) return;
-    var idx = cardId - 10000;
+    var idx = loadCustomCards().findIndex(function(card) { return card.id === cardId; });
     // Read directly from ALL_CARDS in memory (the merged custom card)
     var memCard = ALL_CARDS.find(function(c) { return c.id === cardId; });
     if (!memCard) return;
@@ -584,6 +633,7 @@ function TylerBlackTracker() {
         custom[ec.idx].product = ec.product.trim() || custom[ec.idx].product;
         custom[ec.idx].cardNumber = ec.cardNumber.trim() || custom[ec.idx].cardNumber;
         custom[ec.idx].copies = String(ec.copies || "").trim() || null;
+        custom[ec.idx].updatedAt = new Date().toISOString();
         saveCustomCards(custom);
       }
     } catch(e) {}
@@ -600,6 +650,65 @@ function TylerBlackTracker() {
     } else {
       setEditingCustom(Object.assign({}, ec, {error: "Card #" + ec.cardId + " not found in memory (idx=" + ec.idx + ")"}));
     }
+  }
+  async function saveCatalogCard(form, original) {
+    if (!window.trackerAuth || !window.trackerAuth.isOwner()) return {ok:false,error:"Sign in to edit your collection."};
+    var existing = original && CARD_BY_ID[original.id];
+    if (original && !existing) return {ok:false,error:"This card is no longer active. Reopen the catalogue before editing."};
+    var candidate = Object.assign({}, existing || {}, form, {catalogMeta:null});
+    if (existing && !existing.isCustom) {
+      ["id", "product", "cardNumber", "cardSet", "copies", "isAuto", "isMem", "isRC"].forEach(function(key) { candidate[key] = existing[key]; });
+    }
+    var error = window.CardCatalog.validate(candidate, existing);
+    if (error) return {ok:false,error:error};
+    var info = window.CardCatalog.getInfo(candidate);
+    if (info.parentCardId && (!CARD_BY_ID[info.parentCardId] || !inChecklist(CARD_BY_ID[info.parentCardId]))) return {ok:false,error:"Choose an existing checklist card to link this to."};
+    var dupe = ALL_CARDS.find(function(card) { return !HIDDEN_DUPES.has(card.id) && (!existing || card.id !== existing.id) && window.CardCatalog.sameIdentity(card, candidate); });
+    if (dupe) return {ok:false,error:"Already recorded: " + dupe.product + " #" + dupe.cardNumber + " · " + dupe.cardSet + ". Edit that entry to add evidence."};
+    candidate.updatedAt = new Date().toISOString();
+    candidate.sourceUrl = window.CardCatalog.safeUrl(info.sourceUrl);
+    var result;
+    if (!existing || existing.isCustom) {
+      var customs = loadCustomCards();
+      if (existing) {
+        var index = customs.findIndex(function(card) { return card.id === existing.id; });
+        if (index < 0) return {ok:false,error:"The saved card could not be found. Reload the catalogue."};
+        candidate.priceKey = existing.priceKey || globalPriceKey(existing);
+        customs[index] = Object.assign({}, customs[index], candidate, {id:existing.id,isCustom:true});
+      } else {
+        candidate.id = window.CardCatalog.nextCustomId(customs);
+        candidate.isCustom = true;
+        candidate.addedDate = new Date().toISOString().slice(0,10);
+        customs.push(candidate);
+      }
+      result = await saveCustomCards(customs);
+    } else {
+      var metadata = loadCatalogMeta();
+      metadata[existing.id] = {};
+      window.CardCatalog.fields.forEach(function(key) { metadata[existing.id][key] = candidate[key] == null ? "" : candidate[key]; });
+      result = await window.storage.set("tb-catalog-meta-v1", JSON.stringify(metadata));
+      applyCatalogMeta();
+      window.dispatchEvent(new CustomEvent("catalogchange"));
+    }
+    return {ok:!!(result && (result.localSaved || result.cloudSaved)), cloudSaved:!!(result && result.cloudSaved), error:result && result.error, card:CARD_BY_ID[candidate.id] || candidate};
+  }
+  async function archiveCatalogCard(card) {
+    if (!window.trackerAuth || !window.trackerAuth.isOwner()) return {ok:false,error:"Sign in to edit your collection."};
+    var customs = loadCustomCards();
+    var index = customs.findIndex(function(item) { return item.id === card.id; });
+    if (index < 0) return {ok:false,error:"Only a manually added card can be archived."};
+    customs[index] = Object.assign({}, customs[index], {archived:true,updatedAt:new Date().toISOString()});
+    var result = await saveCustomCards(customs);
+    return {ok:!!(result && (result.localSaved || result.cloudSaved)),cloudSaved:!!(result && result.cloudSaved),error:result && result.error};
+  }
+  async function restoreCatalogCard(card) {
+    if (!window.trackerAuth || !window.trackerAuth.isOwner()) return {ok:false,error:"Sign in to edit your collection."};
+    var customs = loadCustomCards();
+    var index = customs.findIndex(function(item) { return item.id === card.id; });
+    if (index < 0) return {ok:false,error:"The archived card could not be found."};
+    customs[index] = Object.assign({}, customs[index], {archived:false,updatedAt:new Date().toISOString()});
+    var result = await saveCustomCards(customs);
+    return {ok:!!(result && (result.localSaved || result.cloudSaved)),cloudSaved:!!(result && result.cloudSaved),error:result && result.error};
   }
   useEffect(() => {
     function handleBeforeUnload() {
@@ -688,7 +797,7 @@ function TylerBlackTracker() {
     for (var attempt = 0; attempt < 3 && !ok; attempt++) {
       try {
         var result = await window.storage.set(tbk("alldata-v1"), JSON.stringify(allDataRef.current));
-        if (result) ok = true; else await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+        if (result && result.cloudSaved) ok = true; else await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
       } catch (e) {
         await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
       }
@@ -724,7 +833,7 @@ function TylerBlackTracker() {
 
   // Changelog helper - logs an entry and persists via consolidated storage
   const logChange = useCallback((cardId, changeType, field, oldVal, newVal) => {
-    var card = ALL_CARDS[cardId - 1];
+    var card = CARD_BY_ID[cardId];
     var now = new Date().toISOString();
     var label = card ? ("#" + card.cardNumber + " " + (card.cardSet || "Base") + " - " + card.product) : ("Card #" + cardId);
     var sid = sessionId.current;
@@ -946,6 +1055,7 @@ function TylerBlackTracker() {
       if (d.date && (!preset || d.date !== preset.d)) diff.date = d.date;
       if (d.notes && (!preset || d.notes !== preset.n)) diff.notes = d.notes;
       if (d.printRun && (!preset || d.printRun !== preset.pr)) diff.printRun = d.printRun;
+      if (d.qty != null && d.qty !== "") diff.qty = String(d.qty);
       if (Object.keys(diff).length > 0) userEdits[id] = diff;
     });
     persistField("details", userEdits);
@@ -987,10 +1097,10 @@ function TylerBlackTracker() {
     });
   }, [persistField, dirtyIds]);
   const needsSync = useMemo(() => {
-    var ids = new Set([...NOT_SYNCED].filter(id => !syncedIds.has(id) && !NOT_ON_TCDB.has(id) && !MISSING_FROM_TCDB.has(id)));
-    dirtyIds.forEach(function(id) { if (!syncedIds.has(id) && !NOT_ON_TCDB.has(id) && !MISSING_FROM_TCDB.has(id)) ids.add(id); });
+    var ids = new Set([...NOT_SYNCED].filter(id => !syncedIds.has(id) && canSyncCardToTcdb(id)));
+    dirtyIds.forEach(function(id) { if (!syncedIds.has(id) && canSyncCardToTcdb(id)) ids.add(id); });
     return ids;
-  }, [syncedIds, dirtyIds]);
+  }, [syncedIds, dirtyIds, customEditVer, tcdbFixes]);
   const unsyncedCards = useMemo(() => {
     return [...needsSync].map(function(id) { return ALL_CARDS.find(function(c) { return c.id === id; }); }).filter(Boolean);
   }, [needsSync]);
@@ -1009,7 +1119,7 @@ function TylerBlackTracker() {
     var counts = { missing_serial: 0, missing_price: 0, missing_date: 0, flagged_notes: 0, ebay_mislog: 0, not_on_tcdb: 0, missing_from_tcdb: 0, extra_duplicate: 0, total: 0 };
     ALL_CARDS.forEach(function(card) {
       var s = statuses[card.id] || "not_owned";
-      if (NOT_ON_TCDB.has(card.id)) { counts.not_on_tcdb++; counts.total++; return; }
+      if (NOT_ON_TCDB.has(card.id) && inChecklist(card)) { counts.not_on_tcdb++; counts.total++; return; }
       if (MISSING_FROM_TCDB.has(card.id)) { counts.missing_from_tcdb++; counts.total++; return; }
       if (EXTRA_DUPES.has(card.id)) { counts.extra_duplicate++; counts.total++; return; }
       if (s !== "owned" && s !== "in_transit") {
@@ -1215,11 +1325,11 @@ function TylerBlackTracker() {
     ALL_CARDS.forEach(card => {
       if (HIDDEN_DUPES.has(card.id)) return;
       if (card.product.startsWith("TEST")) return;
-      if (card.isCustom) return;
+      if (!inChecklist(card)) return;
       visibleTotal++;
       const s = statuses[card.id] || "not_owned";
       const d = cardDetails[card.id] || {};
-      const is1of1 = card.copies === "1" && !NOT_ON_TCDB.has(card.id) && !HIDDEN_DUPES.has(card.id) && !MISSING_FROM_TCDB.has(card.id);
+      const is1of1 = String(card.copies) === "1";
       if (is1of1) total1of1++;
       if (s === "owned") {
         owned++;
@@ -1246,7 +1356,7 @@ function TylerBlackTracker() {
     const notSynced = needsSync.size;
     const notOwned1of1 = total1of1 - owned1of1;
     return { total: visibleTotal, owned, inTransit, notOwned, owned1of1, total1of1, notOwned1of1, forSale, dupeTransit, dupeSale, dupeComc, notSynced, totalSpent };
-  }, [statuses, cardDetails, forSaleFlags]);
+  }, [statuses, cardDetails, forSaleFlags, customEditVer, needsSync]);
   // Smart filters: each dropdown only shows options that are still valid given the OTHER active filters.
   // years respects player+product (so picking a player narrows the year dropdown to that player's cards)
   const years = useMemo(() => {
@@ -1254,7 +1364,7 @@ function TylerBlackTracker() {
     if (filterPlayer) cards = cards.filter(c => c.player === filterPlayer);
     if (filterProduct !== "all") cards = cards.filter(c => c.product === filterProduct);
     return [...new Set(cards.map(c => cardYear(c) || c.product.match(/^\d{4}/)?.[0]).filter(Boolean))].sort();
-  }, [filterPlayer, filterProduct]);
+  }, [filterPlayer, filterProduct, customEditVer]);
   // cardNumbers respects player+year+product
   const cardNumbers = useMemo(() => {
     var cards = ALL_CARDS;
@@ -1264,19 +1374,20 @@ function TylerBlackTracker() {
     var nums = [...new Set(cards.map(c => c.cardNumber))];
     nums.sort((a, b) => { var an = parseInt(a), bn = parseInt(b); if (!isNaN(an) && !isNaN(bn)) return an - bn; return a.localeCompare(b); });
     return nums;
-  }, [filterPlayer, filterYear, filterProduct]);
+  }, [filterPlayer, filterYear, filterProduct, customEditVer]);
   const filteredProducts = useMemo(() => {
     let cards = ALL_CARDS;
     // Use cardYear() so WNBA cards (numeric `year` field) work, not just TB prefix-style
     if (filterYear !== "all") cards = cards.filter(c => cardYear(c) === filterYear);
     if (filterPlayer) cards = cards.filter(c => c.player === filterPlayer);
     return [...new Set(cards.map(c => c.product))].sort();
-  }, [filterYear, filterPlayer]);
+  }, [filterYear, filterPlayer, customEditVer]);
   const filtered = useMemo(() => {
     const s = search.toLowerCase();
     const cn = filterCardNum;
     return ALL_CARDS.filter(card => {
       if (HIDDEN_DUPES.has(card.id)) return false;
+      if (!matchesCatalogScope(card, catalogScope)) return false;
       const cardStatus = statuses[card.id] || "not_owned";
       if (filterYear !== "all" && cardYear(card) !== filterYear) return false;
       if (filterPlayer && card.player !== filterPlayer) return false;
@@ -1292,10 +1403,10 @@ function TylerBlackTracker() {
       else if (s && !card.product.toLowerCase().includes(s) && !card.cardSet.toLowerCase().includes(s) && !card.cardNumber.toLowerCase().includes(s)) return false;
       return true;
     });
-  }, [statuses, forSaleFlags, tcdbFlags, tcdbFixes, filterYear, filterProduct, filterCardNum, filterStatus, search, filterPlayer, filterColor]);
+  }, [statuses, cardDetails, forSaleFlags, tcdbFlags, tcdbFixes, filterYear, filterProduct, filterCardNum, filterStatus, search, filterPlayer, filterColor, catalogScope, customEditVer]);
   const totalPages = Math.ceil(filtered.length / pageSize);
   const pageCards = filtered.slice(page * pageSize, (page + 1) * pageSize);
-  useEffect(() => { setPage(0); }, [filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer, filterColor]);
+  useEffect(() => { setPage(0); }, [filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer, filterColor, catalogScope, customEditVer]);
   useEffect(() => { if (filterProduct !== "all" && !filteredProducts.includes(filterProduct)) setFilterProduct("all"); }, [filterYear, filterPlayer]);
   // Auto-reset year if it's no longer valid for the new player
   useEffect(() => { if (filterYear !== "all" && !years.includes(filterYear)) setFilterYear("all"); }, [filterPlayer, filterProduct]);
@@ -1403,6 +1514,7 @@ function TylerBlackTracker() {
   const needRegular = stats.notOwned - stats.notOwned1of1;
   const TABS = [
     {id:"collection",label:"Collection",color:"yellow",ownerOnly:true},
+    {id:"catalog",label:"Catalogue",color:"purple",tbOnly:true},
     {id:"lookup",label:"Lookup",color:"purple"},
     {id:"detailed",label:"Detailed",color:"emerald"},
     {id:"summary",label:"Summary",color:"cyan"},
@@ -1416,7 +1528,7 @@ function TylerBlackTracker() {
     {id:"board",label:"Board",color:"blue",ownerOnly:true},
     {id:"tweets",label:"Tweets",color:"blue"},
     {id:"save",label:"Export",color:"emerald",ownerOnly:true},
-  ].filter(function(t) { return !t.ownerOnly || isOwner; });
+  ].filter(function(t) { return (!t.ownerOnly || isOwner) && (!t.tbOnly || trackerMode === "tb"); });
   const tabColorMap = {yellow:"border-yellow-400 text-yellow-300",cyan:"border-yellow-400 text-yellow-300",teal:"border-yellow-400 text-yellow-300",purple:"border-yellow-400 text-yellow-300",orange:"border-yellow-400 text-yellow-300",emerald:"border-yellow-400 text-yellow-300",amber:"border-yellow-400 text-yellow-300",rose:"border-yellow-400 text-yellow-300",indigo:"border-yellow-400 text-yellow-300",blue:"border-yellow-400 text-yellow-300",pink:"border-yellow-400 text-yellow-300",lime:"border-yellow-400 text-yellow-300"};
   const badgeActiveMap = {orange:"bg-orange-400 text-gray-900",amber:"bg-amber-400 text-gray-900",emerald:"bg-emerald-400 text-gray-900",indigo:"bg-indigo-400 text-gray-900"};
   const badgeInactiveMap = {orange:"bg-orange-900 text-orange-300",amber:"bg-amber-900 text-amber-300",emerald:"bg-emerald-900 text-emerald-300",indigo:"bg-indigo-900 text-indigo-300"};
@@ -1575,6 +1687,7 @@ function TylerBlackTracker() {
               )}
             </div>
           )}
+          <CatalogScopeSelect value={catalogScope} onChange={setCatalogScope}/>
           {DUPES.length > 0 && (
             <button onClick={function(){setShowDupes(!showDupes);}} className="text-gray-500 hover:text-gray-300" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
               {showDupes ? "\u25BE" : "\u25B8"} {DUPES.length} dupes
@@ -1584,7 +1697,8 @@ function TylerBlackTracker() {
         {showDupes && (
           <div className="mb-1 max-h-24 overflow-y-auto rounded bg-gray-900/50 border border-gray-800" style={{padding:"clamp(2px,0.3vw,4px)"}}>
             {DUPES.map(function(d, i) {
-              var parent = ALL_CARDS[d.parent_id - 1];
+              var parent = CARD_BY_ID[d.parent_id];
+              if (!parent) return null;
               var isSale = d.type === "forsale";
               var isComc = d.type === "comc";
               return (
@@ -1718,7 +1832,7 @@ function TylerBlackTracker() {
                     ) : (
                       <span className="text-gray-300 truncate">{card.cardSet}</span>
                     )}
-                    {sspBadge(card.cardSet)}
+                    {sspBadge(card.cardSet)}{catalogBadge(card)}
                     {(card.copies || (details.printRun && details.printRun !== "?")) ? <span className="text-yellow-400 font-black whitespace-nowrap" style={{fontSize:"clamp(9px,1vw,12px)"}}>/{details.printRun && details.printRun !== "?" ? details.printRun : card.copies}</span> : null}
                     {isMissingSN(card, cardDetails) && <span className="text-orange-400 font-bold text-[8px] whitespace-nowrap ml-0.5" title="SN but print run unknown">SN?</span>}
                     {details.serial ? <span className="text-yellow-300 font-black whitespace-nowrap" style={{fontSize:"clamp(9px,1vw,12px)"}}>{"#" + details.serial}</span> : null}
@@ -1870,10 +1984,12 @@ function TylerBlackTracker() {
           <CleanupPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} hidePrices={hidePrices} />
         ) : activeTab === "detailed" ? (
           <DetailedPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} needsSync={needsSync} initialSnFilter={detailedSnFilter} initialStatusFilter={detailedStatusFilter} initialCardId={detailedCardId} setDetailedCardId={setDetailedCardId} initialProductFilter={detailedProductFilter} setDetailedProductFilter={setDetailedProductFilter} initialCardNumFilter={detailedCardNumFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} editCustomCardById={editCustomCardById} customEditVer={customEditVer} targetByCardId={targetByCardId} setActiveTab={setActiveTab} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
+        ) : activeTab === "catalog" && trackerMode === "tb" ? (
+          <window.CardCatalogPanel cards={ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id);}).concat(isOwner ? loadCustomCards().filter(function(card){return card.archived;}) : [])} statuses={statuses} isOwner={isOwner} initialEditId={catalogEditId} onClearEdit={function(){setCatalogEditId(null);}} onSave={saveCatalogCard} onArchive={archiveCatalogCard} onRestore={restoreCatalogCard} onOpen={function(card){setDetailedCardId(card.id);setActiveTab("detailed");}} onStatusChange={setCardStatus} revision={customEditVer}/>
         ) : activeTab === "summary" ? (
           <SummaryPanel statuses={statuses} setActiveTab={setActiveTab} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} />
         ) : activeTab === "lookup" ? (
-          <CardLookupPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} needsSync={needsSync} setActiveTab={setActiveTab} setDetailedProductFilter={setDetailedProductFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} setPricesSearchFilter={setPricesSearchFilter} superSearchMode={superSearchMode} targetByCardId={targetByCardId} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
+          <CardLookupPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} setCardQty={setCardQty} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} needsSync={needsSync} setActiveTab={setActiveTab} setDetailedProductFilter={setDetailedProductFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} setPricesSearchFilter={setPricesSearchFilter} superSearchMode={superSearchMode} targetByCardId={targetByCardId} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
         ) : null}
         </div>
         )}
@@ -1989,6 +2105,7 @@ function ProgressBar({ label, owned, transit, total, sub }) {
 }
 function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDetailedSnFilter }) {
   var trackerMode = useTrackerMode();
+  var catalogRevision = useCatalogRevision();
   var [view, setView] = useState("dashboard"); // dashboard, heatmap, breakdown
   var [splitBy, setSplitBy] = useState("year");
   var [expanded, setExpanded] = useState(null);
@@ -2032,7 +2149,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
   function passesFilter(card, minSN, inclBlank, ex1of1, unnumOnly, spOnly) {
     if (HIDDEN_DUPES.has(card.id)) return false;
     if (card.product.startsWith("TEST")) return false;
-    if (card.isCustom) return false;
+    if (!inChecklist(card)) return false;
     if (rookieOnly && !card.product.startsWith("2021") && !card.product.startsWith("2024")) return false;
     if (spOnly) return !!SSP_TAGS[card.cardSet];
     var pr = parseInt(card.copies);
@@ -2077,14 +2194,14 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
 
   var stats = useMemo(function() {
     return calcStats(ALL_CARDS, statuses, snMin, includeBlankSN, exclude1of1, false, false);
-  }, [statuses, snMin, includeBlankSN, exclude1of1, rookieOnly, selectedPlayer]);
+  }, [statuses, snMin, includeBlankSN, exclude1of1, rookieOnly, selectedPlayer, catalogRevision]);
 
   var presetStats = useMemo(function() {
     return PRESETS.map(function(p) {
       var s = calcStats(ALL_CARDS, statuses, p.sn, p.blank, p.ex1, p.unnumOnly, p.spOnly);
       return {label:p.label, pct: s.total ? ((s.owned+s.transit)/s.total*100) : 0, owned:s.owned, transit:s.transit, total:s.total, sn:p.sn, blank:p.blank, ex1:p.ex1, unnumOnly:p.unnumOnly, spOnly:p.spOnly, snKey:p.snKey};
     });
-  }, [statuses, rookieOnly, selectedPlayer]);
+  }, [statuses, rookieOnly, selectedPlayer, catalogRevision]);
 
   var pct = stats.total ? (stats.owned+stats.transit)/stats.total*100 : 0;
   var pctOwned = stats.total ? stats.owned/stats.total*100 : 0;
@@ -2092,7 +2209,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
   // Rarest acquired — numbered cards + SP/SSP cards
   var rarestOwned = useMemo(function() {
     var numbered = ALL_CARDS.filter(function(c) {
-      if (HIDDEN_DUPES.has(c.id)) return false;
+      if (HIDDEN_DUPES.has(c.id) || !inChecklist(c)) return false;
       if (c.product.startsWith("TEST")) return false;
       if (rookieOnly && !c.product.startsWith("2021") && !c.product.startsWith("2024")) return false;
       var s = statuses[c.id] || "not_owned";
@@ -2100,7 +2217,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
       return c.copies && parseInt(c.copies) > 0;
     }).sort(function(a,b) { return parseInt(a.copies) - parseInt(b.copies); }).slice(0,12);
     var spCards = ALL_CARDS.filter(function(c) {
-      if (HIDDEN_DUPES.has(c.id)) return false;
+      if (HIDDEN_DUPES.has(c.id) || !inChecklist(c)) return false;
       if (c.product.startsWith("TEST")) return false;
       if (rookieOnly && !c.product.startsWith("2021") && !c.product.startsWith("2024")) return false;
       var s = statuses[c.id] || "not_owned";
@@ -2108,7 +2225,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
       return SSP_TAGS[c.cardSet] === "SSP" && !c.copies; // unnumbered SSP only
     });
     return { numbered: numbered, sp: spCards };
-  }, [statuses, rookieOnly]);
+  }, [statuses, rookieOnly, catalogRevision]);
 
   function pctColor(owned, transit, total) {
     if (total === 0) return "bg-gray-800";
@@ -2145,7 +2262,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
           return (
             <div key={card.id} className={"flex items-center gap-1 px-1.5 py-0 rounded " + cfg.bg} style={{fontSize:"clamp(8px,1vw,11px)"}}>
               <div className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + cfg.dot} />
-              <span className="flex-1 truncate">#{card.cardNumber} | {card.cardSet}{card.copies ? " /" + card.copies : ""} {sspBadge(card.cardSet)}</span>
+              <span className="flex-1 truncate">#{card.cardNumber} | {card.cardSet}{card.copies ? " /" + card.copies : ""} {sspBadge(card.cardSet)}{catalogBadge(card)}</span>
               <span className={"flex-shrink-0 " + (s === "owned" ? "text-green-300" : s === "in_transit" ? "text-emerald-300" : "text-gray-500")}>{cfg.label}</span>
             </div>
           );
@@ -2194,6 +2311,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
               })}
             </div>
           )}
+          {trackerMode === "tb" && <div className="flex flex-wrap items-center justify-between gap-1 mb-1 text-[11px] text-gray-400"><span>Checklist completion</span><button onClick={function(){setActiveTab("catalog");}} className="text-violet-300 hover:text-violet-100">Proofs & other cards · {ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id) && !inChecklist(card);}).length} recorded →</button></div>}
           {/* TOP ROW: Gauge+stats LEFT, By Year RIGHT */}
           <div className="flex gap-1.5 items-stretch">
             {/* Gauge + legend */}
@@ -2306,7 +2424,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
                         <span className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + (s==="owned"?"bg-green-500":"bg-emerald-400")}/>
                         <span className="font-bold flex-shrink-0 text-cyan-300">#{card.cardNumber}</span>
                         <span className="text-white truncate flex-1">{card.cardSet}</span>
-                        {sspBadge(card.cardSet)}
+                        {sspBadge(card.cardSet)}{catalogBadge(card)}
                         <span className="truncate flex-shrink-0 max-w-[100px]" style={{color:"#7a8ba8",fontSize:"clamp(7px,0.8vw,9px)"}}>{card.product.slice(5)}</span>
                       </div>
                     );
@@ -2320,7 +2438,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
                     var s = statuses[card.id] || "not_owned";
                     return (
                       <div key={card.id} className="flex items-center gap-1.5 px-1 py-0 rounded hover:bg-gray-800/40" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
-                        {sspBadge(card.cardSet)}
+                        {sspBadge(card.cardSet)}{catalogBadge(card)}
                         <span className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + (s==="owned"?"bg-green-500":"bg-emerald-400")}/>
                         <span className="font-bold flex-shrink-0 text-cyan-300">#{card.cardNumber}</span>
                         <span className="text-white truncate flex-1">{card.cardSet}</span>
@@ -2475,8 +2593,10 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
     </div>
   );
 }
-function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, forSaleFlags, toggleForSale, needsSync, setActiveTab, setDetailedProductFilter, setDetailedCardNumFilter, setDetailedStatusFilter, setDetailedSnFilter, setPricesSearchFilter, superSearchMode, targetByCardId, setTargetCardFilter, hidePrices }) {
+function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, setCardQty, forSaleFlags, toggleForSale, needsSync, setActiveTab, setDetailedProductFilter, setDetailedCardNumFilter, setDetailedStatusFilter, setDetailedSnFilter, setPricesSearchFilter, superSearchMode, targetByCardId, setTargetCardFilter, hidePrices }) {
   var trackerMode = useTrackerMode();
+  var catalogRevision = useCatalogRevision();
+  var [lookupScope, setLookupScope] = useState("checklist");
   // Build a quick player-key → display name map. Empty in TB mode.
   var playerNameByKey = useMemo(function() {
     if (typeof window === "undefined" || !window.TEMPO_ROSTER) return {};
@@ -2497,7 +2617,7 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
   var allNumbers = useMemo(function() {
     var nums = {};
     ALL_CARDS.forEach(function(c) {
-      if (HIDDEN_DUPES.has(c.id)) return;
+      if (HIDDEN_DUPES.has(c.id) || !matchesCatalogScope(c, lookupScope)) return;
       if (!nums[c.cardNumber]) nums[c.cardNumber] = { count: 0, owned: 0, transit: 0 };
       nums[c.cardNumber].count++;
       var s = statuses[c.id] || "not_owned";
@@ -2509,7 +2629,7 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
       if (!isNaN(an) && !isNaN(bn)) return an - bn;
       return a[0].localeCompare(b[0]);
     });
-  }, [statuses]);
+  }, [statuses, lookupScope, catalogRevision]);
   var filteredNums = useMemo(function() {
     if (!numSearch) return allNumbers;
     var q = numSearch.toLowerCase();
@@ -2517,8 +2637,8 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
   }, [allNumbers, numSearch]);
   var cardsForNum = useMemo(function() {
     if (!selectedNum) return [];
-    return ALL_CARDS.filter(function(c) { return c.cardNumber === selectedNum && !HIDDEN_DUPES.has(c.id); });
-  }, [selectedNum]);
+    return ALL_CARDS.filter(function(c) { return c.cardNumber === selectedNum && !HIDDEN_DUPES.has(c.id) && matchesCatalogScope(c, lookupScope); });
+  }, [selectedNum, lookupScope, catalogRevision]);
   // Group by product, then list variants
   var productGroups = useMemo(function() {
     var map = {};
@@ -2539,7 +2659,7 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
       productGroups.forEach(function(g) { exp[g[0]] = true; });
       setExpandedProducts(exp);
     }
-  }, [selectedNum]);
+  }, [selectedNum, lookupScope, catalogRevision]);
   function toggleProduct(prod) {
     setExpandedProducts(function(prev) { var n = Object.assign({}, prev); n[prod] = !n[prod]; return n; });
   }
@@ -2642,6 +2762,7 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
           })}
         </div>
       </div>
+      <div className="flex items-center justify-between gap-2 mb-1"><CatalogScopeSelect value={lookupScope} onChange={function(scope){setLookupScope(scope);setSelectedCard(null);}}/>{lookupScope !== "checklist" && trackerMode === "tb" && <span className="text-[10px] text-gray-500">Recorded entries; not a complete proof checklist</span>}</div>
       {/* Product groups with variants */}
       {selectedNum && (
         <div className="flex-1 overflow-y-auto min-h-0">
@@ -2735,7 +2856,7 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
                           {card.copies && <span className="text-yellow-400 font-black text-[10px] flex-shrink-0">/{card.copies}</span>}
                           {/* User-entered serial number — yellow when present */}
                           {dd.serial && <span className="text-yellow-300 font-black text-[10px] flex-shrink-0" title="Your serial number">#{dd.serial}</span>}
-                          {sspBadge(card.cardSet)}
+                          {sspBadge(card.cardSet)}{catalogBadge(card)}
                           {card.isAuto === "Yes" && <span className="text-yellow-500 text-[8px] font-bold flex-shrink-0 bg-yellow-950/40 px-0.5 rounded">A</span>}
                           {card.isMem === "Yes" && <span className="text-purple-500 text-[8px] font-bold flex-shrink-0 bg-purple-950/40 px-0.5 rounded">M</span>}
                           {/* Inline qty +/- — works in any view, click doesn't select */}
@@ -2796,7 +2917,7 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
             </div>
           </div>
           <div className="text-white font-bold text-[12px]">{selectedCard.product}</div>
-          <div className="text-gray-400 text-[10px]">#{selectedCard.cardNumber} -- {selectedCard.cardSet}{selectedCard.copies ? <span className="text-yellow-400 font-black ml-1" style={{fontSize:"12px"}}>{" /" + selectedCard.copies}</span> : ""} {sspBadge(selectedCard.cardSet)}</div>
+          <div className="text-gray-400 text-[10px]">#{selectedCard.cardNumber} -- {selectedCard.cardSet}{selectedCard.copies ? <span className="text-yellow-400 font-black ml-1" style={{fontSize:"12px"}}>{" /" + selectedCard.copies}</span> : ""} {sspBadge(selectedCard.cardSet)}{catalogBadge(selectedCard)}</div>
           {selectedCard.isAuto === "Yes" && <span className="text-yellow-500 text-[8px] font-bold bg-yellow-950/40 px-1 rounded">AUTO</span>}
           {selectedCard.isMem === "Yes" && <span className="text-purple-500 text-[8px] font-bold bg-purple-950/40 px-1 rounded ml-0.5">MEM</span>}
           <div className="grid grid-cols-2 gap-x-2 gap-y-1 mt-1.5 pt-1.5 border-t border-gray-800 text-[10px]">
@@ -2862,6 +2983,8 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
   var [dFilter, setDFilter] = useState(initialStatusFilter || "all");
   var [dYear, setDYear] = useState("all");
   var [dProduct, setDProduct] = useState(initialProductFilter || "all");
+  var catalogRevision = useCatalogRevision();
+  var [dScope, setDScope] = useState("checklist");
   var [dSearch, setDSearch] = useState("");
   var [dCardNum, setDCardNum] = useState(initialCardNumFilter || "");
   var [dSnFilter, setDSnFilter] = useState(initialSnFilter || "all");
@@ -2878,13 +3001,14 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
   }, [initialSnFilter]);
   
   useEffect(function() {
-    if (initialStatusFilter) setDFilter(initialStatusFilter);
+    if (initialStatusFilter) { setDFilter(initialStatusFilter); setDScope("checklist"); }
   }, [initialStatusFilter]);
   
   useEffect(function() {
     if (initialCardId) {
       var targetCard = CARD_BY_ID[initialCardId];
       if (targetCard) {
+        setDScope(inChecklist(targetCard) ? "checklist" : "all");
         setDFilter("all"); setDYear("all"); setDSearch(""); setDSnFilter("all");
         setDProduct(targetCard.product);
         setDCardNum(targetCard.cardNumber);
@@ -2909,15 +3033,15 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
   }, [initialProductFilter, initialCardNumFilter]);
   
   var PAGE_SIZE = 50;
-  var years = useMemo(function() { return [...new Set(ALL_CARDS.map(function(c) { return cardYear(c) || c.product.slice(0,4); }))].sort(); }, []);
+  var years = useMemo(function() { return [...new Set(ALL_CARDS.map(function(c) { return cardYear(c) || c.product.slice(0,4); }))].sort(); }, [catalogRevision]);
   var filteredProducts = useMemo(function() {
     var cards = dYear === "all" ? ALL_CARDS : ALL_CARDS.filter(function(c) { return c.product.startsWith(dYear); });
     return [...new Set(cards.map(function(c) { return c.product; }))].sort();
-  }, [dYear]);
+  }, [dYear, catalogRevision]);
   var filtered = useMemo(function() {
     var s = dSearch.toLowerCase();
     return ALL_CARDS.filter(function(card) {
-      if (HIDDEN_DUPES.has(card.id)) return false;
+      if (HIDDEN_DUPES.has(card.id) || !matchesCatalogScope(card, dScope)) return false;
       var cs = statuses[card.id] || "not_owned";
       var cardDetail = cardDetails[card.id] || {};
       
@@ -2961,7 +3085,7 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
       
       return true;
     });
-  }, [statuses, cardDetails, dFilter, dYear, dProduct, dSearch, dCardNum, dSnFilter, customEditVer]);
+  }, [statuses, cardDetails, dFilter, dYear, dProduct, dSearch, dCardNum, dSnFilter, customEditVer, dScope, catalogRevision]);
   var sorted = useMemo(function() {
     if (!sortCol) return filtered;
     return [...filtered].sort(function(a, b) {
@@ -2997,8 +3121,8 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
   }, [filtered, sortCol, sortDir, statuses, cardDetails]);
   var totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   var pageCards = sorted.slice(dPage * PAGE_SIZE, (dPage + 1) * PAGE_SIZE);
-  useEffect(function() { setDPage(0); }, [dFilter, dYear, dProduct, dSearch, dCardNum, dSnFilter, sortCol, sortDir]);
-  useEffect(function() { if (dProduct !== "all" && !filteredProducts.includes(dProduct)) setDProduct("all"); }, [dYear]);
+  useEffect(function() { setDPage(0); }, [dFilter, dYear, dProduct, dSearch, dCardNum, dSnFilter, sortCol, sortDir, dScope, catalogRevision]);
+  useEffect(function() { if (dProduct !== "all" && !filteredProducts.includes(dProduct)) setDProduct("all"); }, [dYear, catalogRevision]);
   function toggleSort(col) {
     if (sortCol === col) { setSortDir(sortDir === "asc" ? "desc" : "asc"); }
     else { setSortCol(col); setSortDir("asc"); }
@@ -3048,6 +3172,7 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
   return (
     <div>
       <div className="flex gap-1 mb-1 flex-wrap items-center" style={{fontSize:"clamp(9px,1.1vw,11px)"}}>
+        <CatalogScopeSelect value={dScope} onChange={setDScope}/>
         <select value={dFilter} onChange={function(e) { setDFilter(e.target.value); }} className="bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5">
           <option value="all">Status</option>
           <option value="acquired">Owned+Transit</option>
@@ -3153,7 +3278,7 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
                   </td>
                   <td className="px-0.5 py-0.5 text-gray-300 truncate" style={{maxWidth:"clamp(80px,11vw,180px)", fontSize:"9px"}} title={card.product}>{card.product}</td>
                   <td className="px-0.5 py-0.5 text-white font-medium whitespace-nowrap">{card.cardNumber}</td>
-                  <td className="px-0.5 py-0.5 text-gray-400 truncate" style={{fontSize: "9px", maxWidth:"clamp(90px,13vw,220px)"}} title={card.cardSet}>{card.cardSet}{sspBadge(card.cardSet) ? <span className="ml-0.5">{sspBadge(card.cardSet)}</span> : null}</td>
+                  <td className="px-0.5 py-0.5 text-gray-400 truncate" style={{fontSize: "9px", maxWidth:"clamp(90px,13vw,220px)"}} title={card.cardSet}>{card.cardSet}{sspBadge(card.cardSet) ? <span className="ml-0.5">{sspBadge(card.cardSet)}{catalogBadge(card)}</span> : null}</td>
                   <td className="px-0.5 py-0.5 whitespace-nowrap">{(function(){
                     var dd = cardDetails[card.id] || {};
                     var eff = dd.printRun && dd.printRun !== "?" ? dd.printRun : card.copies;
@@ -3216,7 +3341,7 @@ function CleanupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, 
     var s = statuses[card.id] || "not_owned";
     var d = cardDetails[card.id] || {};
     var isAcquired = s === "owned" || s === "in_transit";
-    if (NOT_ON_TCDB.has(card.id)) { issues.push("not_on_tcdb"); return issues; }
+    if (NOT_ON_TCDB.has(card.id) && inChecklist(card)) { issues.push("not_on_tcdb"); return issues; }
     if (MISSING_FROM_TCDB.has(card.id)) { issues.push("missing_from_tcdb"); return issues; }
     if (EXTRA_DUPES.has(card.id)) { issues.push("extra_duplicate"); return issues; }
     if (isAcquired && (card.copies || isMissingSN(card, cardDetails)) && !d.serial) issues.push("missing_serial");
@@ -3354,7 +3479,7 @@ function CleanupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, 
               <div className="flex items-start justify-between gap-2 mb-1">
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-gray-400 truncate">{card.product}</div>
-                  <div className="text-sm text-white font-semibold">{card.cardSet} {sspBadge(card.cardSet)}</div>
+                  <div className="text-sm text-white font-semibold">{card.cardSet} {sspBadge(card.cardSet)}{catalogBadge(card)}</div>
                   <div className="text-xs text-gray-500">#{card.cardNumber}{card.copies ? " /" + card.copies : ""}</div>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
@@ -3693,7 +3818,7 @@ function SyncPanel({ cards, touchupCards, cardDetails, syncIndex, setSyncIndex, 
             <div className={(mode === "sync" ? "text-orange-400" : "text-purple-400") + " font-bold text-lg"}>{card.product}</div>
             <div className="text-gray-300 text-sm">#{card.cardNumber} - Tyler Black{card.copies ? " SN " + card.copies : ""} - Milwaukee Brewers</div>
             <div className="flex items-center justify-between mt-1">
-              <span className="text-gray-500 text-xs">{card.cardSet} {sspBadge(card.cardSet)}</span>
+              <span className="text-gray-500 text-xs">{card.cardSet} {sspBadge(card.cardSet)}{catalogBadge(card)}</span>
               <div className="flex gap-3">
                 <a href={tcdbUrl(card)} target="_blank" rel="noopener noreferrer" className="text-xs text-cyan-400 hover:text-cyan-300 underline">Find on TCDB</a>
                 <a href="#" onClick={function(e) { handleEbayClick(card, e); }} className="text-xs text-yellow-400 hover:text-yellow-300 underline">Search eBay</a>
@@ -3733,7 +3858,7 @@ function SyncPanel({ cards, touchupCards, cardDetails, syncIndex, setSyncIndex, 
                 var d = cardDetails[c.id] || {};
                 return (
                   <div key={c.id} onClick={function() { setActiveIdx(i); }} className={"px-3 py-1.5 rounded cursor-pointer flex items-center gap-2 text-xs " + (isActive ? (mode === "sync" ? "bg-orange-900/40 border border-orange-700" : "bg-purple-900/40 border border-purple-700") : "bg-gray-800 hover:bg-gray-750 border border-transparent")}>
-                    <span className={(isActive ? "text-white font-medium" : "text-gray-400") + " flex-1 min-w-0 truncate"}>#{c.cardNumber} | {c.cardSet} {sspBadge(c.cardSet)}<span className="text-gray-600">| {c.product}</span></span>
+                    <span className={(isActive ? "text-white font-medium" : "text-gray-400") + " flex-1 min-w-0 truncate"}>#{c.cardNumber} | {c.cardSet} {sspBadge(c.cardSet)}{catalogBadge(c)}<span className="text-gray-600">| {c.product}</span></span>
                     {((!hidePrices && d.price) || d.serial) && <span className="flex-shrink-0">{!hidePrices && d.price ? <span className="text-gray-600">{displayPrice(d.price)}</span> : ""}{d.serial ? <span className="text-yellow-400 font-black ml-1">{"#" + d.serial}</span> : ""}</span>}
                     <span className="flex gap-1.5 flex-shrink-0">
                       <a href={tcdbUrl(c)} target="_blank" rel="noopener noreferrer" onClick={function(e) { e.stopPropagation(); }} className="font-bold text-cyan-400 hover:text-cyan-200">T</a>
@@ -4083,10 +4208,11 @@ function COMCScannerPanel(props) {
   }
 
   function editCustomCard(idx) {
-    if (props.editCustomCardById) props.editCustomCardById(10000 + idx);
+    var card = loadCustomCards()[idx];
+    if (card && props.editCustomCardById) props.editCustomCardById(card.id);
   }
 
-  function removeCustomCard(idx) {
+  async function removeCustomCard(idx) {
     if (confirmDeleteIdx !== idx) {
       setConfirmDeleteIdx(idx);
       return;
@@ -4094,8 +4220,11 @@ function COMCScannerPanel(props) {
     // Second click = confirmed
     var custom = loadCustomCards();
     if (idx < 0 || idx >= custom.length) return;
-    custom.splice(idx, 1);
-    saveCustomCards(custom);
+    if (!window.trackerAuth || !window.trackerAuth.isOwner()) return;
+    custom[idx] = Object.assign({}, custom[idx], {archived:true,updatedAt:new Date().toISOString()});
+    var saved = await saveCustomCards(custom);
+    if (!saved.localSaved && !saved.cloudSaved) { alert(saved.error || "Could not save card"); return; }
+    if (!saved.cloudSaved) alert("Saved on this device; cloud sync is pending. " + (saved.error || "Open Catalogue to retry."));
     mergeCustomCards();
     setConfirmDeleteIdx(null);
     // Re-run matching
@@ -4106,7 +4235,8 @@ function COMCScannerPanel(props) {
     setParsed(updatedParsed);
   }
 
-  function handleAddToDb(idx) {
+  async function handleAddToDb(idx) {
+    if (!window.trackerAuth || !window.trackerAuth.isOwner()) return;
     var item = parsed[idx];
     if (!item) return;
     // Use editable form fields
@@ -4128,6 +4258,7 @@ function COMCScannerPanel(props) {
       return;
     }
     custom.push({
+      id: window.CardCatalog.nextCustomId(custom),
       product: dbProduct,
       cardNumber: dbCardNo,
       cardSet: dbVariant,
@@ -4135,9 +4266,13 @@ function COMCScannerPanel(props) {
       isAuto: f.isAuto ? "Yes" : "",
       isMem: f.isMem ? "Yes" : "",
       isRC: f.isRC ? "Yes" : "",
-      addedDate: new Date().toISOString().slice(0, 10)
+      addedDate: new Date().toISOString().slice(0, 10),
+      updatedAt: new Date().toISOString(),
+      verification: "unverified"
     });
-    saveCustomCards(custom);
+    var saved = await saveCustomCards(custom);
+    if (!saved.localSaved && !saved.cloudSaved) { alert(saved.error || "Could not save card"); return; }
+    if (!saved.cloudSaved) alert("Saved on this device; cloud sync is pending. " + (saved.error || "Open Catalogue to retry."));
     mergeCustomCards();
     // Re-run matching on all parsed items so the newly added card gets matched
     var updatedParsed = parsed.map(function(r) {
@@ -6661,10 +6796,11 @@ function COMCScannerPanel(props) {
                     <div className="text-[10px] text-purple-400 font-bold mb-0.5">User-Added Cards ({cc.length})</div>
                     <div className="max-h-32 overflow-y-auto space-y-0.5">
                   {cc.map(function(card, idx) {
+                    if (card.archived) return null;
                     return (
                       <div key={idx} className="flex items-center justify-between bg-gray-800/50 rounded px-2 py-1 text-[10px]">
                         <span className="text-gray-300">
-                          <span className="text-purple-400 font-mono">#{10000 + idx}</span>
+                          <span className="text-purple-400 font-mono">#{card.cardNumber}</span>
                           {" " + card.product + " | " + card.cardSet + " | #" + card.cardNumber}
                           {card.copies ? " /" + card.copies : ""}
                           {card.isAuto === "Yes" ? " [A]" : ""}
@@ -8779,7 +8915,7 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
   }
 
   function generateCsv() {
-    var header = "full_name,year,product,variant,card_number,serial_numbered,print_run,is_auto,is_mem,is_rc,attributes,status,quantity,my_serial_number,price_paid,purchase_date,notes,is_duplicate,dupe_type,source,duplicate_type,synced_to_tcdb,ebay_url,ebay_order_url";
+    var header = "full_name,year,product,variant,card_number,serial_numbered,print_run,is_auto,is_mem,is_rc,attributes,status,quantity,my_serial_number,price_paid,purchase_date,notes,is_duplicate,dupe_type,source,duplicate_type,synced_to_tcdb,ebay_url,ebay_order_url,card_id,catalog_type,verification,source_url,proof_color,proof_finish,signature,proof_serial,certification,parent_card_id";
     var rows = [header];
 
     ALL_CARDS.forEach(function(card) {
@@ -8790,11 +8926,13 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
       var year = extractYear(card.product);
       var prodName = extractProductName(card.product);
       var fullName = buildFullName(card);
-      var isAuto = (card.cardSet && /autograph|auto|signature/i.test(card.cardSet)) ? "Yes" : "";
+      var catalogInfo = window.CardCatalog.getInfo(card);
+      var effectiveRun = getEffCopies(card, cardDetails);
+      var isAuto = catalogInfo.signature === "unsigned" ? "" : (card.isAuto === "Yes" || (card.cardSet && /autograph|auto|signature/i.test(card.cardSet))) ? "Yes" : "";
       var isMem = (card.cardSet && /relic|patch|jersey|swatch|material|memorabilia|glove|hat|thread|gear|sock/i.test(card.cardSet)) ? "Yes" : "";
-      var isRc = (card.product.match(/^202[4-9]/) && !/Draft|Prospect|Pro Debut|Minor|Debut|Inception|Bowman's Best|Bowman Sterling|Bowman Platinum|Chrome Sapphire|Leaf|Panini|Pro Set|Sapphire Edition|Choice/i.test(card.product)) ? "Yes" : "";
+      var isRc = Object.prototype.hasOwnProperty.call(card, "isRC") ? card.isRC : (card.product.match(/^2024/) && !/Draft|Prospect|Pro Debut|Minor|Debut|Inception|Bowman's Best|Bowman Sterling|Bowman Platinum|Chrome Sapphire|Leaf|Panini|Pro Set|Sapphire Edition|Choice/i.test(card.product)) ? "Yes" : "";
       var notOnTcdb = NOT_ON_TCDB.has(card.id);
-      var synced = notOnTcdb ? "" : (needsSync.has(card.id) ? "" : "Yes");
+      var synced = canSyncCardToTcdb(card.id) && (s === "owned" || s === "in_transit") && !needsSync.has(card.id) ? "Yes" : "";
       var ebayOid = EBAY_ORDERS[String(card.id)];
       var ebayOrderUrl = ebayOid ? "https://order.ebay.ca/ord/show?orderId=" + ebayOid : "";
       var ebayLink = EBAY_IDS.has(card.id) ? "" : "";
@@ -8802,28 +8940,30 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
 
       var row = [
         fullName, year, prodName, card.cardSet, card.cardNumber,
-        card.copies || "", "", isAuto, isMem, isRc, fsFlag,
+        effectiveRun || isMissingSN(card, cardDetails) ? "Yes" : "", effectiveRun || "", isAuto, isMem, isRc, fsFlag,
         statusLabel(s), qty, d.serial || "", d.price || "",
         d.date || "", d.notes || "", "No", "",
-        notOnTcdb ? "Manual" : "TCDB", "", synced, ebayLink, ebayOrderUrl
+        TCDB_LINKS[card.id] ? "TCDB" : catalogInfo.verification === "checklist" ? "Checklist" : "Recorded card", "", synced, ebayLink, ebayOrderUrl,
+        card.id, catalogInfo.issueType, catalogInfo.verification, catalogInfo.sourceUrl, catalogInfo.proofColor, catalogInfo.proofFinish, catalogInfo.signature, catalogInfo.serialMark, catalogInfo.certification, catalogInfo.parentCardId
       ].map(escCsv).join(",");
       rows.push(row);
     });
 
     DUPES.forEach(function(dupe) {
-      var parentCard = ALL_CARDS[dupe.parent_id - 1];
+      var parentCard = CARD_BY_ID[dupe.parent_id];
       if (!parentCard) return;
       var year = extractYear(parentCard.product);
       var prodName = extractProductName(parentCard.product);
       var fullName = buildFullName(parentCard);
+      var parentRun = getEffCopies(parentCard, cardDetails);
       var dupeStatus = dupe.type === "intransit" ? "In Transit" : dupe.type === "comc" ? "In Transit" : "Owned";
       var dupeTypeLabel = dupe.type === "intransit" ? "Extra Copy (In Transit)" : dupe.type === "forsale" ? "Extra Copy (For Sale)" : dupe.type === "comc" ? "Extra Copy (COMC)" : "Extra Copy";
 
       var row = [
         fullName, year, prodName, parentCard.cardSet, parentCard.cardNumber,
-        parentCard.copies || "", "", "", "", "", "",
+        parentRun || isMissingSN(parentCard, cardDetails) ? "Yes" : "", parentRun || "", "", "", "", "",
         dupeStatus, 1, "", "", "", "",
-        "Yes", "", "TCDB", dupeTypeLabel, "", "", ""
+        "Yes", "", "TCDB", dupeTypeLabel, "", "", "", parentCard.id, window.CardCatalog.getInfo(parentCard).issueType, "", "", "", "", "", "", "", ""
       ].map(escCsv).join(",");
       rows.push(row);
     });
@@ -8839,6 +8979,8 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
       statuses: statuses,
       cardDetails: cardDetails,
       forSaleFlags: forSaleFlags,
+      customCards: loadCustomCards(),
+      catalogMetadata: loadCatalogMeta(),
       syncedIds: [...(needsSync || [])].length > 0 ? "has_unsynced" : "all_synced"
     }, null, 2);
   }
@@ -8911,6 +9053,24 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
       try {
         var data = JSON.parse(e.target.result);
         if (data.statuses && typeof data.statuses === "object") {
+          if (Array.isArray(data.customCards)) {
+            var restoredCustoms = window.CardCatalog.normalizeCustomCards(data.customCards);
+            var currentCustoms = loadCustomCards();
+            var restoredIds = new Set();
+            restoredCustoms.forEach(function(card) {
+              if (restoredIds.has(card.id)) throw new Error("Backup contains a duplicate card ID; ownership was not replaced.");
+              restoredIds.add(card.id);
+              var current = currentCustoms.find(function(item) { return item.id === card.id; });
+              if (current && !window.CardCatalog.sameIdentity(current, card)) throw new Error("Backup card #" + card.id + " differs from the current card. Review the catalogue before restoring ownership.");
+            });
+            var catalogRestore = await saveCustomCards(restoredCustoms);
+            if (!catalogRestore.cloudSaved || (catalogRestore.conflicts && catalogRestore.conflicts.length)) throw new Error("Catalogue sync could not finish; ownership was not replaced. " + (catalogRestore.error || "Try again when connected."));
+          }
+          if (data.catalogMetadata && window.MODE !== "wnba") {
+            var metadataRestore = await window.storage.set("tb-catalog-meta-v1", JSON.stringify(data.catalogMetadata));
+            applyCatalogMeta(); window.dispatchEvent(new CustomEvent("catalogchange"));
+            if (!metadataRestore.cloudSaved) throw new Error("Catalogue details are saved on this device but cloud sync is pending; ownership was not replaced.");
+          }
           var newStatuses = data.statuses;
           var newDetails = data.cardDetails || {};
           var newForSale = data.forSaleFlags || {};
@@ -8928,8 +9088,8 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
           try { localStorage.setItem(tbk("alldata-v1"), payload); } catch(e2) {}
           try { localStorage.setItem(tbk("alldata-backup-v1"), payload); } catch(e2) {}
           setExportMsg("Saving " + statCount + " statuses + " + detailCount + " details to cloud...");
-          try { await window.storage.set(tbk("alldata-v1"), payload); } catch(e2) {}
-          setExportMsg("Restored " + statCount + " statuses + " + detailCount + " card details!");
+          var ownershipRestore = await window.storage.set(tbk("alldata-v1"), payload);
+          setExportMsg(ownershipRestore.cloudSaved ? "Restored " + statCount + " statuses + " + detailCount + " card details!" : "Restored on this device; cloud sync is pending. " + (ownershipRestore.error || "Try saving again when connected."));
           setTimeout(function() { setExportMsg(""); }, 5000);
         } else {
           setExportMsg("Invalid backup format.");
@@ -9135,6 +9295,7 @@ window.addEventListener("error", function(e) {
 (async function() {
   try {
     if (window.storageReady) { try { await window.storageReady; } catch(e) { console.warn("storageReady failed:", e); } }
+    mergeCustomCards();
     var root = document.getElementById("root");
     if (!root) { console.error("No #root element"); return; }
     // Wrapper component: forces a full remount of TylerBlackTracker when mode changes,
