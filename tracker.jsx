@@ -8918,7 +8918,7 @@ function ChangelogPanel({ changelog }) {
             <th className="px-1.5 py-1 text-left">Card</th>
             <th className="px-1.5 py-1 text-left">Field</th>
             <th className="px-1.5 py-1 text-left">Change</th>
-            <th className="px-1.5 py-1 text-left">From</th>
+            <th className="px-1.5 py-1 text-left">By</th>
           </tr>
         </thead>
         <tbody>
