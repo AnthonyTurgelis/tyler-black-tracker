@@ -51,14 +51,14 @@
   function summarizeCard(input, cardId, statuses, details) {
     var state = normalizeState(input), copies = getCopiesForCard(state, cardId, statuses, details), locations = {};
     Object.keys(LOCATIONS).forEach(function (key) { locations[key] = 0; });
-    var active = copies.filter(function (copy) { return copy.saleStatus !== "sold"; });
+    var active = copies.filter(function (copy) { return copy.saleStatus !== "sold" && copy.currentInventory !== false; });
     active.forEach(function (copy) { locations[LOCATIONS[copy.location] ? copy.location : "unknown"]++; });
     var legacyStatus = (statuses || {})[cardId] || baselineFor(state, cardId, statuses, details).status;
     var legacyOwned = legacyStatus === "owned" || legacyStatus === "for_sale";
     var legacyUnallocated = active.some(function(copy) { return copy.origin === "legacy" && (copy.unallocated || copy.location === "unknown"); });
     // The manual mark remains intact. Explicit copies add independent status flags,
     // so a variant can be present in both Owned and In Transit without counting twice.
-    var owned = legacyOwned && (!hasStoredCopies(state, cardId) || legacyUnallocated) || locations.in_hand > 0;
+    var owned = legacyOwned && (!hasStoredCopies(state, cardId) || legacyUnallocated || !active.length) || locations.in_hand > 0;
     // Owned retains its established meaning of in hand. Confirmed copies elsewhere
     // are acquired but awaiting receipt, including a purchased copy with unknown location.
     var legacyAwaiting = legacyStatus === "in_transit" && (!hasStoredCopies(state, cardId) || legacyUnallocated);
@@ -184,7 +184,7 @@
     context = context || {}; var state = normalizeState(input), at = nowIso(context.now);
     var existing = getCopiesForCard(state, cardId, context.statuses, context.cardDetails).find(function (c) { return c.id === copyId; });
     if (!existing) throw new Error("That copy is no longer available. Refresh and try again.");
-    var allowed = ["location", "serial", "paidPrice", "currency", "purchaseDate", "notes", "duplicateConfirmed", "saleStatus", "listingUrl", "listingPrice", "listingCurrency", "listingCheckedAt", "photos", "secondaryJerseyNumber", "secondaryJerseyEvidence"];
+    var allowed = ["location", "serial", "paidPrice", "currency", "purchaseDate", "notes", "duplicateConfirmed", "saleStatus", "listingUrl", "listingPrice", "listingCurrency", "listingCheckedAt", "photos", "secondaryJerseyNumber", "secondaryJerseyEvidence", "currentInventory"];
     var next = Object.assign({}, existing);
     allowed.forEach(function (key) { if (Object.prototype.hasOwnProperty.call(patch, key)) next[key] = patch[key]; });
     if (text(next.serial) !== text(existing.serial)) { next.serialEvidence = "manual"; next.imageVerified = false; }
@@ -283,7 +283,7 @@
     var state = normalizeState(input), at = nowIso(context.now);
     target = Number(target);
     if (!Number.isSafeInteger(target) || target < 0 || target > 10000) throw new Error("Enter a valid quantity.");
-    var rows = getCopiesForCard(state, cardId, context.statuses, context.cardDetails).filter(function(c){return c.saleStatus !== "sold";});
+    var rows = getCopiesForCard(state, cardId, context.statuses, context.cardDetails).filter(function(c){return c.saleStatus !== "sold" && c.currentInventory !== false;});
     var sourced = rows.filter(function(c){return c.origin !== "legacy";}).length;
     if (target < sourced) throw new Error("The total includes " + sourced + " documented copies. Open Details to resolve those before reducing the total.");
     var desiredLegacy = target - sourced, previous = baselineFor(state, cardId, context.statuses, context.cardDetails);
@@ -306,7 +306,7 @@
   function quickAllocation(input, cardId, inHand, context) {
     context = context || {};
     var state = normalizeState(input), at = nowIso(context.now);
-    var rows = getCopiesForCard(state, cardId, context.statuses, context.cardDetails).filter(function(c){return c.saleStatus !== "sold";});
+    var rows = getCopiesForCard(state, cardId, context.statuses, context.cardDetails).filter(function(c){return c.saleStatus !== "sold" && c.currentInventory !== false;});
     var confirmedHand = rows.filter(function(c){return c.origin !== "legacy" && c.location === "in_hand";}).length;
     var legacy = rows.filter(function(c){return c.origin === "legacy";});
     var desired = Number(inHand);
