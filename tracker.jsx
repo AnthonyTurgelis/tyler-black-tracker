@@ -2118,7 +2118,7 @@ function TylerBlackTracker() {
         ) : (
         <div className="mx-auto flex-1 overflow-y-auto w-full" style={{maxWidth:"min(100%, 1800px)"}}>
         {activeTab === "changelog" ? (
-          <ChangelogPanel changelog={changelog} setChangelog={setChangelog} statuses={statuses} cardDetails={cardDetails} forSaleFlags={forSaleFlags} setStatuses={setStatuses} setCardDetails={setCardDetails} setForSaleFlags={setForSaleFlags} saveStatuses={saveStatuses} saveDetails={saveDetails} setDirtyIds={setDirtyIds} currentSessionId={sessionId.current} clearUndoStack={function() { undoStack.current = []; setUndoLen(0); }} persistField={persistField} />
+          <ChangelogPanel changelog={changelog} onOpenCard={function(id){setDetailedCardId(id);setActiveTab("detailed");}} setChangelog={setChangelog} statuses={statuses} cardDetails={cardDetails} forSaleFlags={forSaleFlags} setStatuses={setStatuses} setCardDetails={setCardDetails} setForSaleFlags={setForSaleFlags} saveStatuses={saveStatuses} saveDetails={saveDetails} setDirtyIds={setDirtyIds} currentSessionId={sessionId.current} clearUndoStack={function() { undoStack.current = []; setUndoLen(0); }} persistField={persistField} />
         ) : activeTab === "versions" ? (
           <VersionLogPanel />
         ) : activeTab === "board" ? (
@@ -8806,166 +8806,217 @@ function VersionLogPanel() {
 }
 
 
-function ChangelogPanel({ changelog }) {
-  const [auditRows, setAuditRows] = useState([]);
-  const [auditReady, setAuditReady] = useState(false);
-  const [loading, setLoading] = useState(true);
+function ChangelogPanel({ changelog, onOpenCard }) {
+  const [filter, setFilter] = useState("impact");
+  const [search, setSearch] = useState("");
+  const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hasMore, setHasMore] = useState(false);
-  const [auditTotal, setAuditTotal] = useState(null);
-  const [expandedId, setExpandedId] = useState(null);
-  const [shown, setShown] = useState(100);
-  const [filter, setFilter] = useState("backend");
-  const [search, setSearch] = useState("");
-  const [desc, setDesc] = useState(true);
+  const [visibleLimit, setVisibleLimit] = useState(100);
+  const [descending, setDescending] = useState(true);
+  const [expanded, setExpanded] = useState(null);
 
   const refresh = useCallback(async function(offset, append) {
-    if (!window.trackerAudit) {
-      setAuditReady(false); setError("Backend history is unavailable.");
-      setLoading(false); return;
-    }
+    if (!window.trackerAudit) { setError("Sign in to view backend activity."); setLoaded(false); return; }
     setLoading(true);
+    if (!append) { setRows([]); setLoaded(false); setTotal(null); }
     try {
-      const result = await window.trackerAudit.list({ offset:offset, limit:500, filter:filter });
-      if (!result.ok) throw new Error(result.error || "Unable to read backend activity.");
-      setAuditRows(previous => append ? previous.concat(result.rows) : result.rows);
-      setHasMore(result.hasMore);
-      setAuditTotal(result.total);
-      setAuditReady(true);
-      setError("");
-    } catch(e) { setError(e.message || "Unable to load activity."); if (!append) setAuditReady(false); }
-    finally { setLoading(false); }
+      const response = await window.trackerAudit.list({filter:filter,offset:offset,limit:500});
+      if (!response.ok) throw new Error(response.error || "Activity unavailable.");
+      setRows(previous => append ? previous.concat(response.rows) : response.rows);
+      setTotal(response.total);
+      setHasMore(response.hasMore);
+      setLoaded(true); setError("");
+    } catch(err) {
+      setError(err.message || "Could not load activity.");
+      if (!append) setLoaded(false);
+    } finally { setLoading(false); }
   }, [filter]);
-  useEffect(function() { setShown(100); refresh(0,false); }, [refresh]);
 
-  const history = useMemo(function() {
-    if (auditReady) return auditRows.map(function(row) {
-      return { id:row.id, ts:row.changed_at, cardId:row.card_id, type:row.category,
-        field:row.field, from:row.old_value, to:row.new_value, actor:row.actor, copyId:row.copy_id,
-        sourceUrl:row.source_ref, sourceKey:row.source_key, evidence:row.evidence_note, evidenceLevel:row.evidence_level };
-    });
-    return (changelog || []).map(function(row,index) {
-      return { id:"old-"+index, ts:row.ts, cardId:row.cardId, cardLabel:row.cardLabel,
-        type:row.field === "qty" ? "qty" : row.type === "status" ? "status" : row.type === "forsale" ? "sale" : "detail",
-        field:row.field === "status" ? "Status" : row.field === "qty" ? "Qty" : row.field || "Detail",
-        from:row.from, to:row.to, actor:"Local" };
-    });
-  }, [auditRows,auditReady,changelog]);
+  useEffect(function() {
+    setVisibleLimit(100);
+    setExpanded(null);
+    refresh(0,false);
+  }, [refresh]);
 
-  const describe = useCallback(function(entry) {
-    var card = CARD_BY_ID[entry.cardId];
-    return card ? String(card.product || "") + " · #" + (card.cardNumber || "") + " · " + (card.cardSet || "Base")
-      : entry.sourceKey ? String(entry.sourceKey).split("|").join(" · ") :
-        entry.cardLabel || (entry.cardId ? "Card #" + entry.cardId : "Unmatched source");
+  const entries = useMemo(function() {
+    if (loaded) return rows.map(function(row) {
+      return {
+        id:row.id, ts:row.changed_at, cardId:row.card_id, type:row.category,
+        field:row.field, from:row.old_value, to:row.new_value, actor:row.actor,
+        copyId:row.copy_id, impact:row.impact_kind, sourceUrl:row.source_ref,
+        evidence:row.evidence_note, evidenceLevel:row.evidence_level, sourceKey:row.source_key
+      };
+    });
+    if (filter !== "impact" && filter !== "status" && filter !== "movement" && filter !== "all") return [];
+    return (changelog || []).filter(function(e){return e.from !== e.to;}).map(function(e,index) {
+      return {
+        id:"historic-"+index, ts:e.ts, cardId:e.cardId, type:e.field==="qty" ? "qty" : e.type==="status" ? "status" : "detail",
+        field:e.field==="qty" ? "Qty" : e.field==="status" ? "Status" : e.field,
+        from:e.from, to:e.to, actor:"Local fallback", cardLabel:e.cardLabel
+      };
+    }).filter(function(e){return filter==="all" || e.type==="status" || e.type==="qty";});
+  }, [rows,loaded,changelog,filter]);
+
+  const cardName = useCallback(function(e) {
+    if (e.type==="system" && !e.cardId) return "Tracker update";
+    var c=CARD_BY_ID[e.cardId];
+    return c ? String(c.product||"")+" · #"+String(c.cardNumber||"")+" · "+String(c.cardSet||"")
+      : e.sourceKey ? String(e.sourceKey).replace(/\|/g," · ")
+      : e.cardLabel || (e.cardId ? "Card #"+e.cardId : "Unmatched source");
   }, []);
 
-  const matches = useMemo(function() {
-    var needle = search.trim().toLowerCase();
-    var rows = history.filter(function(row) {
-      if (filter === "status" && row.type !== "status") return false;
-      if (filter === "movement" && !["status","location","qty","copy"].includes(row.type)) return false;
-      if (filter === "qty" && !["qty","copy"].includes(row.type)) return false;
-      if (filter === "location" && row.type !== "location") return false;
-      if (filter === "backend" && !["Backend","Backfill","Snapshot"].includes(row.actor)) return false;
-      if (["source","catalog","photo","price","review","verification"].includes(filter) && row.type !== filter) return false;
-      return !needle || [describe(row), row.field, row.from, row.to, row.actor, row.copyId, row.evidence, row.sourceKey]
-        .map(function(part){return String(part == null ? "" : part);}).join(" ").toLowerCase().includes(needle);
-    });
-    return rows.sort(function(a,b) {
-      var cmp = (new Date(a.ts).getTime() || 0) - (new Date(b.ts).getTime() || 0);
-      if (!cmp) cmp = Number(a.id) - Number(b.id) || 0;
-      return desc ? -cmp : cmp;
-    });
-  }, [history,filter,search,desc,describe]);
-
-  const val = function(row, raw) {
-    if (raw == null || String(raw) === "") return "—";
-    if (row.type === "status") return ({owned:"Owned",in_transit:"Transit",not_owned:"Needed",for_sale:"For sale"})[raw] || String(raw);
-    if (row.type === "location") return ({in_hand:"Hand",in_transit:"Transit",oklahoma_mailbox:"Oklahoma",comc:"COMC",unknown:"Unknown"})[raw] || String(raw);
-    return String(raw);
+  const shortValue = function(type,value) {
+    if (value==null || String(value).trim()==="") return "?";
+    if (type==="status") return ({owned:"Owned",in_transit:"Transit",not_owned:"Needed",for_sale:"Sale"})[value]||String(value);
+    if (type==="location") return ({in_hand:"Hand",in_transit:"Transit",oklahoma_mailbox:"Oklahoma",comc:"COMC",unknown:"Unknown",Unallocated:"Unallocated"})[value]||String(value);
+    return String(value);
+  };
+  const changeText = function(e) {
+    var before=shortValue(e.type,e.from), after=shortValue(e.type,e.to);
+    if (e.type==="status" || e.type==="location") return before+" → "+after;
+    if (e.type==="qty") {
+      var delta=Number(e.to)-Number(e.from);
+      var suffix=e.from!==null && e.from!=="" && Number.isFinite(delta) && delta!==0
+        ? " ("+(delta>0?"+":"")+delta+")" : "";
+      return "Qty "+before+" → "+after+suffix;
+    }
+    if (e.type==="copy" && e.field==="Counted") return "Counted "+before+" → "+after;
+    if (e.type==="copy" && e.field==="Existing copy mapped") return "Existing copy linked";
+    if (e.type==="copy" && e.field==="Purchased copy recorded")
+      return e.evidenceLevel==="pending" ? "Purchase · NOT counted" : "Copy record · "+after;
+    if (e.type==="source") return String(e.field||"Source")+" · "+after;
+    return String(e.field||"Change")+": "+(e.from==null || e.from==="" ? after : before+" → "+after);
+  };
+  const eventHint = function(e) {
+    if (e.evidenceLevel==="comc_source_matched") return "COMC source matched; NOT in hand";
+    if (e.evidenceLevel==="pending") return "Needs your confirmation; not counted";
+    if (e.evidenceLevel==="snapshot_only") return "Snapshot difference; old quantity unknown";
+    if (e.evidenceLevel==="recorded_not_physical") return "Original log verified; physical ownership not checked";
+    if (e.evidenceLevel==="corrected_unconfirmed") return "Incorrect provisional count corrected";
+    return e.evidence || "Recorded; physical ownership not implied";
+  };
+  const sourceLabel = function(e) {
+    if (e.evidenceLevel==="comc_source_matched") return "COMC ✓";
+    if (e.evidenceLevel==="pending") return "Check";
+    if (e.actor==="Historic") return "Past";
+    if (e.actor==="Snapshot") return "Check";
+    return e.actor || "—";
   };
   const when = function(ts) {
     var d=new Date(ts);
-    return isNaN(d.getTime()) ? "—" : d.toLocaleString([], { month:"short",day:"numeric",hour:"numeric",minute:"2-digit" });
+    return isNaN(d.getTime()) ? "—" : d.toLocaleString([], {month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"});
   };
-  const visible = matches.slice(0,shown);
-  const canShowMore = shown < matches.length || auditReady && hasMore;
-
+  const matches=useMemo(function() {
+    const needle=search.trim().toLowerCase();
+    return entries.filter(function(e) {
+      if (!loaded && filter==="status" && e.type!=="status") return false;
+      return !needle || [cardName(e),e.field,e.from,e.to,e.actor,e.evidence,e.sourceKey,e.copyId,changeText(e)]
+        .map(function(x){return String(x==null?"":x);}).join(" ").toLowerCase().includes(needle);
+    }).sort(function(a,b){
+      var d=(new Date(a.ts).getTime()||0)-(new Date(b.ts).getTime()||0);
+      if (!d) d=(Number(a.id)||0)-(Number(b.id)||0);
+      return descending ? -d : d;
+    });
+  },[entries,search,cardName,descending,loaded,filter]);
+  const visible=matches.slice(0,visibleLimit);
   async function more() {
-    if (shown < matches.length) { setShown(function(n){return n + 100;}); return; }
-    if (auditReady && hasMore && !loading) {
-      await refresh(auditRows.length,true);
-      setShown(function(n){return n + 100;});
-    }
+    if (visibleLimit<matches.length) {setVisibleLimit(n=>n+100);return;}
+    if (hasMore && !loading) {await refresh(rows.length,true);setVisibleLimit(n=>n+100);}
   }
 
   return <section className="text-slate-200">
-    <div className="flex flex-wrap gap-1.5 items-center mb-2">
-      <span className="text-xs font-bold text-white mr-2">Activity</span>
-      <input aria-label="Search changes" value={search} onChange={function(e){setSearch(e.target.value);setShown(100);}}
-        placeholder="Search loaded changes" className="rounded bg-slate-900 border border-slate-700 px-2 py-1 text-xs min-w-28 flex-1" />
-      <select aria-label="Activity filter" value={filter} onChange={function(e){setFilter(e.target.value);setShown(100);}}
-        className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs">
-        <option value="all">All changes</option><option value="movement">Status + Qty + Location</option>
-        <option value="status">Status</option><option value="qty">Qty</option>
-        <option value="location">Location</option>
-        <option value="catalog">Catalogue / proofs</option>
-        <option value="source">eBay / COMC sources</option>
-        <option value="photo">Photos</option>
-        <option value="price">Market evidence</option>
-        <option value="review">Review questions</option>
-        <option value="verification">Verified scans</option>
-        <option value="backend">Backend + backfills</option>
+    <div className="mb-1.5 flex flex-wrap items-center gap-1">
+      <select aria-label="Activity change type" value={filter} onChange={function(e){setFilter(e.target.value);setVisibleLimit(100);}}
+        className="min-w-0 max-w-[230px] rounded border border-slate-700 bg-slate-900 px-1.5 py-1 text-[11px]">
+        <optgroup label="Collection changes">
+          <option value="impact">All status & quantity changes</option>
+          <option value="received">Transit → Owned / In hand</option>
+          <option value="added">Added / Qty increased or set</option>
+          <option value="removed">Removed / Qty decreased</option>
+          <option value="to_transit">Owned → Transit</option>
+          <option value="qty">Quantity changes only</option>
+          <option value="status">Stoplight changes only</option>
+          <option value="backend_impact">Backend status / count edits</option>
+        </optgroup>
+        <optgroup label="Check or verify">
+          <option value="pending">Unconfirmed purchases</option>
+          <option value="comc">COMC source matches</option>
+          <option value="review">Numbered review questions</option>
+        </optgroup>
+        <optgroup label="Other history">
+          <option value="backend">All backend / backfill</option>
+          <option value="evidence">All evidence imports</option>
+          <option value="catalog">Catalogue / proofs</option>
+          <option value="source">eBay / COMC scans</option>
+          <option value="verification">Image / serial checks</option>
+          <option value="price">Price observations</option>
+          <option value="photo">Reference images</option>
+          <option value="all">All changes</option>
+        </optgroup>
       </select>
-      <button onClick={function(){setShown(100);refresh(0,false);}}
-        className="border border-slate-700 rounded px-2 py-1 text-xs hover:bg-slate-800" disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
-      <span className="text-[10px] text-slate-400 tabular-nums">{auditReady && auditTotal !== null ? auditTotal.toLocaleString() : matches.length + (hasMore ? "+" : "")} entries</span>
+      <input aria-label="Search loaded changes" value={search}
+        onChange={function(e){setSearch(e.target.value);setVisibleLimit(100);}}
+        placeholder="Card / serial" className="min-w-20 flex-1 rounded border border-slate-700 bg-slate-900 px-1.5 py-1 text-[11px]" />
+      <button type="button" onClick={function(){refresh(0,false);}} disabled={loading}
+        className="rounded border border-slate-700 px-1.5 py-1 text-[10px] text-slate-300">↻</button>
+      <span className="text-[10px] tabular-nums text-slate-500">{total==null ? matches.length+(hasMore?"+":"") : total.toLocaleString()}</span>
     </div>
-    {error && <p role="status" className="text-xs text-amber-300 mb-2">{error}{!auditReady ? " · Local history shown." : ""}</p>}
-    <div className="overflow-auto max-h-[67vh] border border-slate-800 rounded">
-      <table className="w-full min-w-[610px] table-fixed text-[10px] border-collapse">
-        <colgroup><col className="w-[102px]" /><col /><col className="w-[64px]" /><col className="w-[165px]" /><col className="w-[82px]" /></colgroup>
+    {error && <p role="status" className="mb-1 text-xs text-amber-300">{error}{!loaded ? " · Saved browser history only." : ""}</p>}
+    <div className="max-h-[69vh] overflow-auto rounded border border-slate-800">
+      <table className="w-full table-fixed border-collapse text-[10px]">
+        <colgroup><col className="w-[73px]"/><col/><col className="w-[126px]"/><col className="w-[56px]"/></colgroup>
         <thead className="sticky top-0 z-10 bg-slate-900 text-slate-400">
           <tr className="border-b border-slate-700">
-            <th className="px-1.5 py-1 text-left cursor-pointer" onClick={function(){setDesc(!desc);}}>When {desc ? "↓" : "↑"}</th>
-            <th className="px-1.5 py-1 text-left">Card</th>
-            <th className="px-1.5 py-1 text-left">Field</th>
-            <th className="px-1.5 py-1 text-left">Change</th>
-            <th className="px-1.5 py-1 text-left">By</th>
+            <th className="cursor-pointer px-1 py-1 text-left" onClick={function(){setDescending(!descending);}}>When {descending?"↓":"↑"}</th>
+            <th className="px-1 py-1 text-left">Card</th>
+            <th className="px-1 py-1 text-left">Change</th>
+            <th className="px-1 py-1 text-left">By</th>
           </tr>
         </thead>
         <tbody>
-          {visible.map(function(row,index) {
-            var name = describe(row);
-            var oldText = val(row,row.from), newText = val(row,row.to);
-            return <React.Fragment key={row.id+"-"+index}><tr className="border-b border-slate-800/70 hover:bg-slate-800/60 even:bg-slate-900/20">
-              <td className="px-1.5 py-[3px] tabular-nums text-slate-500 whitespace-nowrap">{when(row.ts)}</td>
-              <td className="px-1.5 py-[3px] truncate font-medium cursor-pointer" title="Tap for evidence" onClick={function(){setExpandedId(expandedId === row.id ? null : row.id);}}>{name}</td>
-              <td className="px-1.5 py-[3px] text-slate-400 truncate" title={row.field + (row.evidenceLevel ? " · " + row.evidenceLevel : "")}>{row.field}</td>
-              <td className="px-1.5 py-[3px] truncate" title={oldText+" → "+newText}>
-                <span className="text-slate-500">{oldText}</span><span className="mx-1 text-slate-600">→</span><span className="text-emerald-300">{newText}</span>
-              </td>
-              <td className={"px-1.5 py-[3px] truncate "+(["Backend","Backfill","Snapshot"].includes(row.actor) ? "font-semibold text-amber-300" : "text-slate-500")}
-                title={row.actor + (row.evidence ? " · "+row.evidence : "")}>
-                {row.actor === "Historic" ? "Past" : row.actor}
-                {row.sourceUrl && /^https:\/\//i.test(row.sourceUrl) ? <a href={row.sourceUrl} target="_blank" rel="noreferrer" className="ml-1 text-sky-400" title="View original source" onClick={function(e){e.stopPropagation();}}>↗</a> : null}
-              </td>
+          {visible.map(function(e,index) {
+            var title=cardName(e),change=changeText(e);
+            var requiresCheck=e.evidenceLevel==="pending" || e.evidenceLevel==="snapshot_only" ||
+              e.evidenceLevel==="recorded_not_physical" || e.evidenceLevel==="corrected_unconfirmed";
+            return <React.Fragment key={String(e.id)+"-"+index}>
+              <tr className="cursor-pointer border-b border-slate-800/70 even:bg-slate-900/25 hover:bg-slate-800/60"
+                onClick={function(){setExpanded(expanded===e.id ? null:e.id);}}>
+                <td className="whitespace-nowrap px-1 py-[3px] text-slate-500">{when(e.ts)}</td>
+                <td className="truncate px-1 py-[3px] font-semibold" title={title}>{title}</td>
+                <td className="truncate px-1 py-[3px]" title={change+" · "+eventHint(e)}>
+                  <span className={e.impact==="removed" || e.impact==="qty_down" || e.impact==="count_removed"
+                    ? "text-rose-300" : e.impact==="transit_to_owned" || e.impact==="location_to_hand"
+                    ? "text-emerald-300" : "text-slate-200"}>{change}</span>
+                </td>
+                <td className={"truncate px-1 py-[3px] "+(requiresCheck ? "text-amber-300" : e.evidenceLevel==="comc_source_matched" ? "text-emerald-300" : "text-slate-500")}
+                  title={sourceLabel(e)+" · "+eventHint(e)}>{sourceLabel(e)}</td>
               </tr>
-              {expandedId === row.id && <tr className="border-b border-slate-700 bg-slate-800/70">
-                <td colSpan={5} className="px-2 py-2 text-[11px] text-slate-300">
-                  <span className="font-semibold text-slate-100">{row.actor} · {row.type}</span>
-                  {row.evidenceLevel && <span className="text-slate-400"> · {row.evidenceLevel}</span>}
-                  <span className="ml-2">{row.evidence || "Recorded change"}</span>
-                  {row.sourceUrl && /^https:\/\//i.test(row.sourceUrl) && <a href={row.sourceUrl} target="_blank" rel="noreferrer" className="ml-2 text-sky-300 underline">Source</a>}
+              {expanded===e.id && <tr className="border-b border-slate-700 bg-slate-800/70">
+                <td colSpan={4} className="px-2 py-2 text-[11px] text-slate-300">
+                  <span className="font-semibold text-white">{change}</span>
+                  <span className="ml-2">{eventHint(e)}</span>
+                  {e.evidence && e.evidence!==eventHint(e) && <span className="ml-1 text-slate-400">{e.evidence}</span>}
+                  <div className="mt-1 flex flex-wrap gap-3">
+                    {onOpenCard && CARD_BY_ID[e.cardId] && <button type="button"
+                      className="text-cyan-300 underline" onClick={function(){onOpenCard(e.cardId);}}>Open card</button>}
+                    {e.sourceUrl && /^https:\/\//i.test(e.sourceUrl) && <a href={e.sourceUrl} target="_blank"
+                      rel="noopener noreferrer" className="text-sky-300 underline">Source</a>}
+                    {e.actor && <span className="text-slate-500">{e.actor}</span>}
+                  </div>
                 </td>
               </tr>}
-              </React.Fragment>;
+            </React.Fragment>;
           })}
         </tbody>
       </table>
-      {!visible.length && <div className="text-xs text-slate-500 py-8 text-center">{loading ? "Loading changes…" : "No matching changes"}</div>}
+      {!visible.length && <p className="py-6 text-center text-[11px] text-slate-500">{loading?"Loading…":"No matching changes"}</p>}
     </div>
-    {canShowMore && <button disabled={loading} onClick={more} className="mt-2 w-full rounded border border-slate-800 py-1 text-xs text-slate-400 hover:text-white">+ More changes</button>}
+    {(visibleLimit<matches.length||hasMore) && <button type="button" disabled={loading} onClick={more}
+      className="mt-1.5 w-full rounded border border-slate-800 py-1 text-[11px] text-slate-400">More changes</button>}
   </section>;
 }
 
