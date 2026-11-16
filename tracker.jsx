@@ -1348,6 +1348,20 @@ function TylerBlackTracker() {
   }, [statuses,cardDetails,saveCopyInventory]);
   const setCardStatus = useCallback((cardId, status) => {
     if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
+    if (trackerMode === "tb") {
+      var quick = window.CopyInventory.quickStatusPresence(copyStateRef.current.inventory,cardId,status,{statuses:statuses,cardDetails:cardDetails});
+      if (quick.handled) {
+        if (quick.requiresDetails) { setCopyCardId(cardId); setActiveTab("copies"); }
+        else if (quick.changed) saveCopyInventory(quick.inventory).then(function(result) {
+          if (!result || result.ok === false) window.alert(result && result.error || "Unable to save copy status.");
+        }).catch(function(error){window.alert(error.message || "Unable to save copy status.");});
+        return true;
+      }
+      if (status === "not_owned") {
+        var qty = window.CopyInventory.summarizeCard(copyStateRef.current.inventory,cardId,statuses,cardDetails).total;
+        if (qty > 0) { window.alert("Reduce Qty to 0 to mark a card Needed. Your counted copies have not changed."); return false; }
+      }
+    }
     if (trackerMode === "tb" && window.CopyInventory.hasStoredCopies(copyStateRef.current.inventory, cardId)) {
       var rows = window.CopyInventory.getCopiesForCard(copyStateRef.current.inventory,cardId,statuses,cardDetails).filter(function(c){return c.saleStatus !== "sold" && c.currentInventory !== false;});
       var legacy = rows.filter(function(c){return c.origin === "legacy";});
@@ -1377,7 +1391,7 @@ function TylerBlackTracker() {
       }
       return next;
     });
-  }, [saveStatuses, pushUndo, logChange, persistField, trackerMode, statuses, cardDetails, quickSaveHand]);
+  }, [saveStatuses, pushUndo, logChange, persistField, trackerMode, statuses, cardDetails, quickSaveHand, saveCopyInventory]);
   const copySummaries = useMemo(function() {
     if (!isOwner || trackerMode !== "tb") return null;
     var result = {};
@@ -1998,8 +2012,8 @@ function TylerBlackTracker() {
                       return (
                       <button key={key} onClick={function(){setCardStatus(card.id, key);}}
                         title={"Manual mark: " + c.label}
-                        className={"rounded-full border flex items-center justify-center transition-all " + (displayStatus === key ? c.border + " " + c.bg : "border-gray-700 hover:border-gray-500")} style={{width:"clamp(16px,2.2vw,22px)",height:"clamp(16px,2.2vw,22px)"}}>
-                        <div className={"rounded-full " + (displayStatus === key ? c.dot : "bg-gray-700")} style={{width:"clamp(6px,0.8vw,10px)",height:"clamp(6px,0.8vw,10px)"}} />
+                        className={"rounded-full border flex items-center justify-center transition-all " + ((copySummary.owned && key === "owned" || copySummary.inTransit && key === "in_transit") ? c.border + " " + c.bg : "border-gray-700 hover:border-gray-500")} style={{width:"clamp(16px,2.2vw,22px)",height:"clamp(16px,2.2vw,22px)"}}>
+                        <div className={"rounded-full " + ((copySummary.owned && key === "owned" || copySummary.inTransit && key === "in_transit") ? c.dot : "bg-gray-700")} style={{width:"clamp(6px,0.8vw,10px)",height:"clamp(6px,0.8vw,10px)"}} />
                       </button>
                       );
                     })}
