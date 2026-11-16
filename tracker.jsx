@@ -8900,7 +8900,7 @@ function ChangelogPanel({ changelog }) {
     <div className="flex flex-wrap gap-1.5 items-center mb-2">
       <span className="text-xs font-bold text-white mr-2">Activity</span>
       <input aria-label="Search changes" value={search} onChange={function(e){setSearch(e.target.value);setShown(100);}}
-        placeholder="Find card / change" className="rounded bg-slate-900 border border-slate-700 px-2 py-1 text-xs min-w-28 flex-1" />
+        placeholder="Search loaded changes" className="rounded bg-slate-900 border border-slate-700 px-2 py-1 text-xs min-w-28 flex-1" />
       <select aria-label="Activity filter" value={filter} onChange={function(e){setFilter(e.target.value);setShown(100);}}
         className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs">
         <option value="all">All changes</option><option value="movement">Status + Qty + Location</option>
@@ -8920,8 +8920,8 @@ function ChangelogPanel({ changelog }) {
     </div>
     {error && <p role="status" className="text-xs text-amber-300 mb-2">{error}{!auditReady ? " · Local history shown." : ""}</p>}
     <div className="overflow-auto max-h-[67vh] border border-slate-800 rounded">
-      <table className="w-full min-w-[570px] table-fixed text-[10px] border-collapse">
-        <colgroup><col className="w-[102px]" /><col /><col className="w-[64px]" /><col className="w-[165px]" /><col className="w-[55px]" /></colgroup>
+      <table className="w-full min-w-[610px] table-fixed text-[10px] border-collapse">
+        <colgroup><col className="w-[102px]" /><col /><col className="w-[64px]" /><col className="w-[165px]" /><col className="w-[82px]" /></colgroup>
         <thead className="sticky top-0 z-10 bg-slate-900 text-slate-400">
           <tr className="border-b border-slate-700">
             <th className="px-1.5 py-1 text-left cursor-pointer" onClick={function(){setDesc(!desc);}}>When {desc ? "↓" : "↑"}</th>
