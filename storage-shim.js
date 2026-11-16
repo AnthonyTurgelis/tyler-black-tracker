@@ -24,6 +24,7 @@
     "tb-comc-overrides-v1",
     "tb-custom-cards-v1",
     "tb-catalog-meta-v1",
+    "tb-card-media-v1",
     "tb-linked-tweets-v1"
   ];
   var TEMPO_CLOUD_KEYS = [                                          // + TEMPO
@@ -49,6 +50,7 @@
     return key === "tb-custom-cards-v1" || key === "tb-catalog-meta-v1";
   }
   var catalogWrites = {};
+  var priceHistoryWrite = Promise.resolve();
   window.storageSyncIssues = {};
 
   function recordTime(record) {
@@ -158,7 +160,23 @@
   // ── State ──
   var supabase = null;
   var isOwner = false;
+  var privateGeneration = 0;
+  var privateOwnerId = null;
   var hydrated = false;
+
+  function updateSessionIdentity(user, force) {
+    var ownerId = user && user.id || null;
+    var changed = ownerId !== privateOwnerId;
+    if (!changed && !force) return;
+    privateOwnerId = ownerId;
+    privateGeneration++;
+    isOwner = !!ownerId;
+    if (!isOwner && window.MODE === "wnba") {
+      window.MODE = "tb";
+      window.dispatchEvent(new CustomEvent("modechange", { detail: { mode: "tb" } }));
+    }
+    window.dispatchEvent(new CustomEvent("authchange", { detail: { isOwner: isOwner, ownerId: ownerId, generation: privateGeneration } }));
+  }
 
   function initSupabase() {
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -167,6 +185,11 @@
     }
     if (window.supabase && window.supabase.createClient) {
       supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      if (supabase.auth.onAuthStateChange) supabase.auth.onAuthStateChange(function(event, session) {
+        // Supabase broadcasts account changes and sign-outs across browser tabs.
+        // Keep this callback synchronous; private requests perform their own verification.
+        updateSessionIdentity(session && session.user, event === "SIGNED_OUT");
+      });
       console.log("[storage] Supabase client ready");
     } else {
       console.warn("[storage] supabase-js not loaded — localStorage only mode");
@@ -176,15 +199,17 @@
   // ── Auth (exposed globally for the tracker UI) ──
   window.trackerAuth = {
     isOwner: function () { return isOwner; },
+    userId: function () { return privateOwnerId; },
 
     login: async function (email, password) {
       if (!supabase) return { error: "Supabase not configured" };
       try {
         var result = await supabase.auth.signInWithPassword({ email: email, password: password });
         if (result.error) return { error: result.error.message };
-        isOwner = true;
+        var sessionUser = result.data && (result.data.user || result.data.session && result.data.session.user);
+        if (!sessionUser) return { error: "The signed-in account could not be verified." };
+        updateSessionIdentity(sessionUser);
         console.log("[storage] Owner logged in");
-        window.dispatchEvent(new CustomEvent("authchange", { detail: { isOwner: true } })); // + TEMPO
         // Re-hydrate now that we have access to tempo keys                                  // + TEMPO
         hydrated = false;                                                                   // + TEMPO
         hydrateFromCloud();                                                                 // + TEMPO
@@ -196,14 +221,14 @@
 
     logout: async function () {
       if (!supabase) return;
+      // Clear private UI before waiting for the network sign-out response.
+      updateSessionIdentity(null, true);
       await supabase.auth.signOut();
-      isOwner = false;
       // If we were in WNBA mode, force back to TB on logout            // + TEMPO
       if (window.MODE === "wnba") {                                     // + TEMPO
         window.MODE = "tb";                                              // + TEMPO
         window.dispatchEvent(new CustomEvent("modechange", { detail: { mode: "tb" } })); // + TEMPO
       }                                                                  // + TEMPO
-      window.dispatchEvent(new CustomEvent("authchange", { detail: { isOwner: false } })); // + TEMPO
       console.log("[storage] Logged out");
     },
 
@@ -211,8 +236,9 @@
       if (!supabase) return false;
       try {
         var result = await supabase.auth.getSession();
-        if (result.data && result.data.session) {
-          isOwner = true;
+        var user = result.data && result.data.session && result.data.session.user;
+        updateSessionIdentity(user);
+        if (user) {
           console.log("[storage] Active session found — owner mode");
           return true;
         }
@@ -240,6 +266,12 @@
             }
             var jsonVal;
             try { jsonVal = JSON.parse(val); } catch (e) { jsonVal = val; }
+            if (key === "tb-price-history-v1") {
+              var priceResult = await writeToCloud(key, jsonVal);
+              if (priceResult.error) errors.push(key + ": " + priceResult.error); else migrated++;
+              continue;
+            }
+            if (key === "tb-card-media-v1") jsonVal = window.TrackerMedia.normalizePublicMedia(jsonVal);
             var result = await supabase.from(tableForKey(key)).upsert(  // + TEMPO routed
               { key: key, value: jsonVal },
               { onConflict: "key" }
@@ -256,6 +288,85 @@
         }
       }
       return { migrated: migrated, total: CLOUD_KEYS.length, errors: errors };
+    }
+  };
+
+  // Per-copy purchases are private. These methods never read/write the public
+  // collection_kv table and never cache purchase records in localStorage.
+  // The database also enforces auth.uid() = owner_id with RLS.
+  function privateSessionError() {
+    var error = new Error("Your session changed. Refresh your private inventory before saving.");
+    error.signedOut = true;
+    return error;
+  }
+  async function privateUser(generation, expectedOwnerId) {
+    if (!supabase) throw new Error("Cloud storage is unavailable.");
+    var result = await supabase.auth.getUser();
+    if (generation !== privateGeneration) throw privateSessionError();
+    var user = result.data && result.data.user;
+    if (result.error || !user) {
+      updateSessionIdentity(null);
+      var signInError = new Error("Sign in to access your private copy inventory.");
+      signInError.signedOut = true;
+      throw signInError;
+    }
+    if (user.id !== privateOwnerId) {
+      updateSessionIdentity(user);
+      throw privateSessionError();
+    }
+    if (expectedOwnerId && user.id !== expectedOwnerId) throw privateSessionError();
+    return user;
+  }
+  window.trackerPrivateStore = {
+    async load(key) {
+      var generation = privateGeneration;
+      try {
+        var user = await privateUser(generation);
+        var result = await supabase.from("collection_private_kv")
+          .select("value, revision, updated_at").eq("owner_id", user.id).eq("key", key).maybeSingle();
+        await privateUser(generation, user.id);
+        if (result.error) throw new Error(result.error.message || "Could not load the private inventory.");
+        return { ok: true, ownerId: user.id, value: result.data ? result.data.value : null, revision: result.data ? result.data.revision : null, updatedAt: result.data ? result.data.updated_at : null };
+      } catch (error) { return { ok: false, signedOut: !!error.signedOut, error: error.message || "Could not load the private inventory." }; }
+    },
+    async save(key, value, revision, expectedOwnerId) {
+      var generation = privateGeneration;
+      try {
+        if (!expectedOwnerId) throw new Error("Refresh your private inventory before saving.");
+        var user = await privateUser(generation, expectedOwnerId);
+        var query;
+        if (revision == null) {
+          query = supabase.from("collection_private_kv").insert({ owner_id: user.id, key: key, value: value });
+        } else {
+          if (!Number.isSafeInteger(Number(revision)) || Number(revision) < 1) throw new Error("Refresh your private inventory before saving.");
+          query = supabase.from("collection_private_kv").update({ value: value })
+            .eq("owner_id", user.id).eq("key", key).eq("revision", revision);
+        }
+        var result = await query.select("value, revision, updated_at").maybeSingle();
+        await privateUser(generation, expectedOwnerId);
+        if (result.error && result.error.code !== "23505") throw new Error(result.error.message || "Could not save the private inventory.");
+        if (result.error || !result.data) return { ok: false, conflict: true, error: "Your copy inventory changed in another session. Refresh it before saving; your newer cloud records were preserved." };
+        return { ok: true, ownerId: user.id, value: result.data.value, revision: result.data.revision, updatedAt: result.data.updated_at };
+      } catch (error) { return { ok: false, signedOut: !!error.signedOut, error: error.message || "Could not save the private inventory." }; }
+    }
+  };
+
+  // Public catalogue references have their own read path so Refresh can replace
+  // an old local cache. Copy photos are never supplied to this public store.
+  window.trackerMediaStore = {
+    async load() {
+      var key = "tb-card-media-v1", normalize = window.TrackerMedia.normalizePublicMedia;
+      var cached = normalize(null);
+      try { cached = normalize(localStorage.getItem(key)); } catch (_) {}
+      if (!supabase) return { ok: true, localOnly: true, value: cached };
+      try {
+        if (window.storageReady) await window.storageReady;
+        var result = await supabase.from("collection_kv").select("value").eq("key", key).maybeSingle();
+        if (result.error) throw new Error(result.error.message || "Reference photos could not be loaded.");
+        var value = normalize(result.data && result.data.value);
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+        return { ok: true, value: value };
+      } catch (error) { return { ok: false, value: cached, error: error.message || "Reference photos could not be loaded." }; }
     }
   };
 
@@ -289,6 +400,14 @@
         var row = rows[i];
         try {
           var cloudVal = typeof row.value === "string" ? row.value : JSON.stringify(row.value);
+          if (row.key === "tb-price-history-v1") {
+            localStorage.setItem(row.key, JSON.stringify(window.PriceHistoryUtils.merge(row.value, localStorage.getItem(row.key))));
+            continue;
+          }
+          if (row.key === "tb-card-media-v1") {
+            localStorage.setItem(row.key, JSON.stringify(window.TrackerMedia.normalizePublicMedia(row.value)));
+            continue;
+          }
           if (isCatalogKey(row.key)) {
             var mergedCatalog = mergeCatalog(row.key,
               decodeCatalog(row.key, localStorage.getItem(row.key)), decodeCatalog(row.key, row.value));
@@ -349,14 +468,42 @@
   }
 
   // ── Cloud write (awaited; errors are returned to the caller) ──
+  async function writePriceHistory(value) {
+    var key = "tb-price-history-v1", helper = window.PriceHistoryUtils;
+    for (var attempt = 0; attempt < 5; attempt++) {
+      if (!isOwner) throw new Error("Sign in to save price history.");
+      var current = await supabase.from("collection_kv").select("value, updated_at").eq("key", key).maybeSingle();
+      if (current.error) throw new Error(current.error.message || "Could not read current cloud price history.");
+      var merged = helper.merge(current.data && current.data.value, helper.merge(value, localStorage.getItem(key)));
+      var query;
+      if (current.data) {
+        if (!current.data.updated_at) throw new Error("Cloud price-history revision is missing. Refresh before saving.");
+        query = supabase.from("collection_kv").update({value:merged}).eq("key",key).eq("updated_at",current.data.updated_at);
+      } else query = supabase.from("collection_kv").insert({key:key,value:merged});
+      var saved = await query.select("value, updated_at").maybeSingle();
+      if (saved.error && saved.error.code !== "23505") throw new Error(saved.error.message || "Could not save price history.");
+      if (!saved.error && saved.data) {
+        var cached = helper.merge(saved.data.value, localStorage.getItem(key));
+        localStorage.setItem(key,JSON.stringify(cached));
+        delete window.storageSyncIssues[key];
+        window.dispatchEvent(new CustomEvent("price-history-saved",{detail:{key:key}}));
+        return {cloudSaved:true,value:JSON.stringify(cached)};
+      }
+      // Another tab won the timestamp comparison, or inserted the first row.
+      // Re-read and merge that winner before the next conditional write.
+    }
+    throw new Error("Price history kept changing in another session. Your local evidence is retained; refresh and try saving again.");
+  }
   async function writeToCloud(key, value) {
     if (!supabase) return { cloudSaved: false, error: "Cloud storage is unavailable" };
     if (!isOwner) return { cloudSaved: false, error: "Sign in to save changes to cloud" };
     var table = tableForKey(key);                                       // + TEMPO
     try {
+      if (key === "tb-price-history-v1") return await writePriceHistory(value);
       var jsonVal;
       try { jsonVal = typeof value === "string" ? JSON.parse(value) : value; }
       catch (e) { jsonVal = value; }
+      if (key === "tb-card-media-v1") jsonVal = window.TrackerMedia.normalizePublicMedia(jsonVal);
 
       if (isCatalogKey(key)) {
         var current = await supabase.from(table).select("value").eq("key", key).maybeSingle();
@@ -426,6 +573,8 @@
     },
 
     async set(key, value) {
+      if (key === "tb-card-media-v1") value = window.TrackerMedia.normalizePublicMedia(value);
+      if (key === "tb-price-history-v1") value = window.PriceHistoryUtils.merge(localStorage.getItem(key),value);
       if (typeof value !== "string") value = JSON.stringify(value);
 
       var localSaved = true;
@@ -435,7 +584,11 @@
 
       // Cloud keys: also persist to Supabase (awaited for restore reliability)
       var cloudResult = { cloudSaved: false, localOnly: true };
-      if (isCatalogKey(key) && !localSaved) {
+      if (key === "tb-price-history-v1") {
+        var pendingPrice = priceHistoryWrite.then(function(){return writeToCloud(key,value);});
+        priceHistoryWrite = pendingPrice;
+        cloudResult = await pendingPrice;
+      } else if (isCatalogKey(key) && !localSaved) {
         cloudResult = { cloudSaved: false, error: "Local catalogue could not be saved; cloud was not changed" };
       } else if (isCatalogKey(key)) {
         var previous = catalogWrites[key] || Promise.resolve();

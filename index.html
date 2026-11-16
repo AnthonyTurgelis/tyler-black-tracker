@@ -116,6 +116,10 @@
 
   <!-- Storage shim (Supabase + localStorage) — must be before tracker -->
   <script src="catalog-utils.js"></script>
+  <script src="market-utils.js"></script>
+  <script src="price-history-utils.js"></script>
+  <script src="media-utils.js"></script>
+  <script src="copy-utils.js"></script>
   <script src="storage-shim.js"></script>
 
   <!-- Auth UI logic -->
@@ -212,7 +216,10 @@
   <!-- The tracker (Babel transpiles JSX at runtime) -->
   <script src="tempo_data.js"></script>
   <script src="catalog-2026.js"></script>
+  <script src="catalog-corrections.js"></script>
   <script type="text/babel" data-presets="react" src="catalog-panel.jsx"></script>
+  <script type="text/babel" data-presets="react" src="media-panel.jsx"></script>
+  <script type="text/babel" data-presets="react" src="inventory-panel.jsx"></script>
   <script type="text/babel" data-presets="react" src="tracker.jsx"></script>
 
 </body>

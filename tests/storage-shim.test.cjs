@@ -57,6 +57,8 @@ async function boot({ local = {}, cloud = {}, owner = true } = {}) {
     }
   };
   const window = {
+    TrackerMedia: require('../media-utils.js'),
+    PriceHistoryUtils: require('../price-history-utils.js'),
     SUPABASE_URL: 'https://example.invalid', SUPABASE_ANON_KEY: 'test-publishable-key',
     supabase: { createClient: () => client },
     dispatchEvent: event => calls.events.push(event)
@@ -71,6 +73,22 @@ async function boot({ local = {}, cloud = {}, owner = true } = {}) {
   await window.storageReady;
   return { window, cache, database, calls, localStorage, read: key => JSON.parse(cache.get(key)) };
 }
+
+test('reference-photo refresh replaces a stale local media cache with sanitized current public references',async()=>{
+  const key='tb-card-media-v1',photo={id:'ref',url:'https://example.test/front.jpg',side:'front',kind:'reference'};
+  const h=await boot({local:{[key]:{version:1,cards:{7:{photos:[{...photo,url:'https://example.test/old.jpg'}]}}}},cloud:{[key]:{version:1,cards:{7:{photos:[photo,{...photo,id:'private',url:'https://example.test/private.jpg',kind:'own_photo'}],paidPrice:'private'}}}}});
+  const result=await h.window.trackerMediaStore.load();
+  assert.equal(result.ok,true);assert.equal(result.value.cards[7].photos.length,1);assert.equal(result.value.cards[7].photos[0].url,photo.url);
+  assert.equal(h.read(key).cards[7].paidPrice,undefined);assert.equal(h.calls.writes.length,0);
+});
+
+test('public media writes cannot carry own-copy photos or private purchase fields',async()=>{
+  const h=await boot();
+  await h.window.storage.set('tb-card-media-v1',{cards:{7:{photos:[{url:'https://example.test/own.jpg',kind:'own_photo',side:'front'},{url:'https://example.test/reference.jpg',kind:'reference',side:'front'}],sourceOrderId:'PRIVATE ORDER',paidPrice:'37.50'}}});
+  const saved=h.database.collection_kv['tb-card-media-v1'];
+  assert.equal(saved.cards[7].photos.length,1);assert.equal(saved.cards[7].photos[0].kind,'reference');
+  assert.equal(JSON.stringify(saved).includes('PRIVATE ORDER'),false);assert.equal(JSON.stringify(saved).includes('37.50'),false);assert.equal(JSON.stringify(saved).includes('own.jpg'),false);
+});
 
 test('hydration adds cloud customs without losing unsynced local additions or legacy IDs', async () => {
   const legacy = card(null, 'Unsigned proof');

@@ -84,6 +84,7 @@ function getLowestTargetPrice(cardId, targetByCardId) {
   var tgts = targetByCardId[cardId];
   var lowest = Infinity;
   for (var i = 0; i < tgts.length; i++) {
+    if (tgts[i].currency !== "USD" || tgts[i].priceKind !== "asking") continue;
     var p = parseFloat(tgts[i].watchPrice) || parseFloat(tgts[i].price) || Infinity;
     if (p < lowest) lowest = p;
   }
@@ -97,7 +98,9 @@ function getLowestScannerPrice(card) {
   if (!entries.length) return null;
   var lowest = Infinity;
   for (var i = 0; i < entries.length; i++) {
-    if (entries[i].price > 0 && entries[i].price < lowest) lowest = entries[i].price;
+    // This legacy numeric-only badge is explicitly USD asking prices. Other
+    // currencies, bids, paid prices and legacy unknowns stay in Prices.
+    if (entries[i].currency === "USD" && entries[i].kind === "asking" && entries[i].price > 0 && entries[i].price < lowest) lowest = entries[i].price;
   }
   return lowest === Infinity ? null : lowest;
 }
@@ -134,8 +137,17 @@ function useIsOwner() {
 }
 // ──────────────────────────────────────────────────────────────────────────
 
-function loadPriceHistory() { try { return JSON.parse(localStorage.getItem(tbk("price-history-v1")) || "{}"); } catch(e) { return {}; } }
-function savePriceHistory(obj) { var k = tbk("price-history-v1"); localStorage.setItem(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} PRICE_HISTORY = obj; }
+function loadPriceHistory() { try { var k=tbk("price-history-v1"), raw=JSON.parse(localStorage.getItem(k) || "{}"); return k === "tb-price-history-v1" ? window.PriceHistoryUtils.visible(raw) : raw; } catch(e) { return {}; } }
+function savePriceHistory(obj, changes) {
+  var k = tbk("price-history-v1"), value=obj;
+  if (k === "tb-price-history-v1") {
+    value=window.PriceHistoryUtils.merge(localStorage.getItem(k),obj);
+    if (changes) value=window.PriceHistoryUtils.applyChanges(value,changes.removals,changes.restores);
+  }
+  localStorage.setItem(k,JSON.stringify(value));
+  try { var pending=window.storage.set(k,JSON.stringify(value)); if(pending && pending.catch) pending.catch(function(error){window.dispatchEvent(new CustomEvent("storage-sync-issue",{detail:{key:k,error:error.message || "Price history could not be saved."}}));}); } catch(e) {}
+  PRICE_HISTORY = k === "tb-price-history-v1" ? window.PriceHistoryUtils.visible(value) : value;
+}
 var TCDB_FLAGS = {}; // Populated from localStorage -- flagged bad links
 var EBAY_BLOCKED = {}; // Populated from localStorage -- blocked eBay listings
 function loadEbayBlocked() { try { return JSON.parse(localStorage.getItem(tbk("ebay-blocked-v1")) || "{}"); } catch(e) { return {}; } }
@@ -183,11 +195,15 @@ function cardYear(card) {
 // - If cardDetails[id].qty is set explicitly, use that.
 // - Otherwise infer from status: owned/in_transit -> 1, else 0.
 // This keeps existing TB data working without migration.
-function getCardQty(cardDetails, statuses, cardId) {
+function getCardQty(cardDetails, statuses, cardId, copySummaries) {
+  if (copySummaries && copySummaries[cardId]) return copySummaries[cardId].total;
   var d = cardDetails && cardDetails[cardId];
   if (d && d.qty != null && d.qty !== "" && !isNaN(parseInt(d.qty))) return Math.max(0, parseInt(d.qty));
   var s = statuses && statuses[cardId];
   return (s === "owned" || s === "in_transit") ? 1 : 0;
+}
+function collectionCardState(cardId, statuses, cardDetails, copySummaries) {
+  return copySummaries && copySummaries[cardId] || window.CopyInventory.summarizeCard(null, cardId, statuses, cardDetails);
 }
 // COLOR_PALETTE: keywords found in card variants → background tint + text color.
 // Includes literal colors plus parallel-pattern names (ice, holo, mojo, etc).
@@ -336,6 +352,7 @@ function pt130Url(card) {
   return "https://130point.com/sales/?search=" + encodeURIComponent(q.trim());
 }
 let TB_ALL_CARDS = expandData(RAW_DATA).filter(function(c) { return c.id !== 1; }).concat(window.TB_CATALOG_UPDATES || []);
+if (window.applyTylerCatalogueCorrections) TB_ALL_CARDS = window.applyTylerCatalogueCorrections(TB_ALL_CARDS);
 let ALL_CARDS = TB_ALL_CARDS;
 // Swap card source on mode change. WNBA mode loads window.TEMPO_ALL_CARDS (without test card).
 if (typeof window !== "undefined") {
@@ -499,19 +516,104 @@ function TylerBlackTracker() {
   // WNBA Tempo mode subscription — fires re-render on modechange events from storage-shim
   var trackerMode = useTrackerMode();
   useEffect(function() {
+    function onAuth(event) { setIsOwner(!!event.detail.isOwner); }
+    window.addEventListener("authchange", onAuth);
     var iv = setInterval(function() {
       try {
         var o = !!(window.trackerAuth && window.trackerAuth.isOwner());
         setIsOwner(function(p) { return p === o ? p : o; });
       } catch(e) {}
     }, 1000);
-    return function() { clearInterval(iv); };
+    return function() { clearInterval(iv); window.removeEventListener("authchange", onAuth); };
   }, []);
   const [statuses, setStatuses] = useState({});
   const [cardDetails, setCardDetails] = useState({});
+  const [copyInventory, setCopyInventory] = useState(function() { return window.CopyInventory.normalizeState(null); });
+  const [publicMedia, setPublicMedia] = useState(function() { return window.TrackerMedia.normalizePublicMedia(null); });
+  const [mediaStorage, setMediaStorage] = useState({loading:false,error:""});
+  const refreshPublicMedia = useCallback(async function() {
+    setMediaStorage({loading:true,error:""});
+    try {
+      var result = window.trackerMediaStore ? await window.trackerMediaStore.load() : {ok:true,value:window.TrackerMedia.normalizePublicMedia(localStorage.getItem("tb-card-media-v1"))};
+      if (result.value) setPublicMedia(window.TrackerMedia.normalizePublicMedia(result.value));
+      setMediaStorage({loading:false,error:result.error || ""});
+      return result;
+    } catch (error) { setMediaStorage({loading:false,error:error.message}); return {ok:false,error:error.message}; }
+  }, []);
+  useEffect(function() { refreshPublicMedia(); }, [refreshPublicMedia]);
+  const [copyStorage, setCopyStorage] = useState({ ready: false, loading: false, error: "" });
+  const copyStateRef = useRef({ inventory: window.CopyInventory.normalizeState(null), revision: null, ownerId: null, ready: false, epoch: 0 });
+  const refreshCopyInventory = useCallback(async function() {
+    var epoch = ++copyStateRef.current.epoch;
+    copyStateRef.current.ready = false;
+    setCopyStorage({ ready: false, loading: true, error: "" });
+    var result = window.trackerPrivateStore ? await window.trackerPrivateStore.load("tb-copy-inventory-v1") : { ok: false, error: "Private storage is unavailable." };
+    if (epoch !== copyStateRef.current.epoch) return;
+    if (!result.ok || !result.ownerId) { setCopyStorage({ ready: false, loading: false, error: result.error || "Your account could not be verified. Refresh your private inventory." }); return result; }
+    if (window.trackerAuth.userId && window.trackerAuth.userId() !== result.ownerId) return { ok: false, error: "Your session changed. Refresh your private inventory." };
+    var value = window.CopyInventory.normalizeState(result.value);
+    copyStateRef.current = { inventory: value, revision: result.revision, ownerId: result.ownerId, ready: true, epoch: epoch };
+    setCopyInventory(value);
+    setCopyStorage({ ready: true, loading: false, error: "" });
+    return { ok: true };
+  }, []);
+  useEffect(function() {
+    function clearPrivateInventory() {
+      copyStateRef.current = { inventory: window.CopyInventory.normalizeState(null), revision: null, ownerId: null, ready: false, epoch: copyStateRef.current.epoch + 1 };
+      setCopyInventory(copyStateRef.current.inventory);
+      setCopyStorage({ ready: false, loading: false, error: "" });
+    }
+    function authChanged(event) {
+      clearPrivateInventory();
+      scannerStateRef.current = null;
+      setActiveTab(function(tab) { return ["copies", "comc_scanner", "collection"].includes(tab) ? "summary" : tab; });
+      if (event.detail.isOwner && trackerMode === "tb") refreshCopyInventory();
+    }
+    window.addEventListener("authchange", authChanged);
+    if (isOwner && trackerMode === "tb") refreshCopyInventory(); else clearPrivateInventory();
+    return function() { window.removeEventListener("authchange", authChanged); };
+  }, [isOwner, trackerMode, refreshCopyInventory]);
+  const saveCopyInventory = useCallback(async function(next) {
+    var current = copyStateRef.current, epoch = current.epoch;
+    if (!current.ready || !current.ownerId) return { ok: false, error: "Load your private copy inventory before saving." };
+    var result = await window.trackerPrivateStore.save("tb-copy-inventory-v1", next, current.revision, current.ownerId);
+    if (epoch !== copyStateRef.current.epoch) return { ok: false, error: "Your session changed. Sign in again." };
+    if (!result.ok) {
+      if (result.conflict || result.signedOut) copyStateRef.current.ready = false;
+      if (result.signedOut) {
+        copyStateRef.current.inventory = window.CopyInventory.normalizeState(null);
+        copyStateRef.current.ownerId = null;
+        setCopyInventory(copyStateRef.current.inventory);
+      }
+      setCopyStorage({ ready: !result.conflict && !result.signedOut, loading: false, error: result.error });
+      return result;
+    }
+    if (result.ownerId !== current.ownerId) return { ok: false, error: "Your session changed. Refresh your private inventory." };
+    var value = window.CopyInventory.normalizeState(result.value);
+    copyStateRef.current = { inventory: value, revision: result.revision, ownerId: result.ownerId, ready: true, epoch: epoch };
+    setCopyInventory(value);
+    setCopyStorage({ ready: true, loading: false, error: "" });
+    return { ok: true };
+  }, []);
+  const importPurchaseCopy = useCallback(async function(card, parsed) {
+    if (!copyStateRef.current.ready) return { ok: false, error: "Open Copies and sign in or refresh the private inventory before importing purchases." };
+    var code = window.TrackerMarket.currency(parsed.currency);
+    var result = window.CopyInventory.upsertPurchase(copyStateRef.current.inventory, {
+      cardId: card.id, source: String(parsed.source || parsed.seller || "manual").toLowerCase(),
+      sourceItemId: parsed.itemId || parsed.sourceItemId || "", sourceOrderId: parsed.orderNum || "", orderLineId: parsed.orderLineId || "",
+      quantity: parsed.quantity, unitIndex: parsed.unitIndex, requiresQuantityReview: parsed.requiresQuantityReview,
+      observationId: parsed.source === "Manual" ? parsed.observationId : "",
+      sourceUrl: window.TrackerMarket.safeUrl(parsed.itemUrl || parsed.url || parsed.sourceUrl), title: parsed.rawSet || "",
+      seller: parsed.seller || "", purchaseDate: parsed.date || "", paidPrice: window.TrackerMarket.amount(parsed.price),
+      currency: code === "UNKNOWN" ? "" : code, serial: parsed.serial || "", printRun: parsed.printRun || ""
+    }, { statuses: statuses, cardDetails: cardDetails, priceVerified: code !== "UNKNOWN", imageVerified: false });
+    if (!result.observationId) return { ok: false, error: result.reviewReason };
+    return result.changed ? saveCopyInventory(result.inventory) : { ok: true };
+  }, [statuses, cardDetails, saveCopyInventory]);
   const [filterYear, setFilterYear] = useState("all");
   const [filterProduct, setFilterProduct] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [copyCardId, setCopyCardId] = useState(null);
   const [catalogScope, setCatalogScope] = useState("checklist");
   // Collection: filter to a single WNBA player. null = all. Hidden/unused in TB mode.
   const [filterPlayer, setFilterPlayer] = useState(null);
@@ -1045,19 +1147,9 @@ function TylerBlackTracker() {
     persistField("statuses", newStatuses);
   }, [persistField]);
   const saveDetails = useCallback(async (newDetails) => {
-    // Only persist user edits that differ from PRESET_DETAILS
-    var userEdits = {};
-    Object.entries(newDetails).forEach(([id, d]) => {
-      var preset = PRESET_DETAILS[id];
-      var diff = {};
-      if (d.serial && (!preset || d.serial !== preset.s)) diff.serial = d.serial;
-      if (d.price && (!preset || d.price !== preset.p)) diff.price = d.price;
-      if (d.date && (!preset || d.date !== preset.d)) diff.date = d.date;
-      if (d.notes && (!preset || d.notes !== preset.n)) diff.notes = d.notes;
-      if (d.printRun && (!preset || d.printRun !== preset.pr)) diff.printRun = d.printRun;
-      if (d.qty != null && d.qty !== "") diff.qty = String(d.qty);
-      if (Object.keys(diff).length > 0) userEdits[id] = diff;
-    });
+    // Keep provenance and future detail fields, including explicit cleared
+    // preset values. The old whitelist silently discarded purchase metadata.
+    var userEdits = window.TrackerMarket.detailOverrides(newDetails, PRESET_DETAILS);
     persistField("details", userEdits);
     flashSave("");
   }, [persistField, flashSave]);
@@ -1238,6 +1330,9 @@ function TylerBlackTracker() {
   }, [saveDetails, pushUndo, logChange, persistField]);
   const setCardStatus = useCallback((cardId, status) => {
     if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
+    if (trackerMode === "tb" && window.CopyInventory.hasStoredCopies(copyStateRef.current.inventory, cardId)) {
+      setCopyCardId(cardId); setActiveTab("copies"); return false;
+    }
     setSessionChanges(prev => prev + 1);
     setStatuses(prev => {
       const prevStatus = prev[cardId] || "not_owned";
@@ -1255,12 +1350,28 @@ function TylerBlackTracker() {
       }
       return next;
     });
-  }, [saveStatuses, pushUndo, logChange, persistField]);
+  }, [saveStatuses, pushUndo, logChange, persistField, trackerMode]);
+  const copySummaries = useMemo(function() {
+    if (!isOwner || trackerMode !== "tb") return null;
+    var result = {};
+    ALL_CARDS.forEach(function(card) { result[card.id] = window.CopyInventory.summarizeCard(copyInventory, card.id, statuses, cardDetails); });
+    return result;
+  }, [copyInventory, statuses, cardDetails, isOwner, trackerMode, customEditVer]);
+  // Summary charts use one slice per variant; a mixed variant belongs to Owned.
+  // The Collection/Detailed views retain both independent flags for filtering.
+  const summaryStatuses = useMemo(function() {
+    if (!copySummaries) return statuses;
+    var result = { ...statuses };
+    Object.keys(copySummaries).forEach(function(id) { var view = copySummaries[id]; result[id] = view.owned ? "owned" : view.inTransit ? "in_transit" : "not_owned"; });
+    return result;
+  }, [statuses, copySummaries]);
+  const openCardCopies = useCallback(function(cardId) { setCopyCardId(cardId); setActiveTab("copies"); }, []);
   // adjustCardQty: change owned-copy count by `delta` (positive or negative). If qty
   // crosses 0->1, auto-set status to in_transit (newly-acquired). If crosses 1+ -> 0,
   // auto-set status to not_owned. Setting an explicit value uses setCardQty below.
   const adjustCardQty = useCallback((cardId, delta) => {
     if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
+    if (copySummaries && copySummaries[cardId] && copySummaries[cardId].managed) { openCardCopies(cardId); return; }
     var current = getCardQty(cardDetails, statuses, cardId);
     var next = Math.max(0, current + (delta || 0));
     if (next === current) return;
@@ -1271,9 +1382,10 @@ function TylerBlackTracker() {
     } else if (current >= 1 && next === 0 && (prevStatus === "owned" || prevStatus === "in_transit")) {
       setCardStatus(cardId, "not_owned");
     }
-  }, [cardDetails, statuses, updateCardDetail, setCardStatus]);
+  }, [cardDetails, statuses, updateCardDetail, setCardStatus, copySummaries, openCardCopies]);
   const setCardQty = useCallback((cardId, newQty) => {
     if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
+    if (copySummaries && copySummaries[cardId] && copySummaries[cardId].managed) { openCardCopies(cardId); return; }
     var current = getCardQty(cardDetails, statuses, cardId);
     var n = Math.max(0, parseInt(newQty) || 0);
     if (n === current) return;
@@ -1284,7 +1396,7 @@ function TylerBlackTracker() {
     } else if (current >= 1 && n === 0 && (prevStatus === "owned" || prevStatus === "in_transit")) {
       setCardStatus(cardId, "not_owned");
     }
-  }, [cardDetails, statuses, updateCardDetail, setCardStatus]);
+  }, [cardDetails, statuses, updateCardDetail, setCardStatus, copySummaries, openCardCopies]);
   const toggleStatus = useCallback((cardId) => {
     setSessionChanges(prev => prev + 1);
     setStatuses(prev => {
@@ -1320,8 +1432,10 @@ function TylerBlackTracker() {
     });
   }, [pushUndo, logChange, persistField]);
   const stats = useMemo(() => {
-    let owned = 0, inTransit = 0, forSale = 0, notOwned = 0, owned1of1 = 0, total1of1 = 0, totalSpent = 0;
+    let forSale = 0, owned1of1 = 0, total1of1 = 0, totalSpent = 0;
     var visibleTotal = 0;
+    var recordedCosts = [];
+    var collectionViews = [];
     ALL_CARDS.forEach(card => {
       if (HIDDEN_DUPES.has(card.id)) return;
       if (card.product.startsWith("TEST")) return;
@@ -1329,23 +1443,15 @@ function TylerBlackTracker() {
       visibleTotal++;
       const s = statuses[card.id] || "not_owned";
       const d = cardDetails[card.id] || {};
+      const view = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+      collectionViews.push(view);
       const is1of1 = String(card.copies) === "1";
       if (is1of1) total1of1++;
-      if (s === "owned") {
-        owned++;
-        if (is1of1) owned1of1++;
-      }
-      else if (s === "in_transit") {
-        inTransit++;
-        if (is1of1) owned1of1++;
-      }
-      else {
-        notOwned++;
-      }
-      var qty = parseInt(d.qty) || 1;
-      if (qty > 1 && (s === "owned" || s === "in_transit")) forSale++;
-      if (forSaleFlags[card.id] && (s === "owned" || s === "in_transit") && qty <= 1) forSale++;
+      if (view.acquired && is1of1) owned1of1++;
+      var legacySale = forSaleFlags[card.id] || !view.managed && (parseInt(d.qty) || 1) > 1;
+      if (window.CopyInventory.matchesStatus(view, "for_sale", legacySale)) forSale++;
       if ((s === "owned" || s === "in_transit") && d.price) {
+        recordedCosts.push({price: d.price, currency: d.currency});
         var pv = parseFloat(String(d.price).replace(/^\$/, "")) || 0;
         if (pv > 0) totalSpent += pv;
       }
@@ -1355,8 +1461,8 @@ function TylerBlackTracker() {
     const dupeComc = DUPES.filter(d => d.type === "comc").length;
     const notSynced = needsSync.size;
     const notOwned1of1 = total1of1 - owned1of1;
-    return { total: visibleTotal, owned, inTransit, notOwned, owned1of1, total1of1, notOwned1of1, forSale, dupeTransit, dupeSale, dupeComc, notSynced, totalSpent };
-  }, [statuses, cardDetails, forSaleFlags, customEditVer, needsSync]);
+    return { ...window.CopyInventory.countCards(collectionViews), owned1of1, total1of1, notOwned1of1, forSale, dupeTransit, dupeSale, dupeComc, notSynced, totalSpent, recordedCosts: window.TrackerMarket.summarizeAmounts(recordedCosts) };
+  }, [statuses, cardDetails, copySummaries, forSaleFlags, customEditVer, needsSync]);
   // Smart filters: each dropdown only shows options that are still valid given the OTHER active filters.
   // years respects player+product (so picking a player narrows the year dropdown to that player's cards)
   const years = useMemo(() => {
@@ -1389,21 +1495,21 @@ function TylerBlackTracker() {
       if (HIDDEN_DUPES.has(card.id)) return false;
       if (!matchesCatalogScope(card, catalogScope)) return false;
       const cardStatus = statuses[card.id] || "not_owned";
+      const view = collectionCardState(card.id, statuses, cardDetails, copySummaries);
       if (filterYear !== "all" && cardYear(card) !== filterYear) return false;
       if (filterPlayer && card.player !== filterPlayer) return false;
       if (filterColor && !extractColors(card.cardSet).includes(filterColor)) return false;
       if (filterProduct !== "all" && card.product !== filterProduct) return false;
       if (cn && card.cardNumber !== cn) return false;
-      if (filterStatus === "acquired" && cardStatus !== "owned" && cardStatus !== "in_transit") return false;
-      else if (filterStatus === "for_sale") { var qtyVal = parseInt((cardDetails[card.id] || {}).qty) || 1; if (!(forSaleFlags[card.id] || qtyVal > 1) || (cardStatus !== "owned" && cardStatus !== "in_transit")) return false; }
-      else if (filterStatus !== "all" && filterStatus !== "acquired" && cardStatus !== filterStatus) return false;
+      var legacySale = forSaleFlags[card.id] || !view.managed && (parseInt((cardDetails[card.id] || {}).qty) || 1) > 1;
+      if (!window.CopyInventory.matchesStatus(view, filterStatus, legacySale)) return false;
       if (s === "tcdb:flagged") { if (!tcdbFlags[card.id]) return false; }
       else if (s === "tcdb:fixed") { if (!tcdbFixes[card.id]) return false; }
       else if (s === "tcdb:nolink") { if (TCDB_LINKS[card.id] || tcdbFixes[card.id]) return false; }
       else if (s && !card.product.toLowerCase().includes(s) && !card.cardSet.toLowerCase().includes(s) && !card.cardNumber.toLowerCase().includes(s)) return false;
       return true;
     });
-  }, [statuses, cardDetails, forSaleFlags, tcdbFlags, tcdbFixes, filterYear, filterProduct, filterCardNum, filterStatus, search, filterPlayer, filterColor, catalogScope, customEditVer]);
+  }, [statuses, cardDetails, copySummaries, forSaleFlags, tcdbFlags, tcdbFixes, filterYear, filterProduct, filterCardNum, filterStatus, search, filterPlayer, filterColor, catalogScope, customEditVer]);
   const totalPages = Math.ceil(filtered.length / pageSize);
   const pageCards = filtered.slice(page * pageSize, (page + 1) * pageSize);
   useEffect(() => { setPage(0); }, [filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer, filterColor, catalogScope, customEditVer]);
@@ -1509,12 +1615,14 @@ function TylerBlackTracker() {
   }
   if (loading) return <div className="h-screen bg-gray-950 text-white flex items-center justify-center"><div className="text-lg font-light tracking-wide text-gray-400">Loading collection...</div></div>;
   const pct = stats.total ? (stats.owned / stats.total * 100).toFixed(1) : 0;
-  const pctWithTransit = stats.total ? ((stats.owned + stats.inTransit) / stats.total * 100).toFixed(1) : 0;
-  const acquired = stats.owned + stats.inTransit;
+  const pctWithTransit = stats.total ? (stats.acquired / stats.total * 100).toFixed(1) : 0;
+  const acquired = stats.acquired;
   const needRegular = stats.notOwned - stats.notOwned1of1;
   const TABS = [
     {id:"collection",label:"Collection",color:"yellow",ownerOnly:true},
     {id:"catalog",label:"Catalogue",color:"purple",tbOnly:true},
+    {id:"gallery",label:"Gallery",color:"amber",tbOnly:true},
+    {id:"copies",label:"Copies",color:"cyan",tbOnly:true,ownerOnly:true},
     {id:"lookup",label:"Lookup",color:"purple"},
     {id:"detailed",label:"Detailed",color:"emerald"},
     {id:"summary",label:"Summary",color:"cyan"},
@@ -1597,7 +1705,7 @@ function TylerBlackTracker() {
           {stats.totalSpent > 0 && !hidePrices && (<>
             <span style={{color:"#2a3f5f"}}>|</span>
             <span className="flex-shrink-0" style={{fontSize:"clamp(9px,1.1vw,11px)"}}>
-              <span className="font-bold" style={{color:"#7dd87d"}}>${stats.totalSpent.toFixed(0)}</span><span style={{color:"#7a8ba8"}} className="ml-0.5">spent</span>
+              <span className="font-bold" style={{color:"#7dd87d"}}>{window.TrackerMarket.formatTotals(stats.recordedCosts)}</span><span style={{color:"#7a8ba8"}} className="ml-0.5">recorded costs</span>
             </span>
           </>)}
           <span style={{color:"#2a3f5f"}}>|</span>
@@ -1657,7 +1765,7 @@ function TylerBlackTracker() {
           {TABS.map(function(t) {
             var active = activeTab === t.id;
             return (
-              <button key={t.id} onClick={function(){ setActiveTab(t.id); }} className={"whitespace-nowrap border-b-2 font-medium transition-colors " + (active ? (tabColorMap[t.color] || "") : "border-transparent text-gray-400 hover:text-yellow-200")} style={{padding:"clamp(1px,0.2vw,3px) clamp(4px,0.7vw,10px)",fontSize:"clamp(9px,1.2vw,12px)"}}>
+              <button key={t.id} onClick={function(){ if (t.id === "copies") setCopyCardId(null); setActiveTab(t.id); }} className={"whitespace-nowrap border-b-2 font-medium transition-colors " + (active ? (tabColorMap[t.color] || "") : "border-transparent text-gray-400 hover:text-yellow-200")} style={{padding:"clamp(1px,0.2vw,3px) clamp(4px,0.7vw,10px)",fontSize:"clamp(9px,1.2vw,12px)"}}>
                 {t.label}{t.badge > 0 ? <span className={"ml-1 px-1 rounded-full " + (active ? (badgeActiveMap[t.color] || "bg-gray-400 text-gray-900") : (badgeInactiveMap[t.color] || "bg-gray-700 text-gray-300"))} style={{fontSize:"clamp(8px,0.9vw,10px)"}}>{t.badge}</span> : null}
               </button>
             );
@@ -1804,19 +1912,22 @@ function TylerBlackTracker() {
         <div className="flex-1 overflow-y-auto min-h-0 space-y-px">
           {pageCards.map(function(card, rowIdx) {
             var status = statuses[card.id] || "not_owned";
-            var cfg = STATUS_CONFIG[status];
             var details = cardDetails[card.id] || {};
             var isExpanded = expandedCard === card.id;
+            var copySummary = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+            var displayStatus = copySummary.owned ? "owned" : copySummary.inTransit ? "in_transit" : status;
+            var cfg = STATUS_CONFIG[displayStatus];
+            var copyLocations = copySummary ? Object.keys(copySummary.locations).filter(function(location) { return location !== "unknown" && copySummary.locations[location] > 0; }).map(function(location) { return window.CopyInventory.LOCATIONS[location] + " " + copySummary.locations[location]; }).join(" · ") : "";
             // Alternating row shading. Status owned/transit gets its color tint as background;
             // not-owned alternates between light and dark gray for visual line tracking.
             var altBg = rowIdx % 2 === 0 ? "bg-gray-950/50" : "bg-gray-900/30";
-            var rowBg = status === "owned" ? "bg-green-950/30 border-l-2 border-l-green-600" : status === "in_transit" ? "bg-emerald-950/30 border-l-2 border-l-emerald-400" : (altBg + " border-l-2 border-l-gray-800");
+            var rowBg = displayStatus === "owned" ? "bg-green-950/30 border-l-2 border-l-green-600" : displayStatus === "in_transit" ? "bg-emerald-950/30 border-l-2 border-l-emerald-400" : (altBg + " border-l-2 border-l-gray-800");
             var isFocused = focusIdx === pageCards.indexOf(card);
             // Extract color keywords for cell tinting
             var cardSetColors = extractColors(card.cardSet);
             var primaryColor = cardSetColors.length > 0 ? COLOR_PALETTE[cardSetColors[0]] : null;
             return (
-              <div key={card.id} data-focus-idx={pageCards.indexOf(card)} className={"rounded-sm overflow-hidden " + rowBg + (isFocused ? " ring-1 ring-yellow-400/70 bg-yellow-950/20" : "")}>
+              <div key={card.id} data-card-id={card.id} data-focus-idx={pageCards.indexOf(card)} className={"rounded-sm overflow-hidden " + rowBg + (isFocused ? " ring-1 ring-yellow-400/70 bg-yellow-950/20" : "")}>
                 <div className="flex items-center gap-1 cursor-pointer" style={{padding:"clamp(1px,0.2vw,3px) clamp(3px,0.5vw,8px)"}} onClick={function(){setExpandedCard(isExpanded ? null : card.id);}}>
                   <div className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + cfg.dot} />
                   {/* WNBA-only: player name as a colored pill so user instantly sees whose card this is */}
@@ -1836,13 +1947,17 @@ function TylerBlackTracker() {
                     {(card.copies || (details.printRun && details.printRun !== "?")) ? <span className="text-yellow-400 font-black whitespace-nowrap" style={{fontSize:"clamp(9px,1vw,12px)"}}>/{details.printRun && details.printRun !== "?" ? details.printRun : card.copies}</span> : null}
                     {isMissingSN(card, cardDetails) && <span className="text-orange-400 font-bold text-[8px] whitespace-nowrap ml-0.5" title="SN but print run unknown">SN?</span>}
                     {details.serial ? <span className="text-yellow-300 font-black whitespace-nowrap" style={{fontSize:"clamp(9px,1vw,12px)"}}>{"#" + details.serial}</span> : null}
+                    {copyLocations && <span className="text-cyan-300 text-[8px] truncate" title={copyLocations}>{copyLocations}</span>}
+                    {copySummary.managed && copySummary.owned && <span className="rounded bg-green-950 px-1 text-green-300 text-[8px] whitespace-nowrap">Owned</span>}
+                    {copySummary.managed && copySummary.inTransit && <span className="rounded bg-emerald-950 px-1 text-emerald-300 text-[8px] whitespace-nowrap">In Transit</span>}
                     {needsSync.has(card.id) ? <span className="text-pink-500">!</span> : null}
                   </div>
                   <span className="text-gray-500 truncate hidden sm:inline flex-shrink min-w-0" style={{fontSize:"clamp(8px,0.9vw,10px)",maxWidth:"clamp(80px,12vw,200px)"}}>{card.product.slice(5)}</span>
                   {/* Inline qty +/- controls. Click +/- to adjust without expanding the row. */}
                   <div className="flex items-center gap-0.5 flex-shrink-0" onClick={function(e){e.stopPropagation();}}>
                     {(function() {
-                      var qty = getCardQty(cardDetails, statuses, card.id);
+                      var qty = getCardQty(cardDetails, statuses, card.id, copySummaries);
+                      if (copySummary.managed) return <button onClick={function(){ openCardCopies(card.id); }} className="rounded border border-cyan-800 px-1 text-cyan-300 text-[9px] font-bold" title="Review individual copies and their locations">{qty} {qty === 1 ? "copy" : "copies"}</button>;
                       return <React.Fragment>
                         <button onClick={function(){ adjustCardQty(card.id, -1); }} className="bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white font-bold leading-none px-1" style={{fontSize:"clamp(9px,1vw,11px)",minWidth:"14px"}} title={qty <= 1 ? "Remove (sets not owned)" : "-1 copy"}>-</button>
                         <span className={"font-black tabular-nums " + (qty === 0 ? "text-gray-600" : qty > 1 ? "text-green-400" : "text-cyan-300")} style={{fontSize:"clamp(9px,1vw,11px)",minWidth:"12px",textAlign:"center"}}>{qty}</span>
@@ -1852,11 +1967,11 @@ function TylerBlackTracker() {
                     })()}
                   </div>
                   <div className="flex gap-0.5 flex-shrink-0" onClick={function(e){e.stopPropagation();}}>
-                    {PRIMARY_STATUSES.map(function(key) {
+                    {copySummary.managed ? <button onClick={function(){openCardCopies(card.id);}} className="rounded border border-cyan-800 px-2 py-1 text-[9px] text-cyan-300" title="Change the location or status of an individual copy">Edit locations</button> : PRIMARY_STATUSES.map(function(key) {
                       var c = STATUS_CONFIG[key];
                       return (
                       <button key={key} onClick={function(){setCardStatus(card.id, key);}}
-                        title={c.label}
+                        title={"Manual mark: " + c.label}
                         className={"rounded-full border flex items-center justify-center transition-all " + (status === key ? c.border + " " + c.bg : "border-gray-700 hover:border-gray-500")} style={{width:"clamp(16px,2.2vw,22px)",height:"clamp(16px,2.2vw,22px)"}}>
                         <div className={"rounded-full " + (status === key ? c.dot : "bg-gray-700")} style={{width:"clamp(6px,0.8vw,10px)",height:"clamp(6px,0.8vw,10px)"}} />
                       </button>
@@ -1894,7 +2009,7 @@ function TylerBlackTracker() {
                       <label className="text-gray-600" style={{fontSize:"clamp(7px,0.8vw,9px)"}}>Notes</label>
                       <input type="text" value={details.notes || ""} onChange={function(e){updateCardDetail(card.id, "notes", e.target.value);}} placeholder="..." className="w-full bg-gray-950 border border-gray-700 rounded px-1.5 py-0.5" />
                     </div>
-                    {(statuses[card.id] === "owned" || statuses[card.id] === "in_transit") && <div>
+                    {copySummary.managed ? <div><label className="text-gray-600 text-[9px]">Physical copies</label><button onClick={function(){ openCardCopies(card.id); }} className="block rounded border border-cyan-800 px-2 py-1 text-cyan-300">Review {copySummary.total} counted {copySummary.total === 1 ? "copy" : "copies"}</button></div> : (statuses[card.id] === "owned" || statuses[card.id] === "in_transit") && <div>
                       <label className="text-gray-600" style={{fontSize:"clamp(7px,0.8vw,9px)"}}>Qty {parseInt(details.qty || "1") > 1 && <span className="text-pink-400">(extra for sale)</span>}</label>
                       <div className="flex items-center gap-1">
                         <button onClick={function(){var q=Math.max(1,parseInt(details.qty||"1")-1); updateCardDetail(card.id,"qty",String(q));}} className="bg-gray-800 border border-gray-700 rounded w-6 h-6 text-gray-400 hover:text-white hover:bg-gray-700 font-bold text-sm flex items-center justify-center">-</button>
@@ -1971,7 +2086,7 @@ function TylerBlackTracker() {
         ) : activeTab === "tweets" ? (
           <LinkedTweetsPanel isOwner={isOwner} />
         ) : activeTab === "comc_scanner" ? (
-          <COMCScannerPanel cards={ALL_CARDS} statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} needsSync={needsSync} setDetailedCardId={setDetailedCardId} setActiveTab={setActiveTab} persistedState={scannerStateRef.current} onStateChange={function(s) { scannerStateRef.current = s; }} editCustomCardById={editCustomCardById} />
+          <COMCScannerPanel cards={ALL_CARDS} statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} importPurchaseCopy={importPurchaseCopy} needsSync={needsSync} setDetailedCardId={setDetailedCardId} setActiveTab={setActiveTab} persistedState={scannerStateRef.current} onStateChange={function(s) { scannerStateRef.current = s; }} editCustomCardById={editCustomCardById} />
         ) : activeTab === "targets" ? (
           <TargetsPanel cards={ALL_CARDS} statuses={statuses} setCardStatus={setCardStatus} updateCardDetail={updateCardDetail} setDetailedCardId={setDetailedCardId} setActiveTab={setActiveTab} initialCardFilter={targetCardFilter} setTargetCardFilter={setTargetCardFilter} />
         ) : activeTab === "prices" ? (
@@ -1983,13 +2098,17 @@ function TylerBlackTracker() {
         ) : activeTab === "cleanup" ? (
           <CleanupPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} hidePrices={hidePrices} />
         ) : activeTab === "detailed" ? (
-          <DetailedPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} needsSync={needsSync} initialSnFilter={detailedSnFilter} initialStatusFilter={detailedStatusFilter} initialCardId={detailedCardId} setDetailedCardId={setDetailedCardId} initialProductFilter={detailedProductFilter} setDetailedProductFilter={setDetailedProductFilter} initialCardNumFilter={detailedCardNumFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} editCustomCardById={editCustomCardById} customEditVer={customEditVer} targetByCardId={targetByCardId} setActiveTab={setActiveTab} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
+          <DetailedPanel statuses={statuses} copySummaries={copySummaries} openCardCopies={openCardCopies} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} needsSync={needsSync} initialSnFilter={detailedSnFilter} initialStatusFilter={detailedStatusFilter} initialCardId={detailedCardId} setDetailedCardId={setDetailedCardId} initialProductFilter={detailedProductFilter} setDetailedProductFilter={setDetailedProductFilter} initialCardNumFilter={detailedCardNumFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} editCustomCardById={editCustomCardById} customEditVer={customEditVer} targetByCardId={targetByCardId} setActiveTab={setActiveTab} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
+        ) : activeTab === "copies" && isOwner && trackerMode === "tb" ? (
+          <window.CopyInventoryPanel key={copyStateRef.current.ownerId || "signed-out"} initialCardId={copyCardId} cards={ALL_CARDS.filter(function(card) { return !HIDDEN_DUPES.has(card.id); })} statuses={statuses} cardDetails={cardDetails} inventory={copyInventory} publicMedia={publicMedia} onInventoryChange={saveCopyInventory} onRefresh={refreshCopyInventory} isOwner={isOwner} storageReady={copyStorage.ready} loading={copyStorage.loading} readOnlyReason={copyStorage.error} />
+        ) : activeTab === "gallery" && trackerMode === "tb" ? (
+          <window.CardGalleryPanel key={copyStateRef.current.ownerId || "public"} cards={ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id);})} statuses={statuses} cardDetails={cardDetails} inventory={isOwner ? copyInventory : null} publicMedia={publicMedia} isOwner={isOwner} onOpenCopies={isOwner ? openCardCopies : null} loading={mediaStorage.loading || isOwner && copyStorage.loading} loadError={mediaStorage.error} onRefresh={async function(){var results=await Promise.all([refreshPublicMedia(),isOwner ? refreshCopyInventory() : Promise.resolve({ok:true})]);return results.find(function(result){return result && result.ok === false;}) || {ok:true};}} />
         ) : activeTab === "catalog" && trackerMode === "tb" ? (
           <window.CardCatalogPanel cards={ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id);}).concat(isOwner ? loadCustomCards().filter(function(card){return card.archived;}) : [])} statuses={statuses} isOwner={isOwner} initialEditId={catalogEditId} onClearEdit={function(){setCatalogEditId(null);}} onSave={saveCatalogCard} onArchive={archiveCatalogCard} onRestore={restoreCatalogCard} onOpen={function(card){setDetailedCardId(card.id);setActiveTab("detailed");}} onStatusChange={setCardStatus} revision={customEditVer}/>
         ) : activeTab === "summary" ? (
-          <SummaryPanel statuses={statuses} setActiveTab={setActiveTab} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} />
+          <SummaryPanel statuses={summaryStatuses} setActiveTab={setActiveTab} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} />
         ) : activeTab === "lookup" ? (
-          <CardLookupPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} setCardQty={setCardQty} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} needsSync={needsSync} setActiveTab={setActiveTab} setDetailedProductFilter={setDetailedProductFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} setPricesSearchFilter={setPricesSearchFilter} superSearchMode={superSearchMode} targetByCardId={targetByCardId} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
+          <CardLookupPanel statuses={statuses} copySummaries={copySummaries} openCardCopies={openCardCopies} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} setCardQty={setCardQty} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} needsSync={needsSync} setActiveTab={setActiveTab} setDetailedProductFilter={setDetailedProductFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} setPricesSearchFilter={setPricesSearchFilter} superSearchMode={superSearchMode} targetByCardId={targetByCardId} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
         ) : null}
         </div>
         )}
@@ -2593,7 +2712,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
     </div>
   );
 }
-function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, setCardQty, forSaleFlags, toggleForSale, needsSync, setActiveTab, setDetailedProductFilter, setDetailedCardNumFilter, setDetailedStatusFilter, setDetailedSnFilter, setPricesSearchFilter, superSearchMode, targetByCardId, setTargetCardFilter, hidePrices }) {
+function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, setCardQty, forSaleFlags, toggleForSale, needsSync, setActiveTab, setDetailedProductFilter, setDetailedCardNumFilter, setDetailedStatusFilter, setDetailedSnFilter, setPricesSearchFilter, superSearchMode, targetByCardId, setTargetCardFilter, hidePrices }) {
   var trackerMode = useTrackerMode();
   var catalogRevision = useCatalogRevision();
   var [lookupScope, setLookupScope] = useState("checklist");
@@ -2862,9 +2981,10 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
                           {/* Inline qty +/- — works in any view, click doesn't select */}
                           <div className="flex items-center gap-0.5 flex-shrink-0" onClick={function(e){e.stopPropagation();}}>
                             {(function() {
-                              var qty = getCardQty(cardDetails, statuses, card.id);
+                              var qty = getCardQty(cardDetails, statuses, card.id, copySummaries);
+                              if (copySummaries && copySummaries[card.id] && copySummaries[card.id].managed) return <button onClick={function(){ openCardCopies(card.id); }} className="rounded border border-cyan-800 px-1 text-cyan-300 text-[9px]">{qty} copies</button>;
                               function adjust(delta) {
-                                var current = getCardQty(cardDetails, statuses, card.id);
+                                var current = getCardQty(cardDetails, statuses, card.id, copySummaries);
                                 var next = Math.max(0, current + delta);
                                 if (next === current) return;
                                 updateCardDetail(card.id, "qty", String(next));
@@ -2941,7 +3061,8 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
               <input type="text" value={d.notes || ""} onChange={function(e) { updateCardDetail(selectedCard.id, "notes", e.target.value); }} placeholder="..." className="flex-1 bg-gray-950 border border-gray-700 rounded px-1 py-0 text-white outline-none" />
             </div>
             {(function() {
-              var curQty = getCardQty(cardDetails, statuses, selectedCard.id);
+              var curQty = getCardQty(cardDetails, statuses, selectedCard.id, copySummaries);
+              if (copySummaries && copySummaries[selectedCard.id] && copySummaries[selectedCard.id].managed) return <button onClick={function(){ openCardCopies(selectedCard.id); }} className="rounded border border-cyan-800 px-2 py-1 text-cyan-300">Review {curQty} counted copies</button>;
               return <div className="flex items-center gap-1 col-span-2">
                 <span className="text-gray-500 w-10">Qty</span>
                 <button onClick={function(){ adjustCardQty(selectedCard.id, -1); }} className="bg-gray-800 border border-gray-700 rounded w-5 h-5 text-gray-400 hover:text-white hover:bg-gray-700 font-bold text-[10px] flex items-center justify-center" title={curQty <= 1 ? "Down to 0 (sets status to not owned)" : "Decrement quantity"}>-</button>
@@ -2979,7 +3100,7 @@ function CardLookupPanel({ statuses, cardDetails, updateCardDetail, setCardStatu
     </div>
   );
 }
-function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, needsSync, initialSnFilter, initialStatusFilter, initialCardId = null, setDetailedCardId, initialProductFilter = null, setDetailedProductFilter, initialCardNumFilter = null, setDetailedCardNumFilter, editCustomCardById, customEditVer, targetByCardId, setActiveTab, setTargetCardFilter, hidePrices }) {
+function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, needsSync, initialSnFilter, initialStatusFilter, initialCardId = null, setDetailedCardId, initialProductFilter = null, setDetailedProductFilter, initialCardNumFilter = null, setDetailedCardNumFilter, editCustomCardById, customEditVer, targetByCardId, setActiveTab, setTargetCardFilter, hidePrices }) {
   var [dFilter, setDFilter] = useState(initialStatusFilter || "all");
   var [dYear, setDYear] = useState("all");
   var [dProduct, setDProduct] = useState(initialProductFilter || "all");
@@ -3046,8 +3167,7 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
       var cardDetail = cardDetails[card.id] || {};
       
       // Status filter
-      if (dFilter === "acquired" && cs !== "owned" && cs !== "in_transit") return false;
-      if (dFilter !== "all" && dFilter !== "acquired" && cs !== dFilter) return false;
+      if (!window.CopyInventory.matchesStatus(collectionCardState(card.id, statuses, cardDetails, copySummaries), dFilter)) return false;
       
       // Year filter
       if (dYear !== "all" && !card.product.startsWith(dYear)) return false;
@@ -3085,7 +3205,7 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
       
       return true;
     });
-  }, [statuses, cardDetails, dFilter, dYear, dProduct, dSearch, dCardNum, dSnFilter, customEditVer, dScope, catalogRevision]);
+  }, [statuses, cardDetails, copySummaries, dFilter, dYear, dProduct, dSearch, dCardNum, dSnFilter, customEditVer, dScope, catalogRevision]);
   var sorted = useMemo(function() {
     if (!sortCol) return filtered;
     return [...filtered].sort(function(a, b) {
@@ -3106,8 +3226,8 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
         else { av = parseInt(a.copies) || 999999; bv = parseInt(b.copies) || 999999; }
       }
       else if (sortCol === "qty") {
-        av = getCardQty(cardDetails, statuses, a.id);
-        bv = getCardQty(cardDetails, statuses, b.id);
+        av = getCardQty(cardDetails, statuses, a.id, copySummaries);
+        bv = getCardQty(cardDetails, statuses, b.id, copySummaries);
       }
       else if (sortCol === "serial") { av = da.serial || ""; bv = db.serial || ""; }
       else if (sortCol === "price") { av = parseFloat((da.price || "0").replace(/[^0-9.]/g, "")) || 0; bv = parseFloat((db.price || "0").replace(/[^0-9.]/g, "")) || 0; }
@@ -3118,7 +3238,7 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
       if (av > bv) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
-  }, [filtered, sortCol, sortDir, statuses, cardDetails]);
+  }, [filtered, sortCol, sortDir, statuses, cardDetails, copySummaries]);
   var totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   var pageCards = sorted.slice(dPage * PAGE_SIZE, (dPage + 1) * PAGE_SIZE);
   useEffect(function() { setDPage(0); }, [dFilter, dYear, dProduct, dSearch, dCardNum, dSnFilter, sortCol, sortDir, dScope, catalogRevision]);
@@ -3153,6 +3273,8 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
     if (batchSelected.size === 0) return;
     setBatchBusy(true);
     var ids = Array.from(batchSelected);
+    var managedId = ids.find(function(id){return copySummaries && copySummaries[id] && copySummaries[id].managed;});
+    if (managedId) {setBatchBusy(false);openCardCopies(managedId);return;}
     var i = 0;
     function next() {
       if (i >= ids.length) { setBatchBusy(false); setBatchSelected(new Set()); return; }
@@ -3226,10 +3348,11 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
       )}
       {!hidePrices && (function() {
         var spentTotal = 0, spentCount = 0, needCount = 0, scannerTotal = 0, scannerCount = 0;
+        var recordedCosts = [];
         for (var si = 0; si < sorted.length; si++) {
           var sc = sorted[si], sd = cardDetails[sc.id] || {}, ss = statuses[sc.id] || "not_owned";
           var pp = parseFloat((sd.price || "").replace(/[$,]/g, ""));
-          if (pp > 0 && (ss === "owned" || ss === "in_transit")) { spentTotal += pp; spentCount++; }
+          if (pp > 0 && (ss === "owned" || ss === "in_transit")) { spentTotal += pp; spentCount++; recordedCosts.push({price: sd.price, currency: sd.currency}); }
           if (ss === "not_owned") {
             needCount++;
             var sp = getLowestScannerPrice(sc);
@@ -3238,8 +3361,8 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
         }
         if (spentCount === 0 && scannerCount === 0) return null;
         return <div className="flex gap-3 mb-1 flex-wrap items-center" style={{fontSize:"clamp(9px,1.1vw,11px)"}}>
-          {spentCount > 0 && <span className="font-bold px-2 py-0.5 rounded border" style={{color:"#FFC52F",background:"rgba(212,160,23,0.1)",borderColor:"rgba(212,160,23,0.3)"}}>{"💰 $" + spentTotal.toFixed(2) + " spent (" + spentCount + " cards)"}</span>}
-          {scannerCount > 0 && <span className="px-2 py-0.5 rounded border" style={{color:"#7abfff",background:"rgba(91,155,213,0.1)",borderColor:"rgba(91,155,213,0.3)"}}>{"🔍 " + scannerCount + "/" + needCount + " needed have scanner prices — $" + scannerTotal.toFixed(2) + " cheapest total"}</span>}
+          {spentCount > 0 && <span className="font-bold px-2 py-0.5 rounded border" style={{color:"#FFC52F",background:"rgba(212,160,23,0.1)",borderColor:"rgba(212,160,23,0.3)"}}>{"Recorded costs: " + window.TrackerMarket.formatTotals(window.TrackerMarket.summarizeAmounts(recordedCosts))}</span>}
+          {scannerCount > 0 && <span className="px-2 py-0.5 rounded border" style={{color:"#7abfff",background:"rgba(91,155,213,0.1)",borderColor:"rgba(91,155,213,0.3)"}}>{"🔍 " + scannerCount + "/" + needCount + " needed have recorded USD asking prices"}</span>}
         </div>;
       })()}
       <style>{"\
@@ -3266,15 +3389,17 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
           <tbody>
             {pageCards.map(function(card) {
               var s = statuses[card.id] || "not_owned";
-              var cfg = STATUS_CONFIG[s];
+              var copySummary = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+              var cfg = STATUS_CONFIG[copySummary.owned ? "owned" : copySummary.inTransit ? "in_transit" : s];
               var d = cardDetails[card.id] || {};
               return (
-                <tr key={card.id} className={"border-t border-gray-800 " + cfg.bg + (batchSelected.has(card.id) ? " ring-1 ring-purple-500/50" : "")}>
+                <tr key={card.id} data-card-id={card.id} className={"border-t border-gray-800 " + cfg.bg + (batchSelected.has(card.id) ? " ring-1 ring-purple-500/50" : "")}>
                   {batchMode && <td className="px-0.5 py-0.5"><input type="checkbox" checked={batchSelected.has(card.id)} onChange={function() { toggleBatchCard(card.id); }} className="accent-purple-500" /></td>}
                   <td className="px-0.5 py-0.5">
-                    <select value={s} onChange={function(e) { setCardStatus(card.id, e.target.value); }} className={"bg-transparent border border-gray-700 rounded px-0 py-0 " + (s === "owned" ? "text-green-300" : s === "in_transit" ? "text-emerald-300" : s === "for_sale" ? "text-pink-400" : "text-gray-400")} style={{fontSize: "9px", width:"4.5em"}}>
+                    {copySummary.managed ? <button onClick={function(){openCardCopies(card.id);}} className="rounded border border-cyan-800 px-1 py-0 text-[9px] text-cyan-300" title="Change the location or status of an individual copy">Edit copies</button> : <select value={s} onChange={function(e) { setCardStatus(card.id, e.target.value); }} className={"bg-transparent border border-gray-700 rounded px-0 py-0 " + (s === "owned" ? "text-green-300" : s === "in_transit" ? "text-emerald-300" : s === "for_sale" ? "text-pink-400" : "text-gray-400")} style={{fontSize: "9px", width:"4.5em"}}>
                       {PRIMARY_STATUSES.map(function(k) { return <option key={k} value={k}>{STATUS_CONFIG[k].label}</option>; })}
-                    </select>
+                    </select>}
+                    {copySummary.managed && <span className="block text-[8px] text-cyan-300">{[copySummary.owned && "Owned", copySummary.inTransit && "In Transit"].filter(Boolean).join(" + ")}</span>}
                   </td>
                   <td className="px-0.5 py-0.5 text-gray-300 truncate" style={{maxWidth:"clamp(80px,11vw,180px)", fontSize:"9px"}} title={card.product}>{card.product}</td>
                   <td className="px-0.5 py-0.5 text-white font-medium whitespace-nowrap">{card.cardNumber}</td>
@@ -3286,18 +3411,19 @@ function DetailedPanel({ statuses, cardDetails, updateCardDetail, setCardStatus,
                     var serialVal = dd.serial || "";
                     var hasSN = card.copies || isMissingSN(card, cardDetails);
                     var isMSN = isMissingSN(card, cardDetails);
-                    var qty = getCardQty(cardDetails, statuses, card.id);
+                    var qty = getCardQty(cardDetails, statuses, card.id, copySummaries);
                     return <span className="flex items-center gap-0.5">
                       {eff ? <span className="text-yellow-400 font-black" style={{fontSize:"11px"}}>{"/" + eff}</span> : isMSN ? <span className="text-orange-400 font-black text-[9px]">SN?</span> : <span className="text-gray-700">-</span>}
                       {hasSN && <input type="text" value={serialVal} onChange={function(e) { updateCardDetail(card.id, "serial", e.target.value); }} placeholder="#" className={"bg-transparent border-b font-black focus:border-yellow-400 w-8 outline-none " + (serialVal ? "text-yellow-300 border-yellow-700" : isMSN ? "text-gray-500 border-orange-700" : "text-gray-500 border-gray-700")} style={{fontSize: "11px"}} />}
                       {/* Inline qty controls — minus, count when >0, plus */}
-                      <button onClick={function(e){ e.stopPropagation(); adjustCardQty(card.id, -1); }} className="bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white font-bold leading-none ml-0.5 px-0.5" style={{fontSize:"10px",minWidth:"12px"}} title={qty <= 1 ? "0 = not owned" : "-1 copy"}>-</button>
+                      {copySummary.managed ? <button onClick={function(){ openCardCopies(card.id); }} className="rounded border border-cyan-800 px-1 text-cyan-300 text-[9px]" title="Review individual copies">{qty} copies</button> : <React.Fragment><button onClick={function(e){ e.stopPropagation(); adjustCardQty(card.id, -1); }} className="bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white font-bold leading-none ml-0.5 px-0.5" style={{fontSize:"10px",minWidth:"12px"}} title={qty <= 1 ? "0 = not owned" : "-1 copy"}>-</button>
                       <span className={"font-black " + (qty === 0 ? "text-gray-600" : qty > 1 ? "text-green-400" : "text-cyan-300")} style={{fontSize:"10px",minWidth:"10px",textAlign:"center"}}>{qty}</span>
                       <button onClick={function(e){ e.stopPropagation(); adjustCardQty(card.id, 1); }} className="bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white font-bold leading-none px-0.5" style={{fontSize:"10px",minWidth:"12px"}} title={qty === 0 ? "+1 (sets in-transit)" : "+1 copy"}>+</button>
                       {qty > 1 && <span className="text-green-400 font-black ml-0.5" style={{fontSize:"9px"}} title={(qty-1) + " extra copy" + (qty-1 > 1 ? "s" : "")}>{"+" + (qty-1)}</span>}
+                      </React.Fragment>}
                     </span>;
                   })()}</td>
-                  {!hidePrices && <td className="px-0.5 py-0.5"><input type="text" value={d.price ? displayPrice(d.price) : ""} onChange={function(e) { updateCardDetail(card.id, "price", formatPrice(e.target.value)); }} onBlur={function() { if (d.price) updateCardDetail(card.id, "price", displayPrice(d.price)); }} placeholder="-" className="bg-transparent border-b border-gray-700 focus:border-gray-400 w-12 text-white outline-none" style={{fontSize: "9px"}} />{(function() { var tp = getLowestTargetPrice(card.id, targetByCardId); return tp ? <span onClick={function() { setTargetCardFilter(card.id); setActiveTab("targets"); }} className="text-pink-400 font-bold cursor-pointer hover:text-pink-300 text-[7px] ml-0.5" title={"🎯 $" + tp.toFixed(2)}>{"🎯"}</span> : null; })()}{(function() { if (s !== "not_owned") return null; var sp = getLowestScannerPrice(card); return sp ? <span className="text-cyan-500 text-[7px] ml-0.5" title={"Cheapest: $" + sp.toFixed(2)}>{"🔍"}</span> : null; })()}</td>}
+                  {!hidePrices && <td className="px-0.5 py-0.5"><input type="text" value={d.price ? displayPrice(d.price) : ""} onChange={function(e) { updateCardDetail(card.id, "price", formatPrice(e.target.value)); }} onBlur={function() { if (d.price) updateCardDetail(card.id, "price", displayPrice(d.price)); }} placeholder="-" className="bg-transparent border-b border-gray-700 focus:border-gray-400 w-12 text-white outline-none" style={{fontSize: "9px"}} />{(function() { var tp = getLowestTargetPrice(card.id, targetByCardId); return tp ? <span onClick={function() { setTargetCardFilter(card.id); setActiveTab("targets"); }} className="text-pink-400 font-bold cursor-pointer hover:text-pink-300 text-[7px] ml-0.5" title={"🎯 $" + tp.toFixed(2)}>{"🎯"}</span> : null; })()}{(function() { if (s !== "not_owned") return null; var sp = getLowestScannerPrice(card); return sp ? <span className="text-cyan-500 text-[7px] ml-0.5" title={"Lowest recorded USD asking price: " + sp.toFixed(2)}>{"🔍"}</span> : null; })()}</td>}
                   <td className="dt-date px-0.5 py-0.5"><input type="date" value={d.date || ""} onChange={function(e) { updateCardDetail(card.id, "date", e.target.value); }} className="bg-transparent border-b border-gray-700 focus:border-gray-400 w-24 text-gray-400 outline-none" style={{fontSize: "9px"}} /></td>
                   <td className="dt-notes px-0.5 py-0.5"><input type="text" value={d.notes || ""} onChange={function(e) { updateCardDetail(card.id, "notes", e.target.value); }} placeholder="-" className="bg-transparent border-b border-gray-700 focus:border-gray-400 text-gray-500 outline-none" style={{fontSize: "9px", width:"clamp(40px,8vw,120px)"}} /></td>
                   {!hidePrices && <td className="dt-trend px-0 py-0.5"><Sparkline card={card} width={30} height={12} /></td>}
@@ -3887,7 +4013,10 @@ function COMCScannerPanel(props) {
   var _ri = useState(_ps.rawInput || ""), rawInput = _ri[0], setRawInput = _ri[1];
   var _pa = useState(_ps.parsed || []), parsed = _pa[0], setParsed = _pa[1];
   var _ap = useState(_ps.applied || {}), applied = _ap[0], setApplied = _ap[1];
+  var _im = useState(""), importMessage = _im[0], setImportMessage = _im[1];
+  var _ib = useState(false), importBusy = _ib[0], setImportBusy = _ib[1];
   var _mo = useState(_ps.mode || "auto"), mode = _mo[0], setMode = _mo[1];
+  var _cur = useState(_ps.scanCurrency || "UNKNOWN"), scanCurrency = _cur[0], setScanCurrency = _cur[1];
   var _sf = useState(_ps.shopFilter || "need"), shopFilter = _sf[0], setShopFilter = _sf[1];
   var _pt130f = useState("all"), pt130Filter = _pt130f[0], setPt130Filter = _pt130f[1];
   var _stf = useState(_ps.scanTags || {auto:false, sn:false, graded:false}), scanTags = _stf[0], setScanTags = _stf[1];
@@ -3917,9 +4046,9 @@ function COMCScannerPanel(props) {
   // Save scanner state to parent ref on every meaningful change so it persists across tab switches
   useEffect(function() {
     if (onStateChange) {
-      onStateChange({ rawInput: rawInput, parsed: parsed, applied: applied, mode: mode, shopFilter: shopFilter, scanTags: scanTags, scanCardNo: scanCardNo, shopSort: shopSort, expanded: expanded, showInput: showInput });
+      onStateChange({ rawInput: rawInput, parsed: parsed, applied: applied, mode: mode, shopFilter: shopFilter, scanTags: scanTags, scanCardNo: scanCardNo, shopSort: shopSort, expanded: expanded, showInput: showInput, scanCurrency: scanCurrency });
     }
-  }, [rawInput, parsed, applied, mode, shopFilter, scanTags, scanCardNo, shopSort, expanded, showInput]);
+  }, [rawInput, parsed, applied, mode, shopFilter, scanTags, scanCardNo, shopSort, expanded, showInput, scanCurrency]);
 
   // --- COMC Persistent Match Overrides ---
   function loadComcOverrides() { try { return JSON.parse(localStorage.getItem(tbk("comc-overrides-v1")) || "{}"); } catch(e) { return {}; } }
@@ -3940,41 +4069,45 @@ function COMCScannerPanel(props) {
     return m;
   }, []);
 
-  // Record a single price entry. If batchPH is provided, writes to that object instead of localStorage.
-  function recordPrice(cardId, price, source, title, batchPH) {
-    if (!cardId || !price) return;
-    var numPrice = parseFloat(String(price).replace(/^\$/, "")) || 0;
-    if (numPrice <= 0) return;
+  function parsedCurrency(p) {
+    var code = window.TrackerMarket.currency(p.currency);
+    if (code === "UNKNOWN") code = window.TrackerMarket.detectCurrency(p.price);
+    return code === "UNKNOWN" ? scanCurrency : code;
+  }
+  function parsedPriceKind(p) {
+    if (p.recordType === "purchase") return "purchase";
+    return p._130pt && !p._130pt.forSale ? "sold" : p.listingType === "auction" ? "current_bid" : "asking";
+  }
+  function parsedMoney(p, value) { return window.TrackerMarket.formatMoney(value === undefined ? p.price : value, parsedCurrency(p)); }
+  function scanPriceTotals(items) {
+    return window.TrackerMarket.formatEvidenceTotals(items.map(function(item) { var p = item.parsed; return { price: p.totalPrice || p.price, currency: parsedCurrency(p), kind: parsedPriceKind(p) }; }));
+  }
+  function comparableListingKey(p, cardId) {
+    return cardId + "|" + parsedCurrency(p) + "|" + parsedPriceKind(p);
+  }
+  // Market observations retain their evidence. Private purchase prices belong
+  // in the copy inventory, never in this public market-history key.
+  function recordPrice(cardId, price, source, title, batchPH, evidence) {
+    var p = evidence || {};
+    if (!cardId || !price || p.recordType === "purchase") return;
     var card = CARD_BY_ID[cardId];
     var pk = card ? priceKey(card) : String(cardId);
-    // BLOCK: never record eBay/Whatnot prices for ambiguous variants OR 1/1 cards with "black" in variant
     if (source === "eBay" || source === "Whatnot") {
       if (AMBIGUOUS_PRICE_KEYS.has(pk) || AMBIGUOUS_CARD_IDS.has(cardId)) return;
-      if (card && card.copies === "1" && /\bblack\b/i.test(card.cardSet || "")) return;
+      if (card && String(card.copies) === "1" && /\bblack\b/i.test(card.cardSet || "")) return;
     }
+    var code = parsedCurrency(p);
+    var priceKind = parsedPriceKind(p);
     var ph = batchPH || loadPriceHistory();
-    var today = new Date().toISOString().split("T")[0];
-    if (!ph[pk]) ph[pk] = [];
-    // One entry per day per source
-    var existIdx = -1;
-    for (var ei = 0; ei < ph[pk].length; ei++) {
-      if (ph[pk][ei].date === today && ph[pk][ei].source === source) { existIdx = ei; break; }
-    }
-    if (existIdx >= 0) {
-      var existing = ph[pk][existIdx];
-      if (numPrice < existing.price) existing.price = numPrice;
-      existing.listings = (existing.listings || 1) + 1;
-      if (title) {
-        if (!existing.titles) existing.titles = [];
-        if (existing.titles.indexOf(title) === -1 && existing.titles.length < 5) existing.titles.push(title);
-      }
-    } else {
-      var entry = { price: numPrice, source: source || "unknown", date: today, listings: 1 };
-      if (title) entry.titles = [title];
-      ph[pk].push(entry);
-    }
-    if (ph[pk].length > 365) ph[pk] = ph[pk].slice(-365);
-    if (!batchPH) savePriceHistory(ph); // only save immediately if not batching
+    window.TrackerMarket.record(ph, pk, {
+      price: p.price || price, source: source, title: title, currency: code, kind: priceKind,
+      itemId: p.itemId || p.sourceItemId, itemUrl: p.itemUrl || p.url || p.sourceUrl,
+      marketplace: p.marketplace, eventDate: priceKind === "sold" ? p.date : "",
+      serial: p.serial, printRun: p.printRun,
+      shipping: p.shipping ? (p.shippingNum != null ? p.shippingNum : p.shipping) : null,
+      priceBasis: "item"
+    });
+    if (!batchPH) savePriceHistory(ph);
   }
   function saveComcOverrides(obj) { var k = tbk("comc-overrides-v1"); localStorage.setItem(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} COMC_OVERRIDES = obj; }
   var _cov = useState(function(){ var o = loadComcOverrides(); COMC_OVERRIDES = o; return o; });
@@ -3988,6 +4121,7 @@ function COMCScannerPanel(props) {
   var _tgt = useState(function(){ return loadTargets(); });
   var targets = _tgt[0], setTargets = _tgt[1];
   function addTarget(p, m, status) {
+    if (p.recordType === "purchase") { setImportMessage("Purchase receipts belong in your private copy inventory. Use Import matched purchases to save this receipt."); return; }
     var tgt = loadTargets();
     var key = "tgt_" + Date.now() + "_" + Math.random().toString(36).slice(2,6);
     var cardId = (m && m.card) ? m.card.id : null;
@@ -3996,7 +4130,9 @@ function COMCScannerPanel(props) {
     tgt[key] = {
       id: key, cardId: cardId, cardInfo: cardInfo,
       title: p.rawSet || "", price: p.price || "", seller: p.seller || "",
-      source: p.source || "", currency: p.currency || "USD",
+      source: p.source || (mode === "shop" ? "COMC" : mode),
+      currency: parsedCurrency(p), priceKind: parsedPriceKind(p),
+      itemId: p.itemId || "", itemUrl: window.TrackerMarket.safeUrl(p.itemUrl || p.url || p.sourceUrl),
       year: p.year || "", product: p.product || "", cardNo: p.cardNo || "",
       variant: p.variant || "", printRun: p.printRun || "", serial: p.serial || "",
       graded: p.graded || "", isAuto: !!p.isAuto,
@@ -4140,7 +4276,7 @@ function COMCScannerPanel(props) {
   function assignCandidate(origIdx, candidateCard) {
     // Save persistent override so this match survives repaste
     var item = parsed[origIdx];
-    if (item && item.parsed) {
+    if (item && item.parsed && item.parsed.recordType !== "purchase") {
       var ck = pinKey(item.parsed);
       var overrides = loadComcOverrides();
       overrides[ck] = candidateCard.id;
@@ -4174,9 +4310,9 @@ function COMCScannerPanel(props) {
         }
       }
       // Record current listing price under the correct (new) card
-      var listingPrice = item.parsed.totalPrice || item.parsed.price;
+      var listingPrice = item.parsed.price;
       if (listingPrice && candidateCard) {
-        recordPrice(candidateCard.id, listingPrice, item.parsed.source || (mode === "shop" ? "COMC" : mode === "ebay" ? "eBay" : mode === "sportlots" ? "SportLots" : mode === "whatnot" ? "Whatnot" : mode === "130pt" ? "130point" : "Unknown"), item.parsed.rawSet || item.raw || "");
+        recordPrice(candidateCard.id, listingPrice, item.parsed.source || (mode === "shop" ? "COMC" : mode === "ebay" ? "eBay" : mode === "sportlots" ? "SportLots" : mode === "whatnot" ? "Whatnot" : mode === "130pt" ? "130point" : "Unknown"), item.parsed.rawSet || item.raw || "", null, item.parsed);
       }
     }
     // Force the match to point to this card
@@ -4385,7 +4521,9 @@ function COMCScannerPanel(props) {
       date: (row["Date Sold"] || "").trim().slice(0, 10),
       seller: (row["Purchased From"] || "").trim(),
       rawSet: setName, description: (row["Description"] || "").trim(),
-      orderNum: ""
+      orderNum: "", source: "COMC", recordType: "purchase", currency: window.TrackerMarket.currency(row["Currency"]),
+      itemId: row["Item ID"] || row["ItemID"] || row["Item Id"] || row["COMC Item ID"] || "", itemUrl: row["Item URL"] || "",
+      quantity: row["Quantity Purchased"] || row["Quantity"] || row["Qty"] || "", unitIndex: row["Unit Index"] || ""
     };
   }
 
@@ -4656,6 +4794,13 @@ function COMCScannerPanel(props) {
     parsed.price = price;
     parsed.date = date;
     parsed.orderNum = orderNum;
+    parsed.recordType = "purchase";
+    parsed.itemUrl = window.TrackerMarket.safeUrl(parts[4]);
+    parsed.itemId = window.TrackerMarket.itemId("", parsed.itemUrl);
+    parsed.currency = window.TrackerMarket.currency(parts[5]);
+    if (parsed.currency === "UNKNOWN") parsed.currency = window.TrackerMarket.detectCurrency(parts[1]);
+    parsed.quantity = (parts[6] || "").trim();
+    parsed.unitIndex = (parts[7] || "").trim();
     return parsed;
   }
 
@@ -5956,6 +6101,8 @@ function COMCScannerPanel(props) {
 
   function detectMode(text) {
     if (!text) return "auto";
+    var header = text.split(/\r?\n/, 1)[0];
+    if (/\bSet Name\b/.test(header) && /\bCard No\b/.test(header) && /\bPurchase Price\b/.test(header)) return "csv";
     // TCDB collection paste: "Collection Summary" + "record(s)" or TCDB-specific patterns
     if ((text.indexOf("Collection Summary") !== -1 || text.indexOf("TCDb logo") !== -1) && text.indexOf("record(s)") !== -1) return "tcdb";
     // 130point: "Sold Via:" or For Sale section markers
@@ -6089,7 +6236,7 @@ function COMCScannerPanel(props) {
       var ptItems2 = parse130PointText(rawInput).concat(parse130PointForSale(rawInput));
       var ptResults2 = ptItems2.map(function(p) { var match = matchToCards(p); return { parsed: p, match: match, raw: p.rawSet }; });
       var ptBatch2 = loadPriceHistory();
-      for (var pt2i = 0; pt2i < ptResults2.length; pt2i++) { var pt2 = ptResults2[pt2i]; if (pt2.match && pt2.match.score >= 90 && pt2.parsed.price && !pt2.parsed._130pt.forSale) recordPrice(pt2.match.card.id, pt2.parsed.price, "130point", pt2.parsed.rawSet || "", ptBatch2); }
+      for (var pt2i = 0; pt2i < ptResults2.length; pt2i++) { var pt2 = ptResults2[pt2i]; if (pt2.match && pt2.match.score >= 90 && pt2.parsed.price && !pt2.parsed._130pt.forSale) recordPrice(pt2.match.card.id, pt2.parsed.price, "130point", pt2.parsed.rawSet || "", ptBatch2, pt2.parsed); }
       savePriceHistory(ptBatch2);
       ptResults2.sort(function(a, b) { var dA = (a.parsed._130pt && a.parsed._130pt.date) || ""; var dB = (b.parsed._130pt && b.parsed._130pt.date) || ""; return dB.localeCompare(dA); });
       setParsed(ptResults2);
@@ -6130,7 +6277,7 @@ function COMCScannerPanel(props) {
       for (var pri2 = 0; pri2 < results2.length; pri2++) {
         var prItem2 = results2[pri2];
         if (prItem2.match && prItem2.match.score >= 90 && prItem2.parsed.price) {
-          recordPrice(prItem2.match.card.id, prItem2.parsed.price, "eBay", prItem2.parsed.rawSet || "", batchPH2);
+          recordPrice(prItem2.match.card.id, prItem2.parsed.price, "eBay", prItem2.parsed.rawSet || "", batchPH2, prItem2.parsed);
         }
       }
       savePriceHistory(batchPH2);
@@ -6149,7 +6296,7 @@ function COMCScannerPanel(props) {
       for (var pri = 0; pri < shopResults.length; pri++) {
         var prItem = shopResults[pri];
         if (prItem.match && prItem.match.score >= 90 && prItem.parsed.price) {
-          recordPrice(prItem.match.card.id, prItem.parsed.price, "COMC", prItem.parsed.rawSet || prItem.raw || "", batchPH);
+          recordPrice(prItem.match.card.id, prItem.parsed.price, "COMC", prItem.parsed.rawSet || prItem.raw || "", batchPH, prItem.parsed);
         }
       }
       savePriceHistory(batchPH);
@@ -6220,18 +6367,19 @@ function COMCScannerPanel(props) {
           return { parsed: p, match: match, raw: line };
         });
       }
-      // Record eBay prices for matched cards (batched - one localStorage write)
-      var ebayBatchPH = loadPriceHistory();
-      for (var eri = 0; eri < results2.length; eri++) {
-        var erItem = results2[eri];
-        if (erItem.match && erItem.match.score >= 90 && erItem.parsed.price) {
-          recordPrice(erItem.match.card.id, erItem.parsed.totalPrice || erItem.parsed.price, "eBay", erItem.parsed.rawSet || erItem.raw || "", ebayBatchPH);
+      // Only public search results enter public market history and paste caches.
+      if (isSearchPage) {
+        var ebayBatchPH = loadPriceHistory();
+        for (var eri = 0; eri < results2.length; eri++) {
+          var erItem = results2[eri];
+          if (erItem.match && erItem.match.score >= 90 && erItem.parsed.price) {
+            recordPrice(erItem.match.card.id, erItem.parsed.price, "eBay", erItem.parsed.rawSet || erItem.raw || "", ebayBatchPH, erItem.parsed);
+          }
         }
+        savePriceHistory(ebayBatchPH);
       }
-      savePriceHistory(ebayBatchPH);
       setParsed(results2);
-      // Save last eBay paste for quick reload
-      try { localStorage.setItem(tbk("last-ebay-paste-v1"), rawInput); } catch(e) {}
+      try { if (isSearchPage) localStorage.setItem(tbk("last-ebay-paste-v1"), rawInput); else localStorage.removeItem(tbk("last-ebay-paste-v1")); } catch(e) {}
     } else if (effectiveMode === "sportlots") {
       var slItems = parseSportLotsText(rawInput);
       var slResults = slItems.map(function(p) {
@@ -6243,7 +6391,7 @@ function COMCScannerPanel(props) {
       for (var sli = 0; sli < slResults.length; sli++) {
         var slItem = slResults[sli];
         if (slItem.match && slItem.match.score >= 90 && slItem.parsed.price) {
-          recordPrice(slItem.match.card.id, slItem.parsed.price, "SportLots", slItem.parsed.rawSet || slItem.raw || "", slBatchPH);
+          recordPrice(slItem.match.card.id, slItem.parsed.price, "SportLots", slItem.parsed.rawSet || slItem.raw || "", slBatchPH, slItem.parsed);
         }
       }
       savePriceHistory(slBatchPH);
@@ -6277,7 +6425,7 @@ function COMCScannerPanel(props) {
       for (var wni = 0; wni < wnResults.length; wni++) {
         var wnItem = wnResults[wni];
         if (wnItem.match && wnItem.match.score >= 90 && wnItem.parsed.price) {
-          recordPrice(wnItem.match.card.id, wnItem.parsed.price, "Whatnot", wnItem.parsed.rawSet || wnItem.raw || "", wnBatchPH);
+          recordPrice(wnItem.match.card.id, wnItem.parsed.price, "Whatnot", wnItem.parsed.rawSet || wnItem.raw || "", wnBatchPH, wnItem.parsed);
         }
       }
       savePriceHistory(wnBatchPH);
@@ -6312,7 +6460,7 @@ function COMCScannerPanel(props) {
       for (var pti = 0; pti < ptResults.length; pti++) {
         var ptItem = ptResults[pti];
         if (ptItem.match && ptItem.match.score >= 90 && ptItem.parsed.price && !(ptItem.parsed._130pt && ptItem.parsed._130pt.forSale)) {
-          recordPrice(ptItem.match.card.id, ptItem.parsed.price, "130point", ptItem.parsed.rawSet || ptItem.raw || "", ptBatchPH);
+          recordPrice(ptItem.match.card.id, ptItem.parsed.price, "130point", ptItem.parsed.rawSet || ptItem.raw || "", ptBatchPH, ptItem.parsed);
         }
       }
       savePriceHistory(ptBatchPH);
@@ -6331,7 +6479,7 @@ function COMCScannerPanel(props) {
         cardNo: manualCardNo, cardNoClean: manualCardNo.replace(/\.\d+$/, ""),
         serial: manualSerial, price: manualPrice, date: manualDate,
         seller: manualSeller, rawSet: manualYear + " " + manualProduct + (manualVariant ? " - " + manualVariant : ""),
-        description: "Tyler Black", orderNum: ""
+        description: "Tyler Black", orderNum: "", recordType: "purchase", source: "Manual", currency: scanCurrency, observationId: "manual:" + Date.now()
       };
       var match = matchToCards(manualParsed);
       setParsed([{ parsed: manualParsed, match: match, raw: {} }]);
@@ -6340,62 +6488,45 @@ function COMCScannerPanel(props) {
     setShowInput(false);
   }
 
-  function applyMatch(idx) {
+  async function applyImport(idx, requestedStatus) {
     var item = parsed[idx];
-    if (!item || !item.match) return;
+    if (!item || !item.match) return false;
     var card = item.match.card;
-    var p = item.parsed;
-    setCardStatus(card.id, "owned");
-    if (p.price) updateCardDetail(card.id, "price", "$" + p.price.replace(/^\$/, ""));
-    if (p.date) updateCardDetail(card.id, "date", p.date);
-    if (p.serial) updateCardDetail(card.id, "serial", p.serial);
-    var noteText = p.source === "130point" ? "130pt" + (p._130pt && p._130pt.forSale ? " listing" : " sold") : p.seller === "eBay" ? "eBay" : p.seller === "SportLots" ? "SportLots" : "COMC from " + (p.seller || "unknown");
-    if (p.orderNum) noteText += " order:" + p.orderNum;
-    if (item.match.variantMismatch) noteText += " ⚠variant?";
-    updateCardDetail(card.id, "notes", noteText);
-    var next = Object.assign({}, applied);
-    next[idx] = true;
-    setApplied(next);
+    var p = Object.assign({}, item.parsed);
+    if (window.TrackerMarket.currency(p.currency) === "UNKNOWN") p.currency = scanCurrency;
+    if (p.recordType === "purchase") {
+      if (!props.importPurchaseCopy) { setImportMessage("Sign in to save this purchase in your private copy inventory."); return false; }
+      var result = await props.importPurchaseCopy(card, p);
+      if (!result || !result.ok) { setImportMessage(result && result.error || "The purchase could not be saved. Your collection was not changed."); return false; }
+      setImportMessage("Purchase saved privately. Open Copies to link it to an existing copy or confirm an additional copy.");
+      setApplied(function(prev) { return Object.assign({}, prev, {[idx]: true}); });
+      return true;
+    }
+    // Existing in-hand markings survive a repeat purchase import. A public
+    // listing never supplies a personal paid price, receipt date or serial.
+    if (setCardStatus(card.id, window.TrackerMarket.importStatus(statuses[card.id], requestedStatus)) === false) return false;
+    if (requestedStatus === "owned") updateCardDetail(card.id, "inHandConfirmedAt", new Date().toISOString());
+    setApplied(function(prev) { return Object.assign({}, prev, {[idx]: true}); });
+    return true;
   }
+  function applyMatch(idx) { return applyImport(idx, "owned"); }
+  function applyMatchTransit(idx) { return applyImport(idx, "in_transit"); }
 
-  function applyMatchTransit(idx) {
-    var item = parsed[idx];
-    if (!item || !item.match) return;
-    var card = item.match.card;
-    var p = item.parsed;
-    setCardStatus(card.id, "in_transit");
-    if (p.price) updateCardDetail(card.id, "price", "$" + p.price.replace(/^\$/, ""));
-    if (p.date) updateCardDetail(card.id, "date", p.date);
-    if (p.serial) updateCardDetail(card.id, "serial", p.serial);
-    var noteText = p.source === "130point" ? "130pt" + (p._130pt && p._130pt.forSale ? " listing" : " sold") : p.seller === "eBay" ? "eBay" : p.seller === "SportLots" ? "SportLots" : "COMC from " + (p.seller || "unknown");
-    if (p.orderNum) noteText += " order:" + p.orderNum;
-    if (item.match.variantMismatch) noteText += " ⚠variant?";
-    updateCardDetail(card.id, "notes", noteText);
-    var next = Object.assign({}, applied);
-    next[idx] = true;
-    setApplied(next);
-  }
-
-  function applyAll() {
-    var next = Object.assign({}, applied);
-    parsed.forEach(function(item, idx) {
-      if (item.match && item.match.score >= 85 && !next[idx]) {
-        var card = item.match.card;
-        var p = item.parsed;
-        setCardStatus(card.id, "owned");
-        if (p.price) updateCardDetail(card.id, "price", "$" + p.price.replace(/^\$/, ""));
-        if (p.date) updateCardDetail(card.id, "date", p.date);
-        if (p.serial) updateCardDetail(card.id, "serial", p.serial);
-        var noteText = p.seller === "eBay" ? "eBay" : p.seller === "SportLots" ? "SportLots" : "COMC from " + (p.seller || "unknown");
-        if (p.orderNum) noteText += " order:" + p.orderNum;
-        updateCardDetail(card.id, "notes", noteText);
-        next[idx] = true;
+  async function applyAll() {
+    if (importBusy) return;
+    setImportBusy(true);
+    setImportMessage("");
+    try {
+      for (var idx = 0; idx < parsed.length; idx++) {
+        var item = parsed[idx];
+        if (item.parsed.recordType !== "purchase" || !item.match || item.match.score < 85 || applied[idx]) continue;
+        if (!await applyImport(idx, "in_transit")) break;
       }
-    });
-    setApplied(next);
+    } finally { setImportBusy(false); }
   }
 
   var highConf = parsed.filter(function(r) { return r.match && r.match.score >= 85; });
+  var highConfPurchases = highConf.filter(function(r) { return r.parsed.recordType === "purchase"; });
   var lowConf = parsed.filter(function(r) { return r.match && r.match.score > 0 && r.match.score < 85; });
   var noMatch = parsed.filter(function(r) { return !r.match; });
 
@@ -6457,7 +6588,11 @@ function COMCScannerPanel(props) {
     var dir = shopSort.dir === "asc" ? 1 : -1;
     var col = shopSort.col;
     var av, bv;
-    if (col === "price") { av = parseFloat(a.parsed.totalPrice || a.parsed.price) || 0; bv = parseFloat(b.parsed.totalPrice || b.parsed.price) || 0; }
+    if (col === "price") {
+      var group = parsedCurrency(a.parsed).localeCompare(parsedCurrency(b.parsed)) || parsedPriceKind(a.parsed).localeCompare(parsedPriceKind(b.parsed));
+      if (group) return group;
+      av = parseFloat(a.parsed.totalPrice || a.parsed.price) || 0; bv = parseFloat(b.parsed.totalPrice || b.parsed.price) || 0;
+    }
     else if (col === "year") { av = a.parsed.year; bv = b.parsed.year; }
     else if (col === "product") { av = (a.parsed.product || "").toLowerCase(); bv = (b.parsed.product || "").toLowerCase(); }
     else if (col === "variant") { av = (a.parsed.variant || "").toLowerCase(); bv = (b.parsed.variant || "").toLowerCase(); }
@@ -6477,17 +6612,20 @@ function COMCScannerPanel(props) {
     var tg = targetByCardId[cid][0];
     if (!tg || tg.status !== "watching") return;
     var price = parseFloat(item.parsed.totalPrice || item.parsed.price) || 999999;
-    if (watchedCheapest[cid] === undefined || price < watchedCheapest[cid]) {
-      watchedCheapest[cid] = price;
+    if (parsedCurrency(item.parsed) === "UNKNOWN") return;
+    var comparisonKey = comparableListingKey(item.parsed, cid);
+    if (watchedCheapest[comparisonKey] === undefined || price < watchedCheapest[comparisonKey]) {
+      watchedCheapest[comparisonKey] = price;
     }
   });
   if (Object.keys(watchedCheapest).length > 0) {
     shopSorted = shopSorted.filter(function(item) {
       if (!item.match || item.match.score < 90) return true;
       var cid = item.match.card.id;
-      if (watchedCheapest[cid] === undefined) return true;
+      var comparisonKey = comparableListingKey(item.parsed, cid);
+      if (watchedCheapest[comparisonKey] === undefined) return true;
       var price = parseFloat(item.parsed.totalPrice || item.parsed.price) || 999999;
-      return price <= watchedCheapest[cid];
+      return price <= watchedCheapest[comparisonKey];
     });
   }
   function toggleExpand(idx) { setExpanded(function(prev) { var n = Object.assign({}, prev); n[idx] = !n[idx]; return n; }); if (!expanded[idx]) { setSeenDrops(function(prev) { var n = Object.assign({}, prev); n[idx] = true; return n; }); } }
@@ -6517,6 +6655,14 @@ function COMCScannerPanel(props) {
           )}
         </div>
 
+        {importMessage && <div role="status" className="text-[11px] text-cyan-200 bg-cyan-950/40 border border-cyan-800 rounded p-2 mb-2">{importMessage}{Object.keys(applied).length > 0 && parsed.some(function(item){return item.parsed.recordType === "purchase";}) ? <button onClick={function(){props.setActiveTab("copies");}} className="ml-3 text-cyan-300 underline">Review purchases</button> : null}</div>}
+        {mode === "ebay" && parsed.some(function(item) { return item.parsed.recordType === "purchase"; }) && <button disabled={importBusy} onClick={applyAll} className="text-[10px] px-2 py-1 mb-2 bg-cyan-700 rounded disabled:opacity-50">{importBusy ? "Importing…" : "Import matched purchases · In Transit"}</button>}
+        {showInput && <label className="flex items-center gap-2 text-[10px] text-gray-300 mb-2">Prices in this scan
+          <select aria-label="Scan currency" value={scanCurrency} onChange={function(e) { setScanCurrency(e.target.value); }} className="bg-gray-900 border border-gray-600 rounded px-1 py-0.5">
+            {["UNKNOWN", "USD", "CAD", "GBP", "EUR", "AUD"].map(function(code) { return <option key={code} value={code}>{code === "UNKNOWN" ? "Currency not specified" : code}</option>; })}
+          </select>
+          <span className="text-gray-500">Use the currency shown by the source. Listed prices are not sold values.</span>
+        </label>}
         {!showInput && parsed.length > 0 ? (
           <div className="flex items-center gap-2 mt-1">
             <button onClick={function(){ setShowInput(true); }} className="text-[10px] px-2 py-0.5 bg-gray-700 border border-gray-600 text-gray-300 rounded hover:bg-gray-600">{"\u25BC"} Edit Input</button>
@@ -6697,7 +6843,7 @@ function COMCScannerPanel(props) {
                 {"Asgn (" + total + ")"}
               </button>
             ) : null; })()}
-            {shopNeed.length > 0 && <span className="ml-auto text-[10px]" style={{color:"#FFC52F"}}>Need: ${shopNeed.reduce(function(sum, r) { return sum + (parseFloat(r.parsed.totalPrice || r.parsed.price) || 0); }, 0).toFixed(2)}</span>}
+            {shopNeed.length > 0 && <span className="ml-auto text-[10px]" style={{color:"#FFC52F"}}>Need listings: {scanPriceTotals(shopNeed)}</span>}
           </div>
           {/* Tag filters */}
           <div className="flex items-center gap-1.5 px-2">
@@ -6826,7 +6972,7 @@ function COMCScannerPanel(props) {
           {shopFilter === "need" && shopNeed.length > 0 && (
             <div className="flex items-center gap-1.5 bg-yellow-900/20 border border-yellow-800 rounded px-1.5 py-1">
               <span className="text-[10px] font-bold" style={{color:"#FFC52F"}}>{shopNeed.length} need</span>
-              <span className="text-[9px] text-gray-500">${shopNeed.reduce(function(sum, r) { return sum + (parseFloat(r.parsed.totalPrice || r.parsed.price) || 0); }, 0).toFixed(2)}</span>
+              <span className="text-[9px] text-gray-500">{scanPriceTotals(shopNeed)}</span>
               <div className="ml-auto flex items-center gap-1">
                 <span className="text-[9px] text-yellow-400/60 italic">Auto-add on purchase</span>
                 <button onClick={function(){ setAutoAddEnabled(!autoAddEnabled); }} className={"w-7 h-3.5 rounded-full relative transition-colors " + (autoAddEnabled ? "bg-green-500" : "bg-gray-600")} title="Coming soon: automatically mark cards as owned when purchased on COMC">
@@ -6879,7 +7025,7 @@ function COMCScannerPanel(props) {
                     // Price drop detection for ALL targeted cards (active and watching)
                     var hasPriceDrop = false;
                     var priceDropAmt = 0;
-                    if (isTargeted && targetMatch) {
+                    if (isTargeted && targetMatch && parsedCurrency(p) !== "UNKNOWN" && parsedCurrency(p) === targetMatch.currency && parsedPriceKind(p) === targetMatch.priceKind) {
                       var benchmarkPrice = targetMatch.watchPrice || parseFloat(targetMatch.price) || 0;
                       if (benchmarkPrice > 0) {
                         var currentTotal = parseFloat(p.totalPrice || p.price) || 0;
@@ -6899,7 +7045,7 @@ function COMCScannerPanel(props) {
                       : isNeed ? "bg-green-900/20"
                       : "bg-blue-900/15 opacity-60";
                     var badge = !isExact ? { text: "N/A", color: "bg-red-900 text-red-300" }
-                      : isPriceDrop ? { text: "\u2193$" + priceDropAmt.toFixed(0), color: "bg-amber-500 text-gray-900 font-black" }
+                      : isPriceDrop ? { text: "\u2193 " + parsedMoney(p, priceDropAmt), color: "bg-amber-500 text-gray-900 font-black" }
                       : isWatching ? { text: "\uD83D\uDC41", color: "bg-gray-700 text-gray-300" }
                       : isActiveTarget ? { text: "\uD83C\uDFAF", color: "bg-pink-700 text-pink-200" }
                       : hasBid ? { text: "BID", color: "bg-orange-800 text-orange-200" }
@@ -6919,7 +7065,7 @@ function COMCScannerPanel(props) {
                           <td className="px-0.5 py-0.5 text-gray-300 truncate" style={{maxWidth:"clamp(90px,12vw,200px)"}} title={isExact ? m.card.cardSet + (p.variant && p.variant !== (m.card.cardSet || "Base") ? " (listing: " + p.variant + ")" : "") : p.variant}>{isExact ? (m.card.cardSet || "Base") : (p.variant || "Base")}{isExact && sspBadge(m.card.cardSet)}{p.isAuto ? <span className="ml-0.5 text-yellow-400 text-[8px] font-bold bg-yellow-900/50 px-0.5 rounded">AU</span> : ""}{p.graded ? <span className="ml-0.5 text-pink-400 text-[8px] font-bold bg-pink-900/50 px-0.5 rounded">{p.graded}</span> : ""}</td>
                           <td className="px-0.5 py-0.5 font-mono whitespace-nowrap">{isExact ? <span className="text-gray-400">{m.card.cardNumber}</span> : (p.cardNoClean || p.cardNo ? <span className="text-gray-400">{p.cardNoClean || p.cardNo}</span> : "")}</td>
                           <td className="px-0.5 py-0.5 font-mono whitespace-nowrap">{p.serial ? <span className="text-yellow-300 font-bold bg-yellow-900/30 px-0.5 rounded">{"#" + p.serial}</span> : ""}{p.printRun ? <span className="text-purple-400 font-bold">{"/" + p.printRun}</span> : (isExact && m.card.copies ? <span className="text-purple-400/60">{"/" + m.card.copies}</span> : "")}</td>
-                          <td className={"px-0.5 py-0.5 text-right font-bold whitespace-nowrap " + (isNeed ? "text-green-300" : "text-gray-500")} style={{fontSize:"10px"}}>{p.listingType === "auction" ? <span className="text-red-400" style={{fontSize:"7px"}} title={"Auction - " + (p.bids || 0) + " bids"}>{"\uD83D\uDD28"}</span> : p.listingType === "best_offer" ? <span className="text-cyan-400" style={{fontSize:"7px"}} title="Best Offer">{"\uD83E\uDD1D"}</span> : ""}{p.source === "eBay" ? (p.totalPrice ? "$" + p.totalPrice : p.price ? "$" + p.price : "") : p.price ? "$" + p.price : ""}{p.source === "eBay" && p.shippingNum > 0 ? <span className="text-gray-600 block" style={{fontSize:"8px"}}>{"+$" + p.shippingNum.toFixed(2)}</span> : ""}{p.source === "SportLots" && p.slQuantity ? <span className="text-blue-400 block" style={{fontSize:"8px"}}>{"x" + p.slQuantity}</span> : ""}{p.source === "Whatnot" && p.seller ? <span className="text-violet-400 block" style={{fontSize:"8px"}}>{p.seller}</span> : ""}{p.currency === "GBP" ? <span className="text-gray-600 block" style={{fontSize:"7px"}}>GBP</span> : ""}{p.source === "130point" && p._130pt ? <span className={p._130pt.forSale ? "text-lime-400 block" : "text-teal-500 block"} style={{fontSize:"7px"}} title={p._130pt.forSale ? "For Sale - ends " + p._130pt.date : p._130pt.isBestOffer ? "Listed $" + (p._130pt.listPrice||0).toFixed(2) + " sold $" + p._130pt.salePrice.toFixed(2) : "Fixed price"}>{p._130pt.forSale ? "\uD83C\uDFF7\uFE0F" : ""}{p._130pt.forSale ? "" : p._130pt.date}{p._130pt.isBestOffer && !p._130pt.forSale ? " -" + p._130pt.discount + "%" : ""}</span> : ""}</td>
+                          <td className={"px-0.5 py-0.5 text-right font-bold whitespace-nowrap " + (isNeed ? "text-green-300" : "text-gray-500")} style={{fontSize:"10px"}}>{p.listingType === "auction" ? <span className="text-red-400" style={{fontSize:"7px"}} title={"Auction - " + (p.bids || 0) + " bids"}>{"\uD83D\uDD28"}</span> : p.listingType === "best_offer" ? <span className="text-cyan-400" style={{fontSize:"7px"}} title="Best Offer">{"\uD83E\uDD1D"}</span> : ""}{parsedMoney(p)}<span className="block text-[8px] font-normal text-gray-400">{window.TrackerMarket.kindLabel(parsedPriceKind(p))}</span>{p.source === "eBay" && p.shippingNum > 0 ? <span className="text-gray-600 block" style={{fontSize:"8px"}}>{"Shipping + " + parsedMoney(p, p.shippingNum)}</span> : ""}{p.source === "SportLots" && p.slQuantity ? <span className="text-blue-400 block" style={{fontSize:"8px"}}>{"x" + p.slQuantity}</span> : ""}{p.source === "Whatnot" && p.seller ? <span className="text-violet-400 block" style={{fontSize:"8px"}}>{p.seller}</span> : ""}{p.source === "130point" && p._130pt ? <span className={p._130pt.forSale ? "text-lime-400 block" : "text-teal-500 block"} style={{fontSize:"7px"}} title={p._130pt.forSale ? "For Sale - ends " + p._130pt.date : p._130pt.isBestOffer ? "Listed " + parsedMoney(p, p._130pt.listPrice) + " sold " + parsedMoney(p, p._130pt.salePrice) : "Fixed price"}>{p._130pt.forSale ? "\uD83C\uDFF7\uFE0F" : ""}{p._130pt.forSale ? "" : p._130pt.date}{p._130pt.isBestOffer && !p._130pt.forSale ? " -" + p._130pt.discount + "%" : ""}</span> : ""}</td>
                           <td className="px-0.5 py-0.5 text-center">
                             {isExact ? <span className={"text-[9px] font-bold " + (m.variantMismatch ? "text-yellow-400" : "text-green-400")}>{(m.override ? "\ud83d\udccc" : m.score + "%" + (m.variantMismatch ? "\u26a0" : ""))}</span> : m ? <span className="text-[9px] text-red-400">~{m.score}%</span> : <span className="text-gray-600 text-[9px]">-</span>}
                           </td>
@@ -6932,10 +7078,10 @@ function COMCScannerPanel(props) {
                               {isExact && <a href={whatnotUrl()} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-200 font-bold" title="Whatnot">W</a>}
                               {isExact && <a href={pt130Url(m.card)} target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-200 font-bold" title="130point">P</a>}
                               {/* Inline target toggle: cycles not targeted → active → watching → untargeted */}
-                              {isExact && isNeed && !isApplied && !hasBid && <button onClick={function(){ applyMatch(origIdx); }} className="ml-0.5 px-1 py-0 bg-yellow-700 hover:bg-yellow-600 text-white rounded font-bold" style={{fontSize:"8px"}}>+</button>}
+                              {p.recordType !== "purchase" && isExact && isNeed && !isApplied && !hasBid && <button title="Watch this listing; ownership stays unchanged" onClick={function(){ addTarget(p, item.match, "watching"); }} className="ml-0.5 px-1 py-0 bg-yellow-700 hover:bg-yellow-600 text-white rounded font-bold" style={{fontSize:"8px"}}>+</button>}
                               {isApplied && <span className="text-green-400 font-bold" style={{fontSize:"8px"}}>✓</span>}
                               {!isExact && <button onClick={function(){ openAddForm(origIdx); }} className="px-1 py-0 bg-yellow-700 hover:bg-yellow-600 text-white rounded font-bold" style={{fontSize:"8px"}}>Pick</button>}
-                              {(isNeed || !isExact) && !isTargeted && <button onClick={function(e){ e.stopPropagation(); addTarget(p, m, "active"); }} className="text-pink-400/40 hover:text-pink-300 font-bold" style={{fontSize:"9px"}} title="Pin as target">{"\uD83C\uDFAF"}</button>}
+                              {p.recordType !== "purchase" && (isNeed || !isExact) && !isTargeted && <button onClick={function(e){ e.stopPropagation(); addTarget(p, m, "active"); }} className="text-pink-400/40 hover:text-pink-300 font-bold" style={{fontSize:"9px"}} title="Pin as target">{"\uD83C\uDFAF"}</button>}
                               {isActiveTarget && <button onClick={function(e){ e.stopPropagation(); toggleTargetStatus(targetMatch.id); }} className="text-pink-400 font-bold" style={{fontSize:"9px"}} title="Click: switch to watching">{"\uD83C\uDFAF"}</button>}
                               {isWatching && <button onClick={function(e){ e.stopPropagation(); removeTarget(targetMatch.id); }} className="text-gray-400 font-bold" style={{fontSize:"9px"}} title="Click: unpin target">{"\uD83D\uDC41"}</button>}
                               {p.source === "eBay" && isExact && isNeed && (p.listingType === "auction" || p.listingType === "best_offer") && <button onClick={function(e){ e.stopPropagation(); var bk = (p.rawSet || "").trim(); if (!bk) return; var b = loadEbayBids(); if (b[bk]) { delete b[bk]; } else { b[bk] = { date: new Date().toISOString().slice(0,10) }; } saveEbayBids(b); setEbayBids(Object.assign({}, b)); }} className={"px-1 py-0 rounded font-bold " + (hasBid ? "bg-orange-700 text-orange-100" : "bg-gray-700 text-orange-400 hover:bg-orange-800")} style={{fontSize:"7px"}} title={hasBid ? "Click to un-bid" : "Mark as bid placed"}>{hasBid ? "BID" : "Bid"}</button>}
@@ -6953,7 +7099,7 @@ function COMCScannerPanel(props) {
                             <td colSpan={9} className="px-2 py-1">
                               {hasPriceDrop && (
                                 <div className="mb-1 px-2 py-0.5 rounded bg-amber-900/50 border border-amber-500 text-amber-200 font-bold" style={{fontSize:"10px"}}>
-                                  {"\u2193"} Price drop! Was ${(targetMatch.watchPrice || parseFloat(targetMatch.price) || 0).toFixed(2)} when watched — now ${(parseFloat(p.totalPrice || p.price) || 0).toFixed(2)} (save ${priceDropAmt.toFixed(2)})
+                                  {"\u2193"} Price drop! Was {parsedMoney(p, targetMatch.watchPrice || targetMatch.price)} when watched; now {parsedMoney(p, p.totalPrice || p.price)} (save {parsedMoney(p, priceDropAmt)})
                                 </div>
                               )}
                               <div className="grid grid-cols-2 gap-x-3 gap-y-0.5" style={{fontSize:"10px"}}>
@@ -6969,8 +7115,8 @@ function COMCScannerPanel(props) {
                                   <React.Fragment>
                                     <div>
                                       <span className="text-gray-500">Shipping: </span>
-                                      <span className="text-gray-300">{p.shipping || "N/A"}</span>
-                                      <span className="text-yellow-400 ml-2 font-bold">{"Total: $" + p.totalPrice}</span>
+                                      <span className="text-gray-300">{p.shipping ? parsedMoney(p, p.shippingNum != null ? p.shippingNum : p.shipping) : "Not recorded"}</span>
+                                      <span className="text-yellow-400 ml-2 font-bold">{p.totalPrice ? "Total: " + parsedMoney(p, p.totalPrice) : ""}</span>
                                     </div>
                                     <div>
                                       <span className="text-gray-500">Time left: </span>
@@ -6981,7 +7127,7 @@ function COMCScannerPanel(props) {
                                     </div>
                                     {p.graded && <div><span className="text-gray-500">Graded: </span><span className="text-purple-400 font-bold">{p.graded}</span></div>}
                                     {p.isAuto && <div><span className="text-gray-500">Auto: </span><span className="text-yellow-400 font-bold">Yes - Autograph</span></div>}
-                                    {p.binPrice && <div><span className="text-gray-500">BIN Price: </span><span className="text-green-300">{"$" + p.binPrice}</span></div>}
+                                    {p.binPrice && <div><span className="text-gray-500">BIN Price: </span><span className="text-green-300">{parsedMoney(p, p.binPrice)}</span></div>}
                                   </React.Fragment>
                                 )}
                                 {p.source === "SportLots" && (
@@ -6992,7 +7138,7 @@ function COMCScannerPanel(props) {
                                     </div>
                                     <div>
                                       <span className="text-gray-500">Low price: </span>
-                                      <span className="text-green-300 font-bold">{p.price ? "$" + p.price : "N/A"}</span>
+                                      <span className="text-green-300 font-bold">{parsedMoney(p)}</span>
                                     </div>
                                   </React.Fragment>
                                 )}
@@ -7004,7 +7150,7 @@ function COMCScannerPanel(props) {
                                     </div>
                                     <div>
                                       <span className="text-gray-500">Price: </span>
-                                      <span className="text-green-300 font-bold">{p.price ? (p.currency === "GBP" ? "£" : "$") + p.price : "N/A"}</span>
+                                      <span className="text-green-300 font-bold">{parsedMoney(p)}</span>
                                     </div>
                                   </React.Fragment>
                                 )}
@@ -7053,7 +7199,7 @@ function COMCScannerPanel(props) {
                                   {m && !m.override && isExact && <button onClick={function(e){ e.stopPropagation(); openAddForm(origIdx); }} className="text-[9px] px-1 py-0 bg-gray-800/40 border border-gray-600 text-gray-400 rounded hover:bg-gray-700/40" title="Reassign to different card">{"\u21C4"}</button>}
                                   {m && m.override && <button onClick={function(e){ e.stopPropagation(); var ck = pinKey(p); var ov = loadComcOverrides(); delete ov[ck]; saveComcOverrides(ov); setComcOverrides(Object.assign({}, ov)); var up = parsed.map(function(r, ri){ if (ri === origIdx) { var nm = matchToCards(r.parsed); return { parsed: r.parsed, match: nm, raw: r.raw }; } return r; }); setParsed(up); }} className="text-[9px] px-1 py-0 bg-red-900/40 border border-red-700 text-red-300 rounded hover:bg-red-800/40" title="Unpin match">{"\uD83D\uDCCC"}</button>}
                                   {/* Status actions */}
-                                  {isExact && isNeed && !isApplied && !hasBid && (
+                                  {isExact && (isNeed || p.recordType === "purchase") && !isApplied && !hasBid && (p.recordType === "purchase" ? <button disabled={importBusy} onClick={function(e){e.stopPropagation();applyMatchTransit(origIdx);}} className="text-[9px] px-2 py-1 bg-cyan-700 hover:bg-cyan-600 text-white rounded font-bold">Stage purchase</button> :
                                     <React.Fragment>
                                       <span style={{color:"#2a3f5f"}}>|</span>
                                       <button onClick={function(e){ e.stopPropagation(); applyMatchTransit(origIdx); }} className="text-[9px] px-1 py-0 bg-cyan-700 hover:bg-cyan-600 text-white rounded font-bold" title="Mark as In-Transit">{"\uD83D\uDCE6 Transit"}</button>
@@ -7068,7 +7214,7 @@ function COMCScannerPanel(props) {
                                   )}
                                   {/* Target actions */}
                                   <span style={{color:"#2a3f5f"}}>|</span>
-                                  {!isTargeted && (isNeed || !isExact) && (
+                                  {p.recordType !== "purchase" && !isTargeted && (isNeed || !isExact) && (
                                     <React.Fragment>
                                       <button onClick={function(e){ e.stopPropagation(); addTarget(p, m, "active"); }} className="text-[9px] px-1 py-0 bg-pink-900/40 border border-pink-600 text-pink-300 rounded hover:bg-pink-800/40 font-bold" title="Save as active target - want to buy">{"\uD83C\uDFAF Target"}</button>
                                       <button onClick={function(e){ e.stopPropagation(); addTarget(p, m, "watching"); }} className="text-[9px] px-1 py-0 bg-gray-800/40 border border-gray-600 text-gray-400 rounded hover:bg-gray-700/40" title="Save as watching - too expensive for now">{"\uD83D\uDC41 Watch"}</button>
@@ -7235,7 +7381,7 @@ function COMCScannerPanel(props) {
             <span className="text-yellow-400 font-bold">{lowConf.length} low</span>
             <span className="text-red-400 font-bold">{noMatch.length} none</span>
             <span className="text-cyan-400">{Object.keys(applied).length} applied</span>
-            {highConf.length > 0 && <button onClick={applyAll} className="ml-auto text-[10px] px-2 py-0.5 bg-yellow-700 hover:bg-yellow-600 text-white rounded font-bold">Apply All ({highConf.length})</button>}
+            {highConfPurchases.length > 0 && <button disabled={importBusy} onClick={applyAll} className="ml-auto text-[10px] px-2 py-0.5 bg-cyan-700 hover:bg-cyan-600 text-white rounded font-bold disabled:opacity-50">{importBusy ? "Staging…" : "Stage purchases (" + highConfPurchases.length + ")"}</button>}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-[10px]" style={{tableLayout:"auto"}}>
@@ -7243,7 +7389,7 @@ function COMCScannerPanel(props) {
                 <th className="px-0.5 py-0.5 text-left">Match</th>
                 <th className="px-0.5 py-0.5 text-left">Listing</th>
                 <th className="px-0.5 py-0.5 text-left">Matched Card</th>
-                <th className="px-0.5 py-0.5 text-right">$</th>
+                <th className="px-0.5 py-0.5 text-right">Price / currency</th>
                 <th className="px-0.5 py-0.5 text-center">Status</th>
                 <th className="px-0.5 py-0.5 text-center">Action</th>
               </tr></thead>
@@ -7264,12 +7410,12 @@ function COMCScannerPanel(props) {
                       <td className="px-0.5 py-0.5 truncate" style={{maxWidth:"clamp(100px,15vw,250px)"}}>
                         {m ? <span className="text-cyan-300">{"#" + m.card.cardNumber + " " + (m.card.cardSet || "Base")}{sspBadge(m.card.cardSet)}</span> : <span className="text-gray-600">—</span>}
                       </td>
-                      <td className="px-0.5 py-0.5 text-right text-green-300 font-bold whitespace-nowrap">{p.price ? "$" + p.price : ""}</td>
+                      <td className="px-0.5 py-0.5 text-right text-green-300 font-bold whitespace-nowrap">{parsedMoney(p)}<span className="block text-[8px] font-normal text-gray-400">{window.TrackerMarket.kindLabel(parsedPriceKind(p))}</span></td>
                       <td className="px-0.5 py-0.5 text-center whitespace-nowrap">
                         {m ? <span className={"font-bold text-[9px] " + (currentStatus === "owned" ? "text-green-300" : currentStatus === "in_transit" ? "text-emerald-300" : "text-red-400")}>{currentStatus === "owned" ? "OWN" : currentStatus === "in_transit" ? "TRNS" : "NEED"}</span> : ""}
                       </td>
                       <td className="px-0.5 py-0.5 text-center">
-                        {m && !isApplied ? <button onClick={function(){applyMatch(idx);}} className="px-1 py-0 bg-orange-700 hover:bg-orange-600 text-white rounded text-[9px] font-bold">Own</button> : isApplied ? <span className="text-green-400 text-[9px]">{"\u2713"}</span> : ""}
+                        {m && !isApplied ? p.recordType === "purchase" ? <button disabled={importBusy} onClick={function(){applyMatchTransit(idx);}} className="px-2 py-1 bg-cyan-700 hover:bg-cyan-600 text-white rounded text-[9px] font-bold">Stage purchase</button> : <span className="inline-flex gap-1"><button disabled={importBusy} onClick={function(){applyMatchTransit(idx);}} className="px-1 py-0 bg-cyan-700 hover:bg-cyan-600 text-white rounded text-[9px] font-bold">Import · Transit</button><button disabled={importBusy} onClick={function(){applyMatch(idx);}} className="px-1 py-0 bg-green-700 hover:bg-green-600 text-white rounded text-[9px] font-bold">In hand</button></span> : isApplied ? <span className="text-green-400 text-[9px]">{"\u2713"}</span> : ""}
                       </td>
                     </tr>
                   );
@@ -7291,7 +7437,6 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
   var [ph, setPh] = useState(function() { return loadPriceHistory(); });
   var [sortBy, setSortBy] = useState("recent");
   var [sortDir, setSortDir] = useState("desc");
-  var [sortDir, setSortDir] = useState("desc");
   var [filterSrc, setFilterSrc] = useState("all");
   var [filterStatus, setFilterStatus] = useState("need"); // need, owned, transit, all, flagged
   var [search, setSearch] = useState("");
@@ -7300,54 +7445,29 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
   var [pendingDelete, setPendingDelete] = useState(null);
   var [innerSort, setInnerSort] = useState("date");
   var [innerSortDir, setInnerSortDir] = useState("desc");
-  var [innerSort, setInnerSort] = useState("date");
-  var [innerSortDir, setInnerSortDir] = useState("desc");
   var [pickerPK, setPickerPK] = useState(null); // priceKey being reassigned
   var [pickSearch, setPickSearch] = useState("");
   var [pickCardNo, setPickCardNo] = useState("");
 
-  // One-time migration: convert old numeric keys + purge bad entries
+  var [priceSyncError,setPriceSyncError]=useState(function(){return window.storageSyncIssues && window.storageSyncIssues["tb-price-history-v1"] && window.storageSyncIssues["tb-price-history-v1"].error || "";});
+  useEffect(function(){function issue(event){if(event.detail.key===tbk("price-history-v1"))setPriceSyncError(event.detail.error || "");}function saved(){setPriceSyncError("");setPh(loadPriceHistory());}window.addEventListener("storage-sync-issue",issue);window.addEventListener("price-history-saved",saved);return function(){window.removeEventListener("storage-sync-issue",issue);window.removeEventListener("price-history-saved",saved);};},[]);
+
+  // Numeric keys from old builds can be resolved without reclassifying or
+  // deleting their evidence. Missing currency/type remains explicitly unknown.
   useEffect(function() {
     if (migrated) return;
-    var raw = loadPriceHistory();
-    var changed = false;
-    var next = {};
+    var raw = loadPriceHistory(), changed = false, next = {}, removals=[], restores=[];
     Object.keys(raw).forEach(function(k) {
       var pk = k;
       if (/^\d+$/.test(k) && CARD_BY_ID[parseInt(k)]) {
         var card = CARD_BY_ID[parseInt(k)];
         pk = card.product.slice(0,4) + "|" + card.product + "|" + card.cardNumber + "|" + (card.cardSet || "Base");
         changed = true;
+        removals.push({cardKey:k,entries:raw[k] || []});restores.push({cardKey:pk,entries:raw[k] || []});
       }
-      // PURGE fully-ambiguous variant keys
-      if (AMBIGUOUS_PRICE_KEYS.has(pk)) { changed = true; return; }
-      // PURGE eBay entries for 1/1 cards whose variant contains "black" (player surname)
-      var pkParts = pk.split("|");
-      var pkVariant = pkParts.length >= 4 ? pkParts[3].toLowerCase() : "";
-      var pkCopies = "";
-      // Find the card for this key to check copies
-      var pkCard = null;
-      for (var pci = 0; pci < ALL_CARDS.length; pci++) {
-        var pc = ALL_CARDS[pci];
-        var testPk = pc.product.slice(0,4) + "|" + pc.product + "|" + pc.cardNumber + "|" + (pc.cardSet || "Base");
-        if (testPk === pk) { pkCard = pc; break; }
-      }
-      if (pkCard && pkCard.copies === "1" && /\bblack\b/i.test(pkVariant)) {
-        // 1/1 with "black" in variant — only keep non-eBay entries
-        var cleanEntries = (raw[k] || []).filter(function(e) { return e.source !== "eBay"; });
-        if (cleanEntries.length > 0) {
-          next[pk] = cleanEntries;
-        }
-        changed = true;
-        return;
-      }
-      if (!next[pk]) next[pk] = [];
-      raw[k].forEach(function(entry) {
-        var exists = next[pk].some(function(e) { return e.date === entry.date && e.source === entry.source; });
-        if (!exists) next[pk].push(entry);
-      });
+      next[pk] = (next[pk] || []).concat(raw[k] || []);
     });
-    if (changed) { savePriceHistory(next); setPh(next); }
+    if (changed) { savePriceHistory(next,{removals:removals,restores:restores}); setPh(next); }
     setMigrated(true);
   }, []);
 
@@ -7355,19 +7475,20 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
 
   function reassignPrice(oldPK, newCard) {
     var next = loadPriceHistory();
-    var entries = next[oldPK] || [];
+    var entries = expandedRow && expandedRow.pk === oldPK ? expandedRow.entries : (next[oldPK] || []);
     if (entries.length === 0) return;
     var newPK = newCard.product.slice(0,4) + "|" + newCard.product + "|" + newCard.cardNumber + "|" + (newCard.cardSet || "Base");
     if (newPK === oldPK) return; // same card
     // Merge entries into new key
     if (!next[newPK]) next[newPK] = [];
     entries.forEach(function(e) {
-      var exists = next[newPK].some(function(x) { return x.date === e.date && x.source === e.source; });
+      var exists = next[newPK].some(function(x) { return e.observationKey ? x.observationKey === e.observationKey : JSON.stringify(x) === JSON.stringify(e); });
       if (!exists) next[newPK].push(e);
     });
-    // Delete old key
-    delete next[oldPK];
-    savePriceHistory(next);
+    // Other currencies and price types remain assigned to their original card.
+    next[oldPK] = (next[oldPK] || []).filter(function(e) { return !expandedRow || window.TrackerMarket.seriesKey(e) !== expandedRow.seriesKey; });
+    if (!next[oldPK].length) delete next[oldPK];
+    savePriceHistory(next,{removals:[{cardKey:oldPK,entries:entries}],restores:[{cardKey:newPK,entries:entries}]});
     setPh(next);
 
     // NOTE: Scanner COMC overrides (pins) are NOT modified here.
@@ -7445,41 +7566,43 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
         if (hay.indexOf(sl) === -1) return;
       }
 
-      var sorted = filtered.slice().sort(function(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
-      var first = sorted[0];
-      var last = sorted[sorted.length - 1];
-      var delta = sorted.length >= 2 ? last.price - first.price : 0;
-      var pct = first.price > 0 && sorted.length >= 2 ? ((last.price - first.price) / first.price * 100) : 0;
-      var totalListings = filtered.reduce(function(sum, e) { return sum + (e.listings || 1); }, 0);
-      var lowest = Math.min.apply(null, sorted.map(function(e) { return e.price; }));
-
-      result.push({
-        pk: pk, card: card, entries: sorted, first: first, last: last,
-        delta: delta, pct: pct, status: bestStatus, totalListings: totalListings,
-        latestDate: last.date, latestPrice: last.price, lowestPrice: lowest, flagged: isFlagged
+      window.TrackerMarket.groupSeries(filtered).forEach(function(series) {
+        var sorted = series.entries.slice().sort(function(a, b) { return (a.observedAt || a.date).localeCompare(b.observedAt || b.date); });
+        var first = sorted[0], last = sorted[sorted.length - 1];
+        var comparable = series.currency !== "UNKNOWN" && series.kind !== "unknown";
+        var delta = comparable && sorted.length >= 2 ? last.price - first.price : 0;
+        result.push({
+          pk: pk, rowKey: pk + "::" + series.key, seriesKey: series.key, card: card, entries: sorted,
+          currency: series.currency, kind: series.kind, conditionLabel: series.conditionLabel, comparable: comparable, first: first, last: last,
+          delta: delta, pct: comparable && first.price > 0 ? delta / first.price * 100 : 0,
+          status: bestStatus, totalListings: filtered.reduce(function(sum, e) { return sum + (e.listings || 1); }, 0),
+          latestDate: last.date, latestPrice: last.price,
+          lowestPrice: comparable ? Math.min.apply(null, sorted.map(function(e) { return e.price; })) : Infinity,
+          flagged: isFlagged
+        });
       });
     });
 
     if (sortBy === "recent") result.sort(function(a, b) { return b.latestDate > a.latestDate ? 1 : b.latestDate < a.latestDate ? -1 : 0; });
-    else if (sortBy === "drop") result.sort(function(a, b) { return a.delta - b.delta; });
-    else if (sortBy === "rise") result.sort(function(a, b) { return b.delta - a.delta; });
-    else if (sortBy === "cheapest") result.sort(function(a, b) { return a.lowestPrice - b.lowestPrice; });
+    else if (sortBy === "drop") result.sort(function(a, b) { return a.currency.localeCompare(b.currency) || a.kind.localeCompare(b.kind) || a.delta - b.delta; });
+    else if (sortBy === "rise") result.sort(function(a, b) { return a.currency.localeCompare(b.currency) || a.kind.localeCompare(b.kind) || b.delta - a.delta; });
+    else if (sortBy === "cheapest") result.sort(function(a, b) { return a.currency.localeCompare(b.currency) || a.kind.localeCompare(b.kind) || a.lowestPrice - b.lowestPrice; });
     else if (sortBy === "tracked") result.sort(function(a, b) { return b.entries.length - a.entries.length; });
     else if (sortBy === "product") result.sort(function(a, b) { return a.card.product.localeCompare(b.card.product); });
     else if (sortBy === "number") result.sort(function(a, b) { var an = parseInt(a.card.cardNumber), bn = parseInt(b.card.cardNumber); if (!isNaN(an) && !isNaN(bn)) return an - bn; return a.card.cardNumber.localeCompare(b.card.cardNumber); });
     else if (sortBy === "variant") result.sort(function(a, b) { return (a.card.cardSet || "").localeCompare(b.card.cardSet || ""); });
     else if (sortBy === "sn") result.sort(function(a, b) { var ac = parseInt(a.card.copies) || 99999, bc = parseInt(b.card.copies) || 99999; return ac - bc; });
-    else if (sortBy === "price") result.sort(function(a, b) { return a.lowestPrice - b.lowestPrice; });
+    else if (sortBy === "price") result.sort(function(a, b) { return a.currency.localeCompare(b.currency) || a.kind.localeCompare(b.kind) || a.lowestPrice - b.lowestPrice; });
     else if (sortBy === "date") result.sort(function(a, b) { return a.latestDate > b.latestDate ? 1 : a.latestDate < b.latestDate ? -1 : 0; });
-    else if (sortBy === "trend") result.sort(function(a, b) { return a.delta - b.delta; });
+    else if (sortBy === "trend") result.sort(function(a, b) { return a.currency.localeCompare(b.currency) || a.kind.localeCompare(b.kind) || a.delta - b.delta; });
     if (sortDir === "desc" && sortBy !== "recent" && sortBy !== "rise" && sortBy !== "tracked" && sortBy !== "drop") result.reverse();
     else if (sortBy === "product") result.sort(function(a, b) { return a.card.product.localeCompare(b.card.product); });
     else if (sortBy === "number") result.sort(function(a, b) { var an = parseInt(a.card.cardNumber), bn = parseInt(b.card.cardNumber); if (!isNaN(an) && !isNaN(bn)) return an - bn; return a.card.cardNumber.localeCompare(b.card.cardNumber); });
     else if (sortBy === "variant") result.sort(function(a, b) { return (a.card.cardSet || "").localeCompare(b.card.cardSet || ""); });
     else if (sortBy === "sn") result.sort(function(a, b) { var ac = parseInt(a.card.copies) || 99999, bc = parseInt(b.card.copies) || 99999; return ac - bc; });
-    else if (sortBy === "price") result.sort(function(a, b) { return a.lowestPrice - b.lowestPrice; });
+    else if (sortBy === "price") result.sort(function(a, b) { return a.currency.localeCompare(b.currency) || a.kind.localeCompare(b.kind) || a.lowestPrice - b.lowestPrice; });
     else if (sortBy === "date") result.sort(function(a, b) { return a.latestDate > b.latestDate ? 1 : a.latestDate < b.latestDate ? -1 : 0; });
-    else if (sortBy === "trend") result.sort(function(a, b) { return a.delta - b.delta; });
+    else if (sortBy === "trend") result.sort(function(a, b) { return a.currency.localeCompare(b.currency) || a.kind.localeCompare(b.kind) || a.delta - b.delta; });
     if (sortDir === "desc" && sortBy !== "recent" && sortBy !== "rise" && sortBy !== "tracked" && sortBy !== "drop") result.reverse();
 
     return result;
@@ -7505,14 +7628,15 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
   }, [ph]);
 
   // Expanded detail view
-  var expandedRow = expandedPK ? rows.find(function(r) { return r.pk === expandedPK; }) : null;
+  var expandedRow = expandedPK ? rows.find(function(r) { return r.rowKey === expandedPK; }) : null;
 
   return (
     <div className="space-y-2">
+      {priceSyncError ? <div role="alert" className="rounded border border-amber-700 bg-amber-950/40 p-2 text-xs text-amber-200">{priceSyncError} Your local price evidence is retained.<button className="ml-2 underline" onClick={function(){savePriceHistory(loadPriceHistory());}}>Retry save</button></div> : null}
       {/* Header */}
       <div className="bg-gray-800 rounded-lg p-2">
         <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
-          <h3 className="text-indigo-400 font-bold text-sm">Price Scanner <span className="text-[9px] text-gray-500 font-normal ml-1">lowest seen across all scans</span></h3>
+          <h3 className="text-indigo-400 font-bold text-sm">Price Scanner <span className="text-[9px] text-gray-500 font-normal ml-1">asking prices, bids and sold evidence kept separate</span></h3>
           <div className="flex gap-2 text-[9px] text-gray-400">
             <span>{Object.keys(ph).length} cards</span>
             <span>{totalEntries} prices</span>
@@ -7526,7 +7650,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
             return <button key={f[0]} onClick={function() { setFilterStatus(f[0]); }} className={"text-[9px] px-1.5 py-0.5 rounded font-bold border " + (active ? "bg-" + f[2] + "-900/60 border-" + f[2] + "-500 text-" + f[2] + "-300" : "bg-gray-800 border-gray-600 text-gray-400")}>{f[1]}</button>;
           })}
           <span className="text-gray-600">|</span>
-          {["all", "eBay", "COMC", "SportLots", "Whatnot"].map(function(s) {
+          {["all", "eBay", "COMC", "SportLots", "Whatnot", "130point"].map(function(s) {
             return <button key={s} onClick={function() { setFilterSrc(s); }} className={"text-[9px] px-1.5 py-0.5 rounded font-bold " + (filterSrc === s ? (s === "eBay" ? "bg-yellow-600 text-white" : s === "COMC" ? "bg-green-600 text-white" : s === "Whatnot" ? "bg-violet-600 text-white" : s === "SportLots" ? "bg-blue-600 text-white" : s === "130point" ? "bg-teal-600 text-white" : "bg-indigo-600 text-white") : "bg-gray-700 text-gray-400")}>{s}</button>;
           })}
           <span className="text-gray-600">|</span>
@@ -7556,15 +7680,15 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
                 </div>
               </div>
               <div className="flex gap-1">
-                {pendingDelete === r.pk ? (
+                {pendingDelete === r.rowKey ? (
                   <React.Fragment>
-                    <button onClick={function() { var next = loadPriceHistory(); delete next[r.pk]; savePriceHistory(next); setPh(next); setExpandedPK(null); setPendingDelete(null); setPickerPK(null); }} className="text-red-300 text-xs px-2 py-0.5 bg-red-700 border border-red-500 rounded font-bold animate-pulse">Yes, Delete</button>
+                    <button onClick={function() { var next = loadPriceHistory(); next[r.pk] = (next[r.pk] || []).filter(function(e) { return window.TrackerMarket.seriesKey(e) !== r.seriesKey; }); if (!next[r.pk].length) delete next[r.pk]; savePriceHistory(next,{removals:[{cardKey:r.pk,entries:r.entries}]}); setPh(next); setExpandedPK(null); setPendingDelete(null); setPickerPK(null); }} className="text-red-300 text-xs px-2 py-0.5 bg-red-700 border border-red-500 rounded font-bold animate-pulse">Yes, Delete Series</button>
                     <button onClick={function() { setPendingDelete(null); }} className="text-gray-400 text-xs px-2 py-0.5 bg-gray-700 rounded">Cancel</button>
                   </React.Fragment>
                 ) : (
                   <React.Fragment>
                     <button onClick={function() { if (pickerPK === r.pk) { setPickerPK(null); } else { setPickerPK(r.pk); setPickSearch(""); setPickCardNo(""); setPendingDelete(null); } }} className={"text-xs px-2 py-0.5 rounded border " + (pickerPK === r.pk ? "bg-yellow-700 border-yellow-500 text-yellow-200 font-bold" : "bg-yellow-900/30 border-yellow-800/40 text-yellow-400 hover:text-yellow-300")}>{"\u21C4"} Reassign</button>
-                    <button onClick={function() { setPendingDelete(r.pk); setPickerPK(null); }} className="text-red-400 hover:text-red-300 text-xs px-2 py-0.5 bg-red-900/30 border border-red-800/40 rounded">Delete</button>
+                    <button onClick={function() { setPendingDelete(r.rowKey); setPickerPK(null); }} className="text-red-400 hover:text-red-300 text-xs px-2 py-0.5 bg-red-900/30 border border-red-800/40 rounded">Delete</button>
                   </React.Fragment>
                 )}
                 <button onClick={function() { setExpandedPK(null); setPendingDelete(null); setPickerPK(null); }} className="text-gray-400 hover:text-white text-xs px-2 py-0.5 bg-gray-700 rounded">Close</button>
@@ -7572,6 +7696,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
             </div>
             <div className="text-indigo-300 text-[11px] font-medium mb-2">
               {c.cardSet || "Base"}{c.copies ? " /" + c.copies : ""}
+              <span className="ml-2 text-cyan-300">{window.TrackerMarket.kindLabel(r.kind)} · {r.currency === "UNKNOWN" ? "currency unknown" : r.currency} · {r.conditionLabel}{r.first.priceBasis && r.first.priceBasis !== "item" ? " · "+r.first.priceBasis : ""}</span>
               <span className="ml-3 inline-flex gap-1.5">
                 <button onClick={function(e) { e.stopPropagation(); setActiveTab("detailed"); setDetailedProductFilter(c.product); setDetailedCardNumFilter(c.cardNumber); setDetailedStatusFilter("all"); setDetailedSnFilter("all"); }} className="text-[9px] px-1.5 py-0 rounded bg-purple-900/40 border border-purple-700/50 text-purple-300 hover:bg-purple-800/50 font-bold">{"View #" + c.cardNumber}</button>
                 <button onClick={function(e) { e.stopPropagation(); setActiveTab("detailed"); setDetailedProductFilter(c.product); setDetailedCardNumFilter(null); setDetailedStatusFilter("all"); setDetailedSnFilter("all"); }} className="text-[9px] px-1.5 py-0 rounded bg-gray-700/60 border border-gray-600/50 text-gray-300 hover:bg-gray-600/50 font-bold">Full Set</button>
@@ -7586,19 +7711,19 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
             <div className="grid grid-cols-5 gap-2 mb-3 text-center">
               <div className="bg-yellow-950/40 rounded p-1.5 border border-yellow-900/40">
                 <div className="text-[8px] text-green-500 uppercase font-bold">Lowest</div>
-                <div className="text-sm font-bold" style={{color:"#FFC52F"}}>${minP.toFixed(2)}</div>
+                <div className="text-sm font-bold" style={{color:"#FFC52F"}}>{r.comparable ? window.TrackerMarket.formatMoney(minP, r.currency) : "—"}</div>
               </div>
               <div className="bg-gray-800 rounded p-1.5">
                 <div className="text-[8px] text-gray-500 uppercase">Latest</div>
-                <div className="text-sm font-bold text-indigo-300">${r.latestPrice.toFixed(2)}</div>
+                <div className="text-sm font-bold text-indigo-300">{window.TrackerMarket.formatMoney(r.latestPrice, r.currency)}</div>
               </div>
               <div className="bg-gray-800 rounded p-1.5">
                 <div className="text-[8px] text-gray-500 uppercase">Highest</div>
-                <div className="text-sm font-bold text-red-400">${maxP.toFixed(2)}</div>
+                <div className="text-sm font-bold text-red-400">{r.comparable ? window.TrackerMarket.formatMoney(maxP, r.currency) : "—"}</div>
               </div>
               <div className="bg-gray-800 rounded p-1.5">
                 <div className="text-[8px] text-gray-500 uppercase">Average</div>
-                <div className="text-sm font-bold text-yellow-300">${avgP.toFixed(2)}</div>
+                <div className="text-sm font-bold text-yellow-300">{r.comparable ? window.TrackerMarket.formatMoney(avgP, r.currency) : "—"}</div>
               </div>
               <div className="bg-gray-800 rounded p-1.5">
                 <div className="text-[8px] text-gray-500 uppercase">Sources</div>
@@ -7616,9 +7741,9 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
             </div>
 
             {/* Chart - bar chart with labels */}
-            {r.entries.length >= 2 && (
+            {r.comparable && r.entries.length >= 2 && (
               <div className="bg-gray-900/60 rounded p-2 mb-3">
-                <div className="text-[8px] text-gray-500 uppercase mb-1">Price over time</div>
+                <div className="text-[8px] text-gray-500 uppercase mb-1">Observed prices over time</div>
                 <div className="flex items-end gap-[2px]" style={{height: "60px"}}>
                   {r.entries.map(function(e, i) {
                     var range = maxP - minP || 1;
@@ -7626,7 +7751,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
                     var h = Math.max(4, pct * 52);
                     var barColor = e.source === "eBay" ? "bg-yellow-500" : "bg-green-500";
                     return <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group relative">
-                      <div className="absolute bottom-full mb-0.5 hidden group-hover:block bg-gray-800 text-[8px] text-white px-1 rounded whitespace-nowrap z-10">{e.date.slice(5)} ${e.price.toFixed(2)} {e.source}</div>
+                      <div className="absolute bottom-full mb-0.5 hidden group-hover:block bg-gray-800 text-[8px] text-white px-1 rounded whitespace-nowrap z-10">{e.date.slice(5)} {window.TrackerMarket.formatMoney(e.price, r.currency)} {e.source}</div>
                       <div className={barColor + " w-full rounded-t-sm cursor-pointer hover:opacity-80"} style={{height: h + "px"}}></div>
                     </div>;
                   })}
@@ -7660,18 +7785,19 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
                       for (var pi = 0; pi < r.entries.length; pi++) {
                         if (r.entries[pi].date < e.date && (!prev || r.entries[pi].date > prev.date)) prev = r.entries[pi];
                       }
-                      var chg = prev ? e.price - prev.price : 0;
+                      var chg = prev && r.comparable ? e.price - prev.price : 0;
                       var srcColor = e.source === "eBay" ? "text-yellow-400" : e.source === "SportLots" ? "text-blue-400" : e.source === "Whatnot" ? "text-violet-400" : "text-green-400";
                       var chgColor = !prev ? "text-gray-600" : chg < -0.01 ? "text-yellow-300" : chg > 0.01 ? "text-red-400" : "text-gray-500";
                       var hasTitles = e.titles && e.titles.length > 0;
                       return <React.Fragment key={i}>
                         <tr className="border-b border-gray-800/50 hover:bg-gray-800/40">
-                          <td className="py-0.5 px-1 text-gray-300">{e.date}</td>
-                          <td className={"py-0.5 px-1 font-bold " + srcColor}>{e.source}</td>
-                          <td className="py-0.5 px-1 text-right font-bold text-indigo-300">${e.price.toFixed(2)}</td>
+                          <td className="py-0.5 px-1 text-gray-300">{e.date}{e.eventDate && <div className="text-[8px] text-gray-500">{window.TrackerMarket.kindLabel(e.kind) + " " + e.eventDate}</div>}<div className="text-[8px] text-amber-300/80">Source age at capture: {e.sourceSnapshotFreshness || "unknown"}</div></td>
+                          <td className={"py-0.5 px-1 font-bold " + srcColor}>{e.source}{window.TrackerMarket.safeUrl(e.itemUrl) && <a className="ml-1 underline" href={window.TrackerMarket.safeUrl(e.itemUrl)} target="_blank" rel="noopener noreferrer">Listing</a>}{e.serial && <span className="block text-[8px] text-gray-500">{"Listing serial: " + e.serial}</span>}<span className="block text-[8px] font-normal text-violet-300">{window.TrackerMarket.conditionLabel(e)}</span><span className="block text-[8px] font-normal text-gray-400">{e.liveAvailabilityVerified ? "Availability checked: "+(e.availability || "unspecified") : "Live availability unconfirmed"}{e.seller ? " · Seller: "+e.seller : ""}</span></td>
+                          <td className="py-0.5 px-1 text-right font-bold text-indigo-300">{window.TrackerMarket.formatMoney(e.price, r.currency)}{e.shipping != null ? <span className="block text-[8px] font-normal text-gray-400">Shipping {window.TrackerMarket.formatMoney(e.shipping,e.shippingCurrency)}{e.shippingScope ? " · "+e.shippingScope : ""}</span> : null}</td>
                           <td className="py-0.5 px-1 text-right text-gray-500">{e.listings || 1}</td>
-                          <td className={"py-0.5 px-1 text-right font-bold " + chgColor}>{!prev ? "\u2014" : (chg > 0 ? "+" : "") + chg.toFixed(2)}</td>
+                          <td className={"py-0.5 px-1 text-right font-bold " + chgColor}>{!prev || !r.comparable ? "\u2014" : (chg > 0 ? "+" : "") + chg.toFixed(2)}</td>
                         </tr>
+                        {e.notes && e.notes.length ? <tr><td colSpan={5} className="px-2 py-1 text-[9px] text-gray-400">{Array.isArray(e.notes) ? e.notes.join(" · ") : String(e.notes)}</td></tr> : null}
                         {hasTitles && (
                           <tr className="border-b border-gray-800/30">
                             <td colSpan={5} className="px-1 py-0.5">
@@ -7785,13 +7911,13 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
         <div>
           <div className="flex items-center gap-3 text-[9px] mb-1">
             <span className="text-gray-500">{rows.length} card{rows.length !== 1 ? "s" : ""}</span>
-            {filterStatus === "need" && rows.length > 0 && <span className="font-bold" style={{color:"#FFC52F"}}>{rows.length} need ${rows.reduce(function(s,r){return s+r.lowestPrice;},0).toFixed(2)} at lowest</span>}
+            <span className="text-gray-500">Each row keeps currency, price type, and grade or condition separate. Source ages describe the snapshot when captured; live availability is shown separately.</span>
           </div>
           <div className="overflow-y-auto" style={{maxHeight: expandedRow ? "280px" : "calc(100vh - 220px)"}}>
             <table className="w-full text-[10px]">
               <thead><tr className="text-gray-500 border-b border-gray-700 sticky top-0 bg-gray-900 z-10">
                 <th className="text-left py-1 px-1 w-3"></th>
-                {[["product","Product"],["number","#"],["variant","Variant"],["sn","SN"],["price","Low"],["trend","Trend"],["tracked","Src"],["date","Date"]].map(function(col) {
+                {[["product","Product"],["number","#"],["variant","Variant"],["sn","SN"],["price","Latest"],["trend","Trend"],["tracked","Src"],["date","Date"]].map(function(col) {
                   var isActive = sortBy === col[0];
                   return <th key={col[0]} className={"py-1 px-1 cursor-pointer select-none hover:text-indigo-300 transition-colors " + (col[0] === "price" || col[0] === "sn" || col[0] === "trend" || col[0] === "date" ? "text-right " : "text-left ") + (isActive ? "text-indigo-400 font-bold" : "")} onClick={function() { if (isActive) { setSortDir(sortDir === "asc" ? "desc" : "asc"); } else { setSortBy(col[0]); setSortDir(col[0] === "price" || col[0] === "sn" ? "asc" : "desc"); }}}>{col[1]}{isActive ? (sortDir === "asc" ? " \u25B2" : " \u25BC") : ""}</th>;
                 })}
@@ -7799,17 +7925,17 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
               <tbody>
                 {rows.map(function(row) {
                   var c = row.card;
-                  var isExp = expandedPK === row.pk;
+                  var isExp = expandedPK === row.rowKey;
                   var statusDot = row.status === "owned" ? "bg-green-500" : row.status === "in_transit" ? "bg-emerald-400" : "bg-red-500";
                   var trendColor = row.entries.length < 2 ? "text-gray-600" : row.delta < -0.01 ? "text-green-400" : row.delta > 0.01 ? "text-red-400" : "text-gray-500";
-                  var trendText = row.entries.length < 2 ? "\u2014" : (row.delta < 0 ? "" : "+") + row.delta.toFixed(2);
-                  return <tr key={row.pk} onClick={function() { if (!isExp) { setInnerSort("date"); setInnerSortDir("desc"); } setExpandedPK(isExp ? null : row.pk); }} className={"border-b border-gray-800/30 cursor-pointer hover:bg-gray-800/40 " + (isExp ? "bg-indigo-950/30" : "")}>
+                  var trendText = !row.comparable || row.entries.length < 2 ? "\u2014" : (row.delta < 0 ? "" : "+") + row.delta.toFixed(2);
+                  return <tr key={row.rowKey} onClick={function() { if (!isExp) { setInnerSort("date"); setInnerSortDir("desc"); } setExpandedPK(isExp ? null : row.rowKey); }} className={"border-b border-gray-800/30 cursor-pointer hover:bg-gray-800/40 " + (isExp ? "bg-indigo-950/30" : "")}>
                     <td className="py-0.5 px-1">{row.flagged ? <span className="text-yellow-400 text-[9px]" title="Suspicious - verify match">⚠</span> : <span className={"inline-block w-1.5 h-1.5 rounded-full " + statusDot}></span>}</td>
                     <td className="py-0.5 px-1 text-gray-300 truncate" style={{maxWidth:"clamp(100px,12vw,200px)"}} title={c.product + " - Click to view full set"}><button onClick={function(e) { e.stopPropagation(); setActiveTab("detailed"); setDetailedProductFilter(c.product); setDetailedCardNumFilter(null); setDetailedStatusFilter("all"); setDetailedSnFilter("all"); }} className="text-left hover:text-indigo-300 hover:underline truncate w-full">{c.product.replace(/^\d{4}\s*/, "")}</button></td>
                     <td className="py-0.5 px-1"><button onClick={function(e) { e.stopPropagation(); setActiveTab("detailed"); setDetailedProductFilter(c.product); setDetailedCardNumFilter(c.cardNumber); setDetailedStatusFilter("all"); setDetailedSnFilter("all"); }} className="text-gray-500 hover:text-purple-300 hover:underline" title={"View all #" + c.cardNumber + " variants"}>{c.cardNumber}</button></td>
-                    <td className="py-0.5 px-1 text-gray-400 truncate" style={{maxWidth:"clamp(80px,10vw,180px)"}} title={c.cardSet}>{c.cardSet || "Base"}</td>
+                    <td className="py-0.5 px-1 text-gray-400 truncate" style={{maxWidth:"clamp(80px,10vw,180px)"}} title={c.cardSet}>{c.cardSet || "Base"}<span className="block text-[8px] text-cyan-400">{window.TrackerMarket.kindLabel(row.kind)} · {row.currency === "UNKNOWN" ? "currency unknown" : row.currency}</span><span className="block text-[8px] text-violet-300">{row.conditionLabel}{row.first.priceBasis && row.first.priceBasis !== "item" ? " · "+row.first.priceBasis : ""}</span></td>
                     <td className="py-0.5 px-1 text-right text-purple-400 font-bold">{c.copies ? "/" + c.copies : ""}</td>
-                    <td className="py-0.5 px-1 text-right font-bold text-indigo-300">${row.latestPrice.toFixed(2)}</td>
+                    <td className="py-0.5 px-1 text-right font-bold text-indigo-300">{window.TrackerMarket.formatMoney(row.latestPrice, row.currency)}</td>
                     <td className={"py-0.5 px-1 text-right font-bold " + trendColor}>{trendText}</td>
                     <td className="py-0.5 px-1 text-right text-[9px]">{(function() {
                       var ec = 0, cc = 0;
@@ -7820,7 +7946,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
                       if (cc) parts.push(React.createElement("span", {key:"c", className:"text-green-400"}, cc + "C"));
                       return parts;
                     })()}</td>
-                    <td className="py-0.5 px-1 text-right text-gray-600">{row.latestDate.slice(5)}</td>
+                    <td className="py-0.5 px-1 text-right text-gray-500">{row.latestDate.slice(5)}<span className="block text-[8px] text-amber-300/80">Source age at capture: {row.last.sourceSnapshotFreshness || "unknown"}</span><span className="block text-[8px]">{row.last.liveAvailabilityVerified ? "Availability checked" : "Live availability unconfirmed"}</span></td>
                   </tr>;
                 })}
               </tbody>
@@ -7863,22 +7989,17 @@ function TargetsPanel({ cards, statuses, setCardStatus, updateCardDetail, setDet
     var tgt = loadTargets();
     var t = tgt[key];
     if (!t || !t.cardId) return;
-    setCardStatus(t.cardId, "in_transit");
-    if (t.price) updateCardDetail(t.cardId, "price_paid", "$" + t.price);
-    updateCardDetail(t.cardId, "purchase_date", new Date().toISOString().slice(0,10));
-    if (t.source) updateCardDetail(t.cardId, "source", t.source);
-    if (t.notes) updateCardDetail(t.cardId, "notes", t.notes);
+    if (setCardStatus(t.cardId, window.TrackerMarket.importStatus(statuses[t.cardId], "in_transit")) === false) return;
+    // An asking price is not an actual purchase price. Record the exact copy
+    // and amount paid in Copies after the purchase is identified.
     delete tgt[key]; saveTargets(tgt); setTargets(Object.assign({}, tgt));
   }
   function markOwned(key) {
     var tgt = loadTargets();
     var t = tgt[key];
     if (!t || !t.cardId) return;
-    setCardStatus(t.cardId, "owned");
-    if (t.price) updateCardDetail(t.cardId, "price_paid", "$" + t.price);
-    updateCardDetail(t.cardId, "purchase_date", new Date().toISOString().slice(0,10));
-    if (t.source) updateCardDetail(t.cardId, "source", t.source);
-    if (t.notes) updateCardDetail(t.cardId, "notes", t.notes);
+    if (setCardStatus(t.cardId, "owned") === false) return;
+    updateCardDetail(t.cardId, "inHandConfirmedAt", new Date().toISOString());
     delete tgt[key]; saveTargets(tgt); setTargets(Object.assign({}, tgt));
   }
 
@@ -7908,14 +8029,14 @@ function TargetsPanel({ cards, statuses, setCardStatus, updateCardDetail, setDet
   }
   var sorted = filtered.slice().sort(function(a, b) {
     var mul = sortDir === "asc" ? 1 : -1;
-    if (sort === "price") return mul * ((parseFloat(a.price) || 999) - (parseFloat(b.price) || 999));
+    if (sort === "price") return window.TrackerMarket.currency(a.currency).localeCompare(window.TrackerMarket.currency(b.currency)) || window.TrackerMarket.kind(a.priceKind).localeCompare(window.TrackerMarket.kind(b.priceKind)) || mul * ((parseFloat(a.price) || 999) - (parseFloat(b.price) || 999));
     if (sort === "year") return mul * ((a.year || "").localeCompare(b.year || ""));
     if (sort === "source") return mul * ((a.source || "").localeCompare(b.source || ""));
     if (sort === "status") return mul * ((a.status || "").localeCompare(b.status || ""));
     return mul * ((b.dateAdded || "").localeCompare(a.dateAdded || ""));
   });
 
-  var totalActive = allTargets.filter(function(t){ return t.status === "active"; }).reduce(function(sum, t){ return sum + (parseFloat(t.price) || 0); }, 0);
+  var totalActive = window.TrackerMarket.formatEvidenceTotals(allTargets.filter(function(t){ return t.status === "active"; }).map(function(t){ return { price:t.price, currency:t.currency, kind:t.priceKind }; }));
 
   function sortArrow(col) { return sort === col ? (sortDir === "asc" ? " \u25B2" : " \u25BC") : ""; }
 
@@ -7925,7 +8046,7 @@ function TargetsPanel({ cards, statuses, setCardStatus, updateCardDetail, setDet
       <div className="flex items-center gap-3 flex-wrap">
         <h2 className="text-pink-400 font-bold" style={{fontSize:"14px"}}>{"\uD83C\uDFAF"} Pinned Targets</h2>
         <span className="text-gray-500 text-xs">{allTargets.length} targets saved</span>
-        {activeCount > 0 && <span className="text-pink-300 text-xs">{"\uD83C\uDFAF"} {activeCount} active{totalActive > 0 ? " ($" + totalActive.toFixed(2) + " total)" : ""}</span>}
+        {activeCount > 0 && <span className="text-pink-300 text-xs">{"\uD83C\uDFAF"} {activeCount} active{totalActive ? " (" + totalActive + ")" : ""}</span>}
         {watchingCount > 0 && <span className="text-gray-400 text-xs">{"\uD83D\uDC41"} {watchingCount} watching</span>}
       </div>
       {/* Description */}
@@ -8012,7 +8133,7 @@ function TargetsPanel({ cards, statuses, setCardStatus, updateCardDetail, setDet
                           {card && isTransit && <span className="text-cyan-400 text-[8px] font-bold bg-cyan-900/50 px-0.5 rounded ml-0.5">TRANSIT</span>}
                         </div>
                       </td>
-                      <td className={"px-1 py-1 text-right font-bold whitespace-nowrap " + (isActive && isNeed ? "text-pink-300" : "text-gray-500")}>{t.price ? (t.currency === "GBP" ? "\u00A3" : "$") + t.price : ""}</td>
+                      <td className={"px-1 py-1 text-right font-bold whitespace-nowrap " + (isActive && isNeed ? "text-pink-300" : "text-gray-500")}>{window.TrackerMarket.formatMoney(t.price, t.currency)}<span className="block text-[8px] font-normal">{window.TrackerMarket.kindLabel(t.priceKind)}</span></td>
                       <td className="px-1 py-1 text-gray-500 max-w-[80px] truncate" title={t.seller}>{(function() {
                         if (t.listingType === "auction") return <span className="text-red-400 font-bold text-[9px] bg-red-950/40 px-1 rounded border border-red-800" title={"Auction" + (t.bids ? " - " + t.bids + " bids" : "")}>{"\uD83D\uDD28"}{t.bids ? " " + t.bids : ""}</span>;
                         if (t.listingType === "best_offer") return <span className="text-cyan-400 font-bold text-[9px] bg-cyan-950/40 px-1 rounded border border-cyan-800" title="Best Offer">{"\uD83E\uDD1D OBO"}</span>;
@@ -8034,7 +8155,7 @@ function TargetsPanel({ cards, statuses, setCardStatus, updateCardDetail, setDet
                           <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px]">
                             <div><span className="text-gray-500">Full title: </span><span className="text-gray-300">{t.title || "N/A"}</span></div>
                             <div><span className="text-gray-500">Source: </span><span className={srcColor}>{t.source || "Unknown"}</span></div>
-                            <div><span className="text-gray-500">Price: </span><span className="text-green-300 font-bold">{t.price ? (t.currency === "GBP" ? "\u00A3" : "$") + t.price : "N/A"}</span>{t.watchPrice ? <span className="text-gray-500 ml-1">{"(total incl. shipping: $" + t.watchPrice.toFixed(2) + ")"}</span> : ""}</div>
+                            <div><span className="text-gray-500">Price: </span><span className="text-green-300 font-bold">{window.TrackerMarket.formatMoney(t.price, t.currency)}</span>{t.watchPrice ? <span className="text-gray-500 ml-1">{"(total incl. shipping: " + window.TrackerMarket.formatMoney(t.watchPrice, t.currency) + ")"}</span> : ""}</div>
                             <div><span className="text-gray-500">Seller: </span><span className="text-gray-300">{t.seller || "Unknown"}</span></div>
                             <div><span className="text-gray-500">Date added: </span><span className="text-gray-300">{t.dateAdded || "Unknown"}</span></div>
                             <div><span className="text-gray-500">Status: </span><span className={isActive ? "text-pink-400 font-bold" : "text-gray-400"}>{isActive ? "\uD83C\uDFAF Active" : "\uD83D\uDC41 Watching"}</span></div>
@@ -8463,7 +8584,7 @@ function TaskBoardPanel() {
           <div className="mb-4 p-2 bg-indigo-950/30 border border-indigo-800/40 rounded">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-bold text-indigo-300">Price History (tb-price-history-v1)</span>
-              <button onClick={function() { if (confirm("Clear ALL price history? This cannot be undone.")) { savePriceHistory({}); }}} className="text-[9px] px-1 py-0 bg-red-900/30 text-red-400 rounded hover:bg-red-800/40 border border-red-800/40">Clear</button>
+              <button onClick={function() { if (confirm("Clear ALL price history? This cannot be undone.")) { var current=loadPriceHistory();savePriceHistory({},{removals:Object.keys(current).map(function(key){return {cardKey:key,entries:current[key]};})}); }}} className="text-[9px] px-1 py-0 bg-red-900/30 text-red-400 rounded hover:bg-red-800/40 border border-red-800/40">Clear</button>
             </div>
             <div className="flex gap-4 text-[10px] text-gray-400">
               <span><span className="text-indigo-400 font-bold">{cardCount}</span> cards tracked</span>
