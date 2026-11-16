@@ -1332,10 +1332,33 @@ function TylerBlackTracker() {
       return next;
     });
   }, [saveDetails, pushUndo, logChange, persistField]);
+  const quickSaveCount = useCallback(async function(cardId, count) {
+    try {
+      var next = window.CopyInventory.quickQuantity(copyStateRef.current.inventory, cardId, count, {statuses:statuses,cardDetails:cardDetails});
+      var result = await saveCopyInventory(next);
+      if (!result || result.ok === false) throw Error(result && result.error || "Unable to save quantity.");
+    } catch(error) { window.alert(error.message || "Unable to save quantity."); }
+  }, [statuses,cardDetails,saveCopyInventory]);
+  const quickSaveHand = useCallback(async function(cardId, hand) {
+    try {
+      var next = window.CopyInventory.quickAllocation(copyStateRef.current.inventory, cardId, hand, {statuses:statuses,cardDetails:cardDetails});
+      var result = await saveCopyInventory(next);
+      if (!result || result.ok === false) throw Error(result && result.error || "Unable to save allocation.");
+    } catch(error) { window.alert(error.message || "Unable to save allocation."); }
+  }, [statuses,cardDetails,saveCopyInventory]);
   const setCardStatus = useCallback((cardId, status) => {
     if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
     if (trackerMode === "tb" && window.CopyInventory.hasStoredCopies(copyStateRef.current.inventory, cardId)) {
-      setCopyCardId(cardId); setActiveTab("copies"); return false;
+      var rows = window.CopyInventory.getCopiesForCard(copyStateRef.current.inventory,cardId,statuses,cardDetails).filter(function(c){return c.saleStatus !== "sold";});
+      var legacy = rows.filter(function(c){return c.origin === "legacy";});
+      var explicitHand = rows.filter(function(c){return c.origin !== "legacy" && c.location === "in_hand";}).length;
+      if (status === "not_owned") {
+        if (rows.length) window.alert("Set Qty to 0, or use Details to review documented copies.");
+        return false;
+      }
+      if (!legacy.length) { setCopyCardId(cardId); setActiveTab("copies"); return false; }
+      quickSaveHand(cardId, status === "owned" ? explicitHand + legacy.length : explicitHand);
+      return true;
     }
     setSessionChanges(prev => prev + 1);
     setStatuses(prev => {
@@ -1354,7 +1377,7 @@ function TylerBlackTracker() {
       }
       return next;
     });
-  }, [saveStatuses, pushUndo, logChange, persistField, trackerMode]);
+  }, [saveStatuses, pushUndo, logChange, persistField, trackerMode, statuses, cardDetails, quickSaveHand]);
   const copySummaries = useMemo(function() {
     if (!isOwner || trackerMode !== "tb") return null;
     var result = {};
@@ -1375,7 +1398,7 @@ function TylerBlackTracker() {
   // auto-set status to not_owned. Setting an explicit value uses setCardQty below.
   const adjustCardQty = useCallback((cardId, delta) => {
     if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
-    if (copySummaries && copySummaries[cardId] && copySummaries[cardId].managed) { openCardCopies(cardId); return; }
+    if (copySummaries && copySummaries[cardId] && copySummaries[cardId].managed) { quickSaveCount(cardId, Math.max(0, copySummaries[cardId].total + (delta || 0))); return; }
     var current = getCardQty(cardDetails, statuses, cardId);
     var next = Math.max(0, current + (delta || 0));
     if (next === current) return;
@@ -1386,10 +1409,10 @@ function TylerBlackTracker() {
     } else if (current >= 1 && next === 0 && (prevStatus === "owned" || prevStatus === "in_transit")) {
       setCardStatus(cardId, "not_owned");
     }
-  }, [cardDetails, statuses, updateCardDetail, setCardStatus, copySummaries, openCardCopies]);
+  }, [cardDetails, statuses, updateCardDetail, setCardStatus, copySummaries, openCardCopies, quickSaveCount]);
   const setCardQty = useCallback((cardId, newQty) => {
     if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
-    if (copySummaries && copySummaries[cardId] && copySummaries[cardId].managed) { openCardCopies(cardId); return; }
+    if (copySummaries && copySummaries[cardId] && copySummaries[cardId].managed) { quickSaveCount(cardId, Math.max(0, parseInt(newQty) || 0)); return; }
     var current = getCardQty(cardDetails, statuses, cardId);
     var n = Math.max(0, parseInt(newQty) || 0);
     if (n === current) return;
@@ -1400,7 +1423,7 @@ function TylerBlackTracker() {
     } else if (current >= 1 && n === 0 && (prevStatus === "owned" || prevStatus === "in_transit")) {
       setCardStatus(cardId, "not_owned");
     }
-  }, [cardDetails, statuses, updateCardDetail, setCardStatus, copySummaries, openCardCopies]);
+  }, [cardDetails, statuses, updateCardDetail, setCardStatus, copySummaries, openCardCopies, quickSaveCount]);
   const toggleStatus = useCallback((cardId) => {
     setSessionChanges(prev => prev + 1);
     setStatuses(prev => {
@@ -1961,7 +1984,6 @@ function TylerBlackTracker() {
                   <div className="flex items-center gap-0.5 flex-shrink-0" onClick={function(e){e.stopPropagation();}}>
                     {(function() {
                       var qty = getCardQty(cardDetails, statuses, card.id, copySummaries);
-                      if (copySummary.managed) return <button onClick={function(){ openCardCopies(card.id); }} className="rounded border border-cyan-800 px-1 text-cyan-300 text-[9px] font-bold" title="Review individual copies and their locations">{qty} {qty === 1 ? "copy" : "copies"}</button>;
                       return <React.Fragment>
                         <button onClick={function(){ adjustCardQty(card.id, -1); }} className="bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white font-bold leading-none px-1" style={{fontSize:"clamp(9px,1vw,11px)",minWidth:"14px"}} title={qty <= 1 ? "Remove (sets not owned)" : "-1 copy"}>-</button>
                         <span className={"font-black tabular-nums " + (qty === 0 ? "text-gray-600" : qty > 1 ? "text-green-400" : "text-cyan-300")} style={{fontSize:"clamp(9px,1vw,11px)",minWidth:"12px",textAlign:"center"}}>{qty}</span>
@@ -1971,7 +1993,7 @@ function TylerBlackTracker() {
                     })()}
                   </div>
                   <div className="flex gap-0.5 flex-shrink-0" onClick={function(e){e.stopPropagation();}}>
-                    {copySummary.managed ? <button onClick={function(){openCardCopies(card.id);}} className="rounded border border-cyan-800 px-2 py-1 text-[9px] text-cyan-300" title="Change the location or status of an individual copy">Edit locations</button> : PRIMARY_STATUSES.map(function(key) {
+                    {PRIMARY_STATUSES.map(function(key) {
                       var c = STATUS_CONFIG[key];
                       return (
                       <button key={key} onClick={function(){setCardStatus(card.id, key);}}
@@ -3066,14 +3088,21 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
             </div>
             {(function() {
               var curQty = getCardQty(cardDetails, statuses, selectedCard.id, copySummaries);
-              if (copySummaries && copySummaries[selectedCard.id] && copySummaries[selectedCard.id].managed) return <button onClick={function(){ openCardCopies(selectedCard.id); }} className="rounded border border-cyan-800 px-2 py-1 text-cyan-300">Review {curQty} counted copies</button>;
               return <div className="flex items-center gap-1 col-span-2">
                 <span className="text-gray-500 w-10">Qty</span>
                 <button onClick={function(){ adjustCardQty(selectedCard.id, -1); }} className="bg-gray-800 border border-gray-700 rounded w-5 h-5 text-gray-400 hover:text-white hover:bg-gray-700 font-bold text-[10px] flex items-center justify-center" title={curQty <= 1 ? "Down to 0 (sets status to not owned)" : "Decrement quantity"}>-</button>
                 <input type="number" min="0" value={curQty} onChange={function(e){ setCardQty(selectedCard.id, e.target.value); }} className="w-10 text-center bg-gray-950 border border-gray-700 rounded px-1 py-0 text-white outline-none" />
                 <button onClick={function(){ adjustCardQty(selectedCard.id, 1); }} className="bg-gray-800 border border-gray-700 rounded w-5 h-5 text-gray-400 hover:text-white hover:bg-gray-700 font-bold text-[10px] flex items-center justify-center" title={curQty === 0 ? "Add 1 copy (sets status to in-transit)" : "Increment quantity"}>+</button>
                 {curQty > 1 && <span className="text-green-400 font-black text-[10px] bg-green-950/40 border border-green-800 rounded px-1">{"+" + (curQty - 1) + " extra"}</span>}
-                {curQty === 0 && fs !== "not_owned" && <span className="text-orange-400 text-[8px]">(0 — click + to acquire)</span>}
+                {trackerMode === "tb" && curQty > 1 && (function(){
+                  var rows = window.CopyInventory.getCopiesForCard(copyInventory, selectedCard.id, statuses, cardDetails).filter(function(c){return c.saleStatus !== "sold";});
+                  var legacy = rows.filter(function(c){return c.origin === "legacy";});
+                  var confirmedHand = rows.filter(function(c){return c.origin !== "legacy" && c.location === "in_hand";}).length;
+                  var hand = rows.filter(function(c){return c.location === "in_hand" || c.origin === "legacy" && c.location === "unknown" && fs === "owned";}).length;
+                  return <React.Fragment><span className="text-gray-500 ml-1">Hand</span><input aria-label="Copies in hand" type="number" min={confirmedHand} max={confirmedHand+legacy.length} value={hand} onChange={function(e){quickSaveHand(selectedCard.id,Number(e.target.value));}} className="w-9 rounded border border-green-800 bg-gray-950 text-center text-green-300" /><span className="text-gray-500">Transit {curQty-hand}</span></React.Fragment>;
+                })()}
+                {copySummaries && copySummaries[selectedCard.id] && copySummaries[selectedCard.id].managed && <button className="ml-auto text-cyan-300 underline" onClick={function(){openCardCopies(selectedCard.id);}}>Details</button>}
+                {curQty === 0 && fs !== "not_owned"} && <span className="text-orange-400 text-[8px]">(0 — click + to acquire)</span>}
               </div>;
             })()}
           </div>
