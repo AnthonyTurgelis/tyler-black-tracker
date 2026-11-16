@@ -641,7 +641,7 @@
         else if (options.filter === "removed") query = query.in("impact_kind",["removed","owned_to_transit","location_left_hand","qty_down","count_removed"]);
         else if (options.filter === "to_transit") query = query.in("impact_kind",["owned_to_transit","location_left_hand"]);
         else if (options.filter === "qty") query = query.in("impact_kind",["qty_up","qty_down","qty_set","count_added","count_removed"]);
-        else if (options.filter === "pending") query = query.or("evidence_level.eq.pending,evidence_level.eq.snapshot_only");
+        else if (options.filter === "pending") query = query.eq("category","copy").eq("evidence_level","pending");
         else if (options.filter === "comc") query = query.or("evidence_level.eq.comc_source_matched,source_ref.ilike.%comc.com%");
         else if (options.filter === "backend_impact") query = query.in("actor",["Backend","Backfill","Snapshot"]).not("impact_kind","is",null);
         else if (options.filter === "backend") query = query.in("actor",["Backend","Backfill","Snapshot"]);
