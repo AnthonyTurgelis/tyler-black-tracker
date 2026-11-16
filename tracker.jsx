@@ -8805,225 +8805,143 @@ function VersionLogPanel() {
   );
 }
 
-function ChangelogPanel({ changelog, setChangelog, statuses, cardDetails, forSaleFlags, setStatuses, setCardDetails, setForSaleFlags, saveStatuses, saveDetails, setDirtyIds, currentSessionId, clearUndoStack, persistField }) {
-  var [viewMode, setViewMode] = useState("sessions");
-  var [typeFilter, setTypeFilter] = useState("all");
-  var [dayLimit, setDayLimit] = useState(50);
-  var [confirmClear, setConfirmClear] = useState(false);
-  var [confirmRevert, setConfirmRevert] = useState(null);
 
-  var STATUS_LABELS = { owned: "Owned", in_transit: "In Transit", not_owned: "Not Owned" };
-  var FIELD_LABELS = { serial: "Serial #", price: "Price", date: "Date", notes: "Notes", status: "Status", for_sale: "For Sale" };
-  var TYPE_COLORS = { status: "text-yellow-400", detail: "text-cyan-400", forsale: "text-pink-400" };
-  var TYPE_LABELS = { status: "Status", detail: "Detail", forsale: "For Sale" };
+function ChangelogPanel({ changelog }) {
+  const [auditRows, setAuditRows] = useState([]);
+  const [auditReady, setAuditReady] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [hasMore, setHasMore] = useState(false);
+  const [shown, setShown] = useState(100);
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [desc, setDesc] = useState(true);
 
-  function fmtVal(type, field, val) {
-    if (!val && val !== 0) return "\u2014";
-    if (field === "status" || type === "status") return STATUS_LABELS[val] || val;
-    return String(val);
-  }
-  function fmtTime(iso) {
-    try { return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; }
-  }
-  function fmtDate(iso) {
-    try { return new Date(iso).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }); } catch (e) { return ""; }
-  }
-  function fmtDateTime(iso) {
-    try { return new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; }
-  }
-
-  // Group by session
-  var sessions = useMemo(function() {
-    var map = {};
-    changelog.forEach(function(e) {
-      var sid = e.sid || "unknown";
-      if (!map[sid]) map[sid] = { sid: sid, entries: [], firstTs: e.ts, lastTs: e.ts };
-      map[sid].entries.push(e);
-      if (e.ts < map[sid].firstTs) map[sid].firstTs = e.ts;
-      if (e.ts > map[sid].lastTs) map[sid].lastTs = e.ts;
-    });
-    return Object.values(map).sort(function(a, b) { return b.lastTs.localeCompare(a.lastTs); });
-  }, [changelog]);
-
-  var filtered = useMemo(function() {
-    if (typeFilter === "all") return changelog;
-    return changelog.filter(function(e) { return e.type === typeFilter; });
-  }, [changelog, typeFilter]);
-
-  // Group by date for flat view
-  var grouped = useMemo(function() {
-    var groups = [];
-    var currentDay = null;
-    filtered.slice(0, dayLimit).forEach(function(entry) {
-      var day = fmtDate(entry.ts);
-      if (day !== currentDay) { currentDay = day; groups.push({ day: day, entries: [] }); }
-      groups[groups.length - 1].entries.push(entry);
-    });
-    return groups;
-  }, [filtered, dayLimit]);
-
-  function clearChangelog() {
-    if (!confirmClear) { setConfirmClear(true); setTimeout(function() { setConfirmClear(false); }, 3000); return; }
-    setChangelog([]);
-    persistField("changelog", []);
-    setConfirmClear(false);
-  }
-
-  function revertSession(sid) {
-    if (confirmRevert !== sid) { setConfirmRevert(sid); setTimeout(function() { setConfirmRevert(null); }, 4000); return; }
-    var entries = changelog.filter(function(e) { return e.sid === sid; }).reverse();
-    var newStatuses = { ...statuses };
-    var newDetails = JSON.parse(JSON.stringify(cardDetails));
-    var newForSale = { ...forSaleFlags };
-    var dirtyToRemove = new Set();
-    entries.forEach(function(e) {
-      if (e.type === "status") {
-        newStatuses[e.cardId] = e.from || "not_owned";
-        if (e.from === "not_owned" || !e.from) dirtyToRemove.add(e.cardId);
-      } else if (e.type === "detail") {
-        if (!newDetails[e.cardId]) newDetails[e.cardId] = {};
-        if (e.from) { newDetails[e.cardId][e.field] = e.from; }
-        else { delete newDetails[e.cardId][e.field]; }
-      } else if (e.type === "forsale") {
-        if (e.from === "Yes") newForSale[e.cardId] = true;
-        else delete newForSale[e.cardId];
-      }
-    });
-    setStatuses(newStatuses);
-    setCardDetails(newDetails);
-    setForSaleFlags(newForSale);
-    saveStatuses(newStatuses);
-    saveDetails(newDetails);
-    persistField("forsale", newForSale);
-    if (dirtyToRemove.size > 0) {
-      setDirtyIds(function(prev) {
-        var next = new Set(prev);
-        dirtyToRemove.forEach(function(id) { next.delete(id); });
-        persistField("dirty", [...next]);
-        return next;
-      });
+  const refresh = useCallback(async function(offset, append) {
+    if (!window.trackerAudit) {
+      setAuditReady(false); setError("Backend history is unavailable.");
+      setLoading(false); return;
     }
-    var remaining = changelog.filter(function(e) { return e.sid !== sid; });
-    setChangelog(remaining);
-    persistField("changelog", remaining);
-    setConfirmRevert(null);
-    if (clearUndoStack) clearUndoStack();
+    setLoading(true);
+    try {
+      const result = await window.trackerAudit.list({ offset:offset, limit:500 });
+      if (!result.ok) throw new Error(result.error || "Unable to read backend activity.");
+      setAuditRows(previous => append ? previous.concat(result.rows) : result.rows);
+      setHasMore(result.hasMore);
+      setAuditReady(true);
+      setError("");
+    } catch(e) { setError(e.message || "Unable to load activity."); if (!append) setAuditReady(false); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(function() { refresh(0,false); }, [refresh]);
+
+  const history = useMemo(function() {
+    if (auditReady) return auditRows.map(function(row) {
+      return { id:row.id, ts:row.changed_at, cardId:row.card_id, type:row.category,
+        field:row.field, from:row.old_value, to:row.new_value, actor:row.actor, copyId:row.copy_id };
+    });
+    return (changelog || []).map(function(row,index) {
+      return { id:"old-"+index, ts:row.ts, cardId:row.cardId, cardLabel:row.cardLabel,
+        type:row.field === "qty" ? "qty" : row.type === "status" ? "status" : row.type === "forsale" ? "sale" : "detail",
+        field:row.field === "status" ? "Status" : row.field === "qty" ? "Qty" : row.field || "Detail",
+        from:row.from, to:row.to, actor:"Local" };
+    });
+  }, [auditRows,auditReady,changelog]);
+
+  const describe = useCallback(function(entry) {
+    var card = CARD_BY_ID[entry.cardId];
+    return card ? String(card.product || "") + " · #" + (card.cardNumber || "") + " · " + (card.cardSet || "Base")
+      : entry.cardLabel || ("Card #" + entry.cardId);
+  }, []);
+
+  const matches = useMemo(function() {
+    var needle = search.trim().toLowerCase();
+    var rows = history.filter(function(row) {
+      if (filter === "status" && row.type !== "status") return false;
+      if (filter === "movement" && !["status","location","qty","copy"].includes(row.type)) return false;
+      if (filter === "qty" && !["qty","copy"].includes(row.type)) return false;
+      if (filter === "location" && row.type !== "location") return false;
+      if (filter === "backend" && row.actor !== "Backend") return false;
+      return !needle || [describe(row), row.field, row.from, row.to, row.actor, row.copyId]
+        .map(function(part){return String(part == null ? "" : part);}).join(" ").toLowerCase().includes(needle);
+    });
+    return rows.sort(function(a,b) {
+      var cmp = (new Date(a.ts).getTime() || 0) - (new Date(b.ts).getTime() || 0);
+      if (!cmp) cmp = Number(a.id) - Number(b.id) || 0;
+      return desc ? -cmp : cmp;
+    });
+  }, [history,filter,search,desc,describe]);
+
+  const val = function(row, raw) {
+    if (raw == null || String(raw) === "") return "—";
+    if (row.type === "status") return ({owned:"Owned",in_transit:"Transit",not_owned:"Needed",for_sale:"For sale"})[raw] || String(raw);
+    if (row.type === "location") return ({in_hand:"Hand",in_transit:"Transit",oklahoma_mailbox:"Oklahoma",comc:"COMC",unknown:"Unknown"})[raw] || String(raw);
+    return String(raw);
+  };
+  const when = function(ts) {
+    var d=new Date(ts);
+    return isNaN(d.getTime()) ? "—" : d.toLocaleString([], { month:"short",day:"numeric",hour:"numeric",minute:"2-digit" });
+  };
+  const visible = matches.slice(0,shown);
+  const canShowMore = shown < matches.length || auditReady && hasMore;
+
+  async function more() {
+    if (shown < matches.length) { setShown(function(n){return n + 100;}); return; }
+    if (auditReady && hasMore && !loading) {
+      await refresh(auditRows.length,true);
+      setShown(function(n){return n + 100;});
+    }
   }
 
-  var typeCounts = useMemo(function() {
-    var c = { status: 0, detail: 0, forsale: 0 };
-    changelog.forEach(function(e) { if (c[e.type] !== undefined) c[e.type]++; });
-    return c;
-  }, [changelog]);
-
-  function renderEntry(entry, key) {
-    var tc = TYPE_COLORS[entry.type] || "text-gray-400";
-    var fieldLabel = FIELD_LABELS[entry.field] || entry.field;
-    return (
-      <div key={key} className="flex items-start gap-2 px-2 py-1 text-xs border-b border-gray-800/50">
-        <span className="text-[10px] text-gray-600 w-12 shrink-0">{fmtTime(entry.ts)}</span>
-        <span className={"text-[10px] font-bold w-10 shrink-0 " + tc}>{TYPE_LABELS[entry.type]}</span>
-        <div className="flex-1 min-w-0">
-          <div className="text-xs text-gray-300 truncate" title={entry.cardLabel}>{entry.cardLabel}</div>
-          <div className="flex items-center gap-1 text-[10px]">
-            <span className="text-gray-500">{fieldLabel}:</span>
-            <span className="text-red-400/70 line-through">{fmtVal(entry.type, entry.field, entry.from)}</span>
-            <span className="text-gray-600">{"\u2192"}</span>
-            <span className="text-green-400">{fmtVal(entry.type, entry.field, entry.to)}</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-sm text-gray-400">{changelog.length} changes</div>
-        <div className="flex gap-1">
-          <button onClick={function() { setViewMode("sessions"); }} className={"px-2 py-0.5 rounded text-xs " + (viewMode === "sessions" ? "bg-rose-700 text-white" : "bg-gray-800 text-gray-500")}>Sessions</button>
-          <button onClick={function() { setViewMode("flat"); }} className={"px-2 py-0.5 rounded text-xs " + (viewMode === "flat" ? "bg-rose-700 text-white" : "bg-gray-800 text-gray-500")}>Flat</button>
-          {changelog.length > 0 && (
-            <button onClick={clearChangelog} className={"px-2 py-0.5 rounded text-xs " + (confirmClear ? "bg-red-900 text-red-300" : "text-gray-500 hover:text-red-400")}>{confirmClear ? "Confirm?" : "Clear"}</button>
-          )}
-        </div>
-      </div>
-
-      {/* Filter chips for flat view */}
-      {viewMode === "flat" && (
-        <div className="flex gap-1 mb-2">
-          {[
-            { id: "all", label: "All", count: changelog.length },
-            { id: "status", label: "Status", count: typeCounts.status },
-            { id: "detail", label: "Details", count: typeCounts.detail },
-            { id: "forsale", label: "For Sale", count: typeCounts.forsale }
-          ].map(function(f) {
-            return (
-              <button key={f.id} onClick={function() { setTypeFilter(f.id); setDayLimit(50); }} className={"px-2 py-0.5 rounded text-xs " + (typeFilter === f.id ? "bg-gray-600 text-white" : "bg-gray-800 text-gray-500")}>
-                {f.label} <span className="opacity-60">({f.count})</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {changelog.length === 0 ? (
-        <div className="text-center py-8 text-xs text-gray-500">No changes yet</div>
-      ) : viewMode === "sessions" ? (
-        <div className="space-y-2">
-          {sessions.map(function(session) {
-            var isCurrent = session.sid === currentSessionId;
-            var statusChanges = session.entries.filter(function(e) { return e.type === "status"; }).length;
-            var detailChanges = session.entries.filter(function(e) { return e.type === "detail"; }).length;
-            var fsChanges = session.entries.filter(function(e) { return e.type === "forsale"; }).length;
-            return (
-              <div key={session.sid} className={"border rounded " + (isCurrent ? "border-rose-700/50" : "border-gray-700/50")}>
-                <div className="flex items-center justify-between px-2 py-1.5 border-b border-gray-800">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-300">{fmtDateTime(session.firstTs)}</span>
-                      {isCurrent && <span className="text-[9px] px-1 py-0.5 rounded bg-rose-800 text-rose-300">Current</span>}
-                    </div>
-                    <div className="flex gap-2 mt-0.5 text-[10px]">
-                      {statusChanges > 0 && <span className="text-yellow-400">{statusChanges} status</span>}
-                      {detailChanges > 0 && <span className="text-cyan-400">{detailChanges} detail</span>}
-                      {fsChanges > 0 && <span className="text-pink-400">{fsChanges} sale</span>}
-                    </div>
-                  </div>
-                  <button onClick={function() { revertSession(session.sid); }} className={"px-2 py-1 rounded text-[10px] " + (confirmRevert === session.sid ? "bg-red-700 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600")}>
-                    {confirmRevert === session.sid ? "Confirm?" : "\u21a9"}
-                  </button>
-                </div>
-                <div className="max-h-40 overflow-y-auto">
-                  {session.entries.map(function(entry, ei) { return renderEntry(entry, session.sid + "-" + ei); })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {grouped.map(function(group, gi) {
-            return (
-              <div key={gi}>
-                <div className="text-[10px] text-gray-500 uppercase px-2 py-1 sticky top-0 bg-gray-950">{group.day}</div>
-                <div>
-                  {group.entries.map(function(entry, ei) { return renderEntry(entry, gi + "-" + ei); })}
-                </div>
-              </div>
-            );
-          })}
-          {filtered.length > dayLimit && (
-            <button onClick={function() { setDayLimit(function(prev) { return prev + 50; }); }} className="w-full py-1 text-xs text-gray-500 hover:text-gray-300 bg-gray-800/50 rounded">
-              +{filtered.length - dayLimit} more
-            </button>
-          )}
-        </div>
-      )}
+  return <section className="text-slate-200">
+    <div className="flex flex-wrap gap-1.5 items-center mb-2">
+      <span className="text-xs font-bold text-white mr-2">Activity</span>
+      <input aria-label="Search changes" value={search} onChange={function(e){setSearch(e.target.value);setShown(100);}}
+        placeholder="Find card / change" className="rounded bg-slate-900 border border-slate-700 px-2 py-1 text-xs min-w-28 flex-1" />
+      <select aria-label="Activity filter" value={filter} onChange={function(e){setFilter(e.target.value);setShown(100);}}
+        className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs">
+        <option value="all">All changes</option><option value="movement">Status + Qty + Location</option>
+        <option value="status">Status</option><option value="qty">Qty</option>
+        <option value="location">Location</option><option value="backend">Backend only</option>
+      </select>
+      <button onClick={function(){setShown(100);refresh(0,false);}}
+        className="border border-slate-700 rounded px-2 py-1 text-xs hover:bg-slate-800" disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
+      <span className="text-[10px] text-slate-500 tabular-nums">{matches.length}{auditReady && hasMore ? "+" : ""} records</span>
     </div>
-  );
+    {error && <p role="status" className="text-xs text-amber-300 mb-2">{error}{!auditReady ? " · Local history shown." : ""}</p>}
+    <div className="overflow-auto max-h-[67vh] border border-slate-800 rounded">
+      <table className="w-full min-w-[570px] table-fixed text-[10px] border-collapse">
+        <colgroup><col className="w-[102px]" /><col /><col className="w-[64px]" /><col className="w-[165px]" /><col className="w-[55px]" /></colgroup>
+        <thead className="sticky top-0 z-10 bg-slate-900 text-slate-400">
+          <tr className="border-b border-slate-700">
+            <th className="px-1.5 py-1 text-left cursor-pointer" onClick={function(){setDesc(!desc);}}>When {desc ? "↓" : "↑"}</th>
+            <th className="px-1.5 py-1 text-left">Card</th>
+            <th className="px-1.5 py-1 text-left">Field</th>
+            <th className="px-1.5 py-1 text-left">Change</th>
+            <th className="px-1.5 py-1 text-left">From</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visible.map(function(row,index) {
+            var name = describe(row);
+            var oldText = val(row,row.from), newText = val(row,row.to);
+            return <tr key={row.id+"-"+index} className="border-b border-slate-800/70 hover:bg-slate-800/60 even:bg-slate-900/20">
+              <td className="px-1.5 py-[3px] tabular-nums text-slate-500 whitespace-nowrap">{when(row.ts)}</td>
+              <td className="px-1.5 py-[3px] truncate font-medium" title={name}>{name}</td>
+              <td className="px-1.5 py-[3px] text-slate-400 truncate" title={row.field}>{row.field}</td>
+              <td className="px-1.5 py-[3px] truncate" title={oldText+" → "+newText}>
+                <span className="text-slate-500">{oldText}</span><span className="mx-1 text-slate-600">→</span><span className="text-emerald-300">{newText}</span>
+              </td>
+              <td className={"px-1.5 py-[3px] truncate "+(row.actor === "Backend" ? "font-semibold text-amber-300" : "text-slate-500")} title={row.actor}>{row.actor === "Historic" ? "Past" : row.actor}</td>
+            </tr>;
+          })}
+        </tbody>
+      </table>
+      {!visible.length && <div className="text-xs text-slate-500 py-8 text-center">{loading ? "Loading changes…" : "No matching changes"}</div>}
+    </div>
+    {canShowMore && <button disabled={loading} onClick={more} className="mt-2 w-full rounded border border-slate-800 py-1 text-xs text-slate-400 hover:text-white">+ More changes</button>}
+  </section>;
 }
-
 
 function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheckpoint, setLastCheckpoint, isSavingCheckpoint, setIsSavingCheckpoint, saveCount, flashSave, saveToast, exportCsvRef, persistField, setStatuses, setCardDetails, setForSaleFlags, allDataRef }) {
   var [exportMsg, setExportMsg] = useState("");
