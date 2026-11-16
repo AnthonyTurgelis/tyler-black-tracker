@@ -634,7 +634,7 @@
       var offset = Math.max(0,Math.floor(Number(options.offset) || 0));
       try {
         var query = supabase.from("tb_collection_activity")
-          .select("id,changed_at,card_id,category,field,old_value,new_value,actor,copy_id,source_ref,evidence_note,evidence_level,source_key", { count:"exact" });
+          .select("id,changed_at,card_id,category,field,old_value,new_value,actor,copy_id,source_ref,evidence_note,evidence_level,source_key,impact_kind", { count:"exact" });
         if (options.filter === "movement") query = query.in("category",["status","qty","location","copy"]);
         else if (options.filter === "qty") query = query.in("category",["qty","copy"]);
         else if (options.filter === "backend") query = query.in("actor",["Backend","Backfill","Snapshot"]);
