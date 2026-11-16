@@ -623,6 +623,26 @@
     }
   };
 
+  // Read-only, owner-only activity feed. Entries are written by database triggers,
+  // so direct backend edits appear even when no browser is open.
+  window.trackerAudit = {
+    list: async function(options) {
+      options = options || {};
+      if (!supabase || !isOwner || !privateOwnerId) return { ok:false, error:"Owner login required." };
+      if (window.storageReady) await window.storageReady;
+      var limit = Math.min(500,Math.max(1,Math.floor(Number(options.limit) || 500)));
+      var offset = Math.max(0,Math.floor(Number(options.offset) || 0));
+      try {
+        var result = await supabase.from("tb_collection_activity")
+          .select("id,changed_at,card_id,category,field,old_value,new_value,actor,copy_id")
+          .order("changed_at",{ascending:false}).order("id",{ascending:false})
+          .range(offset,offset+limit-1);
+        if (result.error) throw new Error(result.error.message || "Activity could not be loaded.");
+        return { ok:true, rows:result.data || [], hasMore:(result.data || []).length === limit };
+      } catch(error) { return { ok:false, error:error.message || "Activity could not be loaded." }; }
+    }
+  };
+
   // ── Boot sequence ──
   initSupabase();
 
