@@ -7,6 +7,16 @@
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function nowIso(value) { return value || new Date().toISOString(); }
   function text(value) { return value == null ? "" : String(value).trim(); }
+  function inferredCurrency(item) {
+    item = item || {};
+    var destination = item.shippingCountry || item.shipToCountry || item.deliveryCountry || item.destinationCountry || item.shipCountry;
+    if (!destination && item.shippingAddress && typeof item.shippingAddress === "object")
+      destination = item.shippingAddress.countryCode || item.shippingAddress.country;
+    var country = text(destination).toLowerCase().replace(/\./g, "");
+    if (country === "ca" || country === "can" || country === "canada") return "CAD";
+    if (country === "us" || country === "usa" || country === "united states" || country === "united states of america") return "USD";
+    return "";
+  }
   function normalizeState(value) {
     value = value && typeof value === "object" ? value : {};
     return { version: 1, baselines: Object.assign({}, value.baselines || {}), copies: Object.assign({}, value.copies || {}), observations: Object.assign({}, value.observations || {}), updatedAt: value.updatedAt || "" };
@@ -130,6 +140,7 @@
       id: id, source: text(purchase.source || purchase.sourceKind || "manual").toLowerCase(), sourceItemId: text(purchase.sourceItemId || purchase.itemId), sourceOrderId: text(purchase.sourceOrderId || purchase.orderId), orderLineId: text(purchase.orderLineId), unitIndex: Number(purchase.unitIndex || 1),
       title: text(purchase.title || previous.title), sourceUrl: text(purchase.sourceUrl || previous.sourceUrl), cardId: Number(purchase.cardId || previous.cardId) || null,
       purchaseDate: text(purchase.purchaseDate || previous.purchaseDate), seller: text(purchase.seller || previous.seller),
+      shippingCountry: text(purchase.shippingCountry || purchase.shipToCountry || purchase.deliveryCountry || previous.shippingCountry),
       reportedQuantity: Math.max(1, Number(purchase.quantity) || previous.reportedQuantity || 1),
       requiresQuantityReview: units.requiresQuantityReview || previous.requiresQuantityReview === true,
       observedDeliveryStatus: text(purchase.deliveryStatus || previous.observedDeliveryStatus),
@@ -140,7 +151,7 @@
     if (purchase.orderTotal != null) observation.orderTotal = text(purchase.orderTotal);
     if (options.priceVerified === true && observation.reportedQuantity === 1 && !observation.requiresQuantityReview && purchase.paidPrice != null && purchase.paidPrice !== "") {
       if (!Number.isFinite(Number(purchase.paidPrice)) || Number(purchase.paidPrice) < 0) throw new Error("Enter a non-negative item price.");
-      observation.paidPrice = text(purchase.paidPrice); observation.currency = text(purchase.currency).toUpperCase(); observation.priceVerified = true;
+      observation.paidPrice = text(purchase.paidPrice); observation.currency = text(purchase.currency || inferredCurrency(observation)).toUpperCase(); observation.priceVerified = true;
     } else if (purchase.paidPrice != null && purchase.paidPrice !== "") observation.reportedPrice = text(purchase.paidPrice);
     if (options.imageVerified === true) {
       if (purchase.serial != null && purchase.serial !== "") observation.serial = text(purchase.serial);
@@ -229,7 +240,7 @@
       copy.secondaryJerseyNumber = text(observation.secondaryJerseyNumber);
       copy.secondaryJerseyEvidence = clone(observation.secondaryJerseyEvidence);
     }
-    if ((copy.paidPrice == null || copy.paidPrice === "") && observation.priceVerified && observation.paidPrice !== "") { copy.paidPrice = observation.paidPrice; copy.currency = observation.currency || ""; }
+    if ((copy.paidPrice == null || copy.paidPrice === "") && observation.priceVerified && observation.paidPrice !== "") { copy.paidPrice = observation.paidPrice; copy.currency = observation.currency || inferredCurrency(observation); }
     if (!copy.purchaseDate) copy.purchaseDate = observation.purchaseDate || "";
     if (decision.location && decision.location !== "unknown") copy.location = decision.location;
     if (decision.duplicateConfirmed === true) copy.duplicateConfirmed = true;
@@ -352,7 +363,7 @@
     if (nextHand === hand) return { handled:true, changed:false, requiresDetails:true, inventory:state };
     return { handled:true, changed:true, inventory:quickAllocation(state,cardId,nextHand,context) };
   }
-  var api = { LOCATIONS: LOCATIONS, SALE_STATUSES: SALE_STATUSES, normalizeState: normalizeState, hasStoredCopies: hasStoredCopies, mergeStates: mergeStates, legacyQuantity: legacyQuantity, getCopiesForCard: getCopiesForCard, summarizeCard: summarizeCard, matchesStatus: matchesStatus, countCards: countCards, needsSaleReview: needsSaleReview, sameSerial: sameSerial, sourceIdentity: sourceIdentity, purchaseUnits: purchaseUnits, upsertPurchase: upsertPurchase, validateCopy: validateCopy, editCopy: editCopy, resolveObservation: resolveObservation, splitObservation: splitObservation, addManualCopy: addManualCopy, quickQuantity: quickQuantity, quickAllocation: quickAllocation, quickStatusPresence: quickStatusPresence };
+  var api = { LOCATIONS: LOCATIONS, SALE_STATUSES: SALE_STATUSES, normalizeState: normalizeState, hasStoredCopies: hasStoredCopies, mergeStates: mergeStates, legacyQuantity: legacyQuantity, getCopiesForCard: getCopiesForCard, summarizeCard: summarizeCard, matchesStatus: matchesStatus, countCards: countCards, needsSaleReview: needsSaleReview, sameSerial: sameSerial, sourceIdentity: sourceIdentity, purchaseUnits: purchaseUnits, upsertPurchase: upsertPurchase, validateCopy: validateCopy, editCopy: editCopy, resolveObservation: resolveObservation, splitObservation: splitObservation, addManualCopy: addManualCopy, quickQuantity: quickQuantity, quickAllocation: quickAllocation, quickStatusPresence: quickStatusPresence, inferredCurrency: inferredCurrency };
   if (root) root.CopyInventory = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : null);
