@@ -11,6 +11,7 @@ function CopyInventoryPanel({cards = [], statuses = {}, cardDetails = {}, invent
   const [preview, setPreview] = React.useState(null);
   const [limit, setLimit] = React.useState(40);
   const [form, setForm] = React.useState(null);
+  const [showMore, setShowMore] = React.useState(false);
   const [cardQuery, setCardQuery] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
@@ -57,14 +58,17 @@ function CopyInventoryPanel({cards = [], statuses = {}, cardDetails = {}, invent
   const buttonClass = "rounded bg-amber-400 px-3 py-2 text-sm font-bold text-slate-950 disabled:opacity-40";
   function change(key, value) { setForm(previous => ({...previous, [key]: value})); }
   function openCopy(card, copy) {
+    setShowMore(false);
     setError(""); setNotice(""); setCardQuery("");
     setForm({mode:"edit",cardId:card.id,copyId:copy.id,location:copy.location || "unknown",serial:copy.serial || "",paidPrice:copy.paidPrice || "",currency:copy.currency || "",purchaseDate:copy.purchaseDate || "",notes:copy.notes || "",duplicateConfirmed:!!copy.duplicateConfirmed,saleStatus:copy.saleStatus || "none",listingUrl:copy.listingUrl || "",photos:TM.normalizePhotos(copy.photos),secondaryJerseyNumber:copy.secondaryJerseyNumber || "",secondaryJerseyEvidence:copy.secondaryJerseyEvidence || {}});
   }
   function openPurchase(observation) {
+    setShowMore(false);
     setError(""); setNotice(""); setCardQuery("");
     setForm({mode:"purchase",observationId:observation.id,cardId:TM.reviewFlags(observation).identityConfirmed ? observation.cardId : "",existingCopyId:"",location:"unknown",confirmAdditional:false,confirmSingleUnit:false,lotQuantity:observation.reportedQuantity > 1 ? String(observation.reportedQuantity) : "",duplicateConfirmed:false});
   }
   function openManual() {
+    setShowMore(false);
     setError(""); setNotice(""); setCardQuery("");
     setForm({mode:"manual",cardId:"",location:"unknown",serial:"",paidPrice:"",currency:"",purchaseDate:"",notes:"",duplicateConfirmed:false,saleStatus:"none",listingUrl:"",confirmAdditional:false,photos:[],secondaryJerseyNumber:"",secondaryJerseyEvidence:{}});
   }
@@ -128,23 +132,23 @@ function CopyInventoryPanel({cards = [], statuses = {}, cardDetails = {}, invent
         <div className="rounded border border-slate-700 p-3"><label className="block text-sm">If this purchase is a lot, how many physical cards are included?<input type="number" min="2" max="1000" className={controlClass + " mt-1"} value={form.lotQuantity} onChange={e => change("lotQuantity",e.target.value)} placeholder="Leave blank for one card" /></label><button type="button" className="mt-2 rounded border border-amber-700 px-3 py-2 text-xs text-amber-200 disabled:opacity-40" disabled={!canEdit || busy || Number(form.lotQuantity) < 2} onClick={splitLot}>Create a review for each card</button><p className="mt-2 text-xs text-slate-400">Each card will get its own match. The lot price and serial will not be copied to every card.</p></div>
         <label className="block text-sm">Which physical copy is this?<select className={controlClass + " mt-1"} value={form.existingCopyId} onChange={e => {change("existingCopyId",e.target.value);change("confirmAdditional",false);}} disabled={!selectedCard}><option value="">Choose a copy</option>{formCopies.map(copy => <option key={copy.id} value={copy.id}>{copy.serial ? `Serial ${copy.serial}` : copy.legacyUnit ? `Existing copy ${copy.legacyUnit}` : "Existing copy"} · {locationLabel(copy)}{copy.unallocated ? ` · ${legacyLabel(copy)}` : ""}</option>)}<option value="__new__">Add an additional physical copy</option></select></label>
         {form.existingCopyId === "__new__" ? <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={form.confirmAdditional} onChange={e => change("confirmAdditional",e.target.checked)} />I confirmed this copy is not already included in my existing count.</label> : null}
-        {!formObservation.serial ? <p className="text-xs text-slate-400">No confirmed serial is recorded for this purchase.</p> : null}
-        {formObservation.priceVerified ? <p className="text-sm text-slate-300">Verified item price: {formObservation.currency} {formObservation.paidPrice}</p> : <p className="text-xs text-slate-400">No verified per-card price. An order total can include shipping, tax, or other cards.</p>}
+        {formObservation.priceVerified ? <span className="text-xs text-slate-400">Paid {formObservation.currency || "$"} {formObservation.paidPrice}</span> : null}
       </div> : <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm">Serial on this copy<input className={controlClass + " mt-1"} value={form.serial} onChange={e => change("serial",e.target.value)} placeholder="For example 07/25 or -3/0" /></label>
-        <label className="text-sm">Purchase date<input className={controlClass + " mt-1"} value={form.purchaseDate} onChange={e => change("purchaseDate",e.target.value)} placeholder="YYYY-MM-DD" /></label>
+        {showMore && <label className="text-sm">Purchase date<input className={controlClass + " mt-1"} value={form.purchaseDate} onChange={e => change("purchaseDate",e.target.value)} placeholder="YYYY-MM-DD" /></label>}
         <label className="text-sm">Price paid for this copy<input className={controlClass + " mt-1"} inputMode="decimal" value={form.paidPrice} onChange={e => change("paidPrice",e.target.value)} placeholder="Item price" /></label>
-        <label className="text-sm">Currency<select className={controlClass + " mt-1"} value={form.currency} onChange={e => change("currency",e.target.value)}><option value="">Choose currency</option><option value="USD">USD</option><option value="CAD">CAD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="AUD">AUD</option></select></label>
+        {showMore && <label className="text-sm">Currency<select className={controlClass + " mt-1"} value={form.currency} onChange={e => change("currency",e.target.value)}><option value="">Choose currency</option><option value="USD">USD</option><option value="CAD">CAD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="AUD">AUD</option></select></label>}
       </div>}
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm">Confirmed location<select className={controlClass + " mt-1"} value={form.location} onChange={e => change("location",e.target.value)}>{Object.entries(CI.LOCATIONS).map(([key,name]) => <option key={key} value={key}>{name}</option>)}</select></label>
         {form.mode !== "purchase" ? <label className="text-sm">Sale status<select className={controlClass + " mt-1"} value={form.saleStatus} onChange={e => change("saleStatus",e.target.value)}>{Object.entries(CI.SALE_STATUSES).map(([key,name]) => <option key={key} value={key}>{name}</option>)}</select></label> : null}
       </div>
-      <p className="text-xs text-slate-400">Choose Oklahoma mailbox or In hand only when you know where this copy is. A delivery date alone does not confirm either location.</p>
-      <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={form.duplicateConfirmed} onChange={e => change("duplicateConfirmed",e.target.checked)} />This is a confirmed extra copy. Extra copies at COMC appear in the sale review list unless already listed.</label>
-      {form.mode !== "purchase" ? <><label className="block text-sm">Existing listing link<input className={controlClass + " mt-1"} value={form.listingUrl} onChange={e => change("listingUrl",e.target.value)} placeholder="https://…" /></label><label className="block text-sm">Copy notes<textarea className={controlClass + " mt-1"} rows="2" value={form.notes} onChange={e => change("notes",e.target.value)} /></label></> : null}
+
+      <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={form.duplicateConfirmed} onChange={e => change("duplicateConfirmed",e.target.checked)} />Extra copy / COMC sale review</label>
+      <button type="button" onClick={() => setShowMore(!showMore)} className="text-left text-xs text-cyan-300 underline">{showMore ? "Less" : "More details"}</button>
+      {showMore && form.mode !== "purchase" ? <><label className="block text-sm">Existing listing link<input className={controlClass + " mt-1"} value={form.listingUrl} onChange={e => change("listingUrl",e.target.value)} placeholder="https://…" /></label><label className="block text-sm">Copy notes<textarea className={controlClass + " mt-1"} rows="2" value={form.notes} onChange={e => change("notes",e.target.value)} /></label></> : null}
       {form.mode === "manual" ? <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={form.confirmAdditional} onChange={e => change("confirmAdditional",e.target.checked)} />This is an additional physical copy, not one already included in my existing count.</label> : null}
-      {form.mode !== "purchase" ? <window.CopyPhotoFields value={form} onChange={change} controlClass={controlClass} /> : null}
+      {showMore && form.mode !== "purchase" ? <window.CopyPhotoFields value={form} onChange={change} controlClass={controlClass} /> : null}
       <button type="submit" disabled={!canEdit || busy} className={buttonClass}>{busy ? "Saving…" : form.mode === "purchase" ? "Save copy match" : "Save copy"}</button>
     </form> : null}
     <div className="flex flex-wrap gap-2" role="tablist" aria-label="Copy inventory views"><button role="tab" aria-selected={view === "copies"} onClick={() => {setView("copies");setLimit(40);}} className={`rounded px-3 py-2 text-sm ${view === "copies" ? "bg-amber-400 text-slate-950 font-bold" : "bg-slate-800"}`}>Copies ({activeCopies.length})</button><button role="tab" aria-selected={view === "purchases"} onClick={() => {setView("purchases");setLimit(40);}} className={`rounded px-3 py-2 text-sm ${view === "purchases" ? "bg-amber-400 text-slate-950 font-bold" : "bg-slate-800"}`}>Purchase review ({pending.length})</button><button role="tab" aria-selected={view === "comc_duplicates"} onClick={() => {setView("comc_duplicates");setLimit(40);}} className={`rounded px-3 py-2 text-sm ${view === "comc_duplicates" ? "bg-amber-400 text-slate-950 font-bold" : "bg-slate-800"}`}>COMC duplicates ({duplicateGroups.length})</button></div>
