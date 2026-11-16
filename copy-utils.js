@@ -58,10 +58,22 @@
     });
     return rows;
   }
+  function isCountedCopy(copy) {
+    if (!copy || copy.archived || copy.saleStatus === "sold" || copy.currentInventory === false) return false;
+    if (copy.currentInventory === true) return true;
+    // Missing confirmation on an imported eBay purchase is NOT permission to
+    // increase the collection. Manually tracked copies and COMC stay intact.
+    if (copy.origin === "purchase" && (
+      String(copy.source || "").toLowerCase() === "ebay" ||
+      String(copy.id || "").indexOf("purchase:ebay:") === 0 ||
+      /ebay\.(com|ca|co\.uk)/i.test(String(copy.sourceUrl || ""))
+    )) return false;
+    return true;
+  }
   function summarizeCard(input, cardId, statuses, details) {
     var state = normalizeState(input), copies = getCopiesForCard(state, cardId, statuses, details), locations = {};
     Object.keys(LOCATIONS).forEach(function (key) { locations[key] = 0; });
-    var active = copies.filter(function (copy) { return copy.saleStatus !== "sold" && copy.currentInventory !== false; });
+    var active = copies.filter(isCountedCopy);
     active.forEach(function (copy) { locations[LOCATIONS[copy.location] ? copy.location : "unknown"]++; });
     var legacyStatus = (statuses || {})[cardId] || baselineFor(state, cardId, statuses, details).status;
     var legacyOwned = legacyStatus === "owned" || legacyStatus === "for_sale";
@@ -225,7 +237,7 @@
       copy = Object.assign({}, copy);
     } else {
       if (decision.confirmAdditional !== true) throw new Error("Confirm this is an additional copy, not one already included in your count.");
-      copy = { id: "purchase:" + observationId, cardId: cardId, origin: "purchase", location: "unknown", serial: "", paidPrice: "", currency: "", purchaseDate: "", sourceRefs: [], duplicateConfirmed: false, saleStatus: "none", createdAt: at };
+      copy = { id: "purchase:" + observationId, cardId: cardId, origin: "purchase", source: observation.source || "", sourceUrl: observation.sourceUrl || "", currentInventory: true, location: "unknown", serial: "", paidPrice: "", currency: "", purchaseDate: "", sourceRefs: [], duplicateConfirmed: false, saleStatus: "none", createdAt: at };
     }
     ensureBaseline(state, cardId, context, at);
     copy.sourceRefs = Array.from(new Set((copy.sourceRefs || []).concat(observationId)));
@@ -294,7 +306,7 @@
     var state = normalizeState(input), at = nowIso(context.now);
     target = Number(target);
     if (!Number.isSafeInteger(target) || target < 0 || target > 10000) throw new Error("Enter a valid quantity.");
-    var rows = getCopiesForCard(state, cardId, context.statuses, context.cardDetails).filter(function(c){return c.saleStatus !== "sold" && c.currentInventory !== false;});
+    var rows = getCopiesForCard(state, cardId, context.statuses, context.cardDetails).filter(isCountedCopy);
     var sourced = rows.filter(function(c){return c.origin !== "legacy";}).length;
     if (target < sourced) throw new Error("The total includes " + sourced + " documented copies. Open Details to resolve those before reducing the total.");
     var desiredLegacy = target - sourced, previous = baselineFor(state, cardId, context.statuses, context.cardDetails);
@@ -317,7 +329,7 @@
   function quickAllocation(input, cardId, inHand, context) {
     context = context || {};
     var state = normalizeState(input), at = nowIso(context.now);
-    var rows = getCopiesForCard(state, cardId, context.statuses, context.cardDetails).filter(function(c){return c.saleStatus !== "sold" && c.currentInventory !== false;});
+    var rows = getCopiesForCard(state, cardId, context.statuses, context.cardDetails).filter(isCountedCopy);
     var confirmedHand = rows.filter(function(c){return c.origin !== "legacy" && c.location === "in_hand";}).length;
     var legacy = rows.filter(function(c){return c.origin === "legacy";});
     var desired = Number(inHand);
@@ -340,7 +352,7 @@
     if (target !== "owned" && target !== "in_transit") return { handled:false };
     var state = normalizeState(input);
     var rows = getCopiesForCard(state, cardId, context.statuses, context.cardDetails)
-      .filter(function(c){ return c.saleStatus !== "sold" && c.currentInventory !== false; });
+      .filter(isCountedCopy);
     if (rows.length < 2) return { handled:false };
     var summary = summarizeCard(state, cardId, context.statuses, context.cardDetails);
     if ((target === "owned" && summary.owned) || (target === "in_transit" && summary.inTransit))
@@ -363,7 +375,7 @@
     if (nextHand === hand) return { handled:true, changed:false, requiresDetails:true, inventory:state };
     return { handled:true, changed:true, inventory:quickAllocation(state,cardId,nextHand,context) };
   }
-  var api = { LOCATIONS: LOCATIONS, SALE_STATUSES: SALE_STATUSES, normalizeState: normalizeState, hasStoredCopies: hasStoredCopies, mergeStates: mergeStates, legacyQuantity: legacyQuantity, getCopiesForCard: getCopiesForCard, summarizeCard: summarizeCard, matchesStatus: matchesStatus, countCards: countCards, needsSaleReview: needsSaleReview, sameSerial: sameSerial, sourceIdentity: sourceIdentity, purchaseUnits: purchaseUnits, upsertPurchase: upsertPurchase, validateCopy: validateCopy, editCopy: editCopy, resolveObservation: resolveObservation, splitObservation: splitObservation, addManualCopy: addManualCopy, quickQuantity: quickQuantity, quickAllocation: quickAllocation, quickStatusPresence: quickStatusPresence, inferredCurrency: inferredCurrency };
+  var api = { LOCATIONS: LOCATIONS, SALE_STATUSES: SALE_STATUSES, normalizeState: normalizeState, hasStoredCopies: hasStoredCopies, mergeStates: mergeStates, legacyQuantity: legacyQuantity, getCopiesForCard: getCopiesForCard, summarizeCard: summarizeCard, matchesStatus: matchesStatus, countCards: countCards, needsSaleReview: needsSaleReview, sameSerial: sameSerial, sourceIdentity: sourceIdentity, purchaseUnits: purchaseUnits, upsertPurchase: upsertPurchase, validateCopy: validateCopy, editCopy: editCopy, resolveObservation: resolveObservation, splitObservation: splitObservation, addManualCopy: addManualCopy, quickQuantity: quickQuantity, quickAllocation: quickAllocation, quickStatusPresence: quickStatusPresence, isCountedCopy: isCountedCopy, inferredCurrency: inferredCurrency };
   if (root) root.CopyInventory = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : null);
