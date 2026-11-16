@@ -275,7 +275,54 @@
     state.copies[id] = copy; state.updatedAt = at;
     return { inventory: state, copyId: id };
   }
-  var api = { LOCATIONS: LOCATIONS, SALE_STATUSES: SALE_STATUSES, normalizeState: normalizeState, hasStoredCopies: hasStoredCopies, mergeStates: mergeStates, legacyQuantity: legacyQuantity, getCopiesForCard: getCopiesForCard, summarizeCard: summarizeCard, matchesStatus: matchesStatus, countCards: countCards, needsSaleReview: needsSaleReview, sameSerial: sameSerial, sourceIdentity: sourceIdentity, purchaseUnits: purchaseUnits, upsertPurchase: upsertPurchase, validateCopy: validateCopy, editCopy: editCopy, resolveObservation: resolveObservation, splitObservation: splitObservation, addManualCopy: addManualCopy };
+
+  // Keep the original quantity/stoplight workflow usable after a copy is documented.
+  // Adjust only legacy slots. Never silently create, move, or delete eBay/COMC copies.
+  function quickQuantity(input, cardId, target, context) {
+    context = context || {};
+    var state = normalizeState(input), at = nowIso(context.now);
+    target = Number(target);
+    if (!Number.isSafeInteger(target) || target < 0 || target > 10000) throw new Error("Enter a valid quantity.");
+    var rows = getCopiesForCard(state, cardId, context.statuses, context.cardDetails).filter(function(c){return c.saleStatus !== "sold";});
+    var sourced = rows.filter(function(c){return c.origin !== "legacy";}).length;
+    if (target < sourced) throw new Error("The total includes " + sourced + " documented copies. Open Details to resolve those before reducing the total.");
+    var desiredLegacy = target - sourced, previous = baselineFor(state, cardId, context.statuses, context.cardDetails);
+    var oldLegacy = previous.quantity;
+    var baseline = Object.assign({}, previous, { quantity: desiredLegacy, updatedAt: at });
+    state.baselines[cardId] = baseline;
+    for (var i = desiredLegacy + 1; i <= oldLegacy; i++) {
+      var id = "legacy:" + cardId + ":" + i;
+      if (state.copies[id]) state.copies[id] = Object.assign({}, state.copies[id], { archived: true, updatedAt: at });
+    }
+    for (var j = oldLegacy + 1; j <= desiredLegacy; j++) {
+      var nextId = "legacy:" + cardId + ":" + j;
+      if (state.copies[nextId] && state.copies[nextId].archived) {
+        state.copies[nextId] = Object.assign({}, state.copies[nextId], { archived: false, updatedAt: at });
+      }
+    }
+    state.updatedAt = at;
+    return state;
+  }
+  function quickAllocation(input, cardId, inHand, context) {
+    context = context || {};
+    var state = normalizeState(input), at = nowIso(context.now);
+    var rows = getCopiesForCard(state, cardId, context.statuses, context.cardDetails).filter(function(c){return c.saleStatus !== "sold";});
+    var confirmedHand = rows.filter(function(c){return c.origin !== "legacy" && c.location === "in_hand";}).length;
+    var legacy = rows.filter(function(c){return c.origin === "legacy";});
+    var desired = Number(inHand);
+    if (!Number.isSafeInteger(desired) || desired < confirmedHand || desired > confirmedHand + legacy.length)
+      throw new Error("Keep the documented copies at their known locations. Open Details to change those individually.");
+    var handLegacy = desired - confirmedHand;
+    legacy.forEach(function(copy,index){
+      var nextLocation = index < handLegacy ? "in_hand" : "in_transit";
+      var next = Object.assign({}, copy, { location: nextLocation, unallocated: false, updatedAt: at, createdAt: copy.createdAt || at });
+      state.copies[copy.id] = next;
+    });
+    if (legacy.length && !state.baselines[cardId]) state.baselines[cardId] = Object.assign({}, baselineFor(state,cardId,context.statuses,context.cardDetails), {updatedAt:at});
+    state.updatedAt = at;
+    return state;
+  }
+  var api = { LOCATIONS: LOCATIONS, SALE_STATUSES: SALE_STATUSES, normalizeState: normalizeState, hasStoredCopies: hasStoredCopies, mergeStates: mergeStates, legacyQuantity: legacyQuantity, getCopiesForCard: getCopiesForCard, summarizeCard: summarizeCard, matchesStatus: matchesStatus, countCards: countCards, needsSaleReview: needsSaleReview, sameSerial: sameSerial, sourceIdentity: sourceIdentity, purchaseUnits: purchaseUnits, upsertPurchase: upsertPurchase, validateCopy: validateCopy, editCopy: editCopy, resolveObservation: resolveObservation, splitObservation: splitObservation, addManualCopy: addManualCopy, quickQuantity: quickQuantity, quickAllocation: quickAllocation };
   if (root) root.CopyInventory = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : null);
