@@ -8813,7 +8813,7 @@ function ChangelogPanel({ changelog }) {
   const [error, setError] = useState("");
   const [hasMore, setHasMore] = useState(false);
   const [shown, setShown] = useState(100);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState("movement");
   const [search, setSearch] = useState("");
   const [desc, setDesc] = useState(true);
 
@@ -8824,7 +8824,7 @@ function ChangelogPanel({ changelog }) {
     }
     setLoading(true);
     try {
-      const result = await window.trackerAudit.list({ offset:offset, limit:500 });
+      const result = await window.trackerAudit.list({ offset:offset, limit:500, filter:filter });
       if (!result.ok) throw new Error(result.error || "Unable to read backend activity.");
       setAuditRows(previous => append ? previous.concat(result.rows) : result.rows);
       setHasMore(result.hasMore);
@@ -8832,13 +8832,14 @@ function ChangelogPanel({ changelog }) {
       setError("");
     } catch(e) { setError(e.message || "Unable to load activity."); if (!append) setAuditReady(false); }
     finally { setLoading(false); }
-  }, []);
-  useEffect(function() { refresh(0,false); }, [refresh]);
+  }, [filter]);
+  useEffect(function() { setShown(100); refresh(0,false); }, [refresh]);
 
   const history = useMemo(function() {
     if (auditReady) return auditRows.map(function(row) {
       return { id:row.id, ts:row.changed_at, cardId:row.card_id, type:row.category,
-        field:row.field, from:row.old_value, to:row.new_value, actor:row.actor, copyId:row.copy_id };
+        field:row.field, from:row.old_value, to:row.new_value, actor:row.actor, copyId:row.copy_id,
+        sourceUrl:row.source_ref, sourceKey:row.source_key, evidence:row.evidence_note, evidenceLevel:row.evidence_level };
     });
     return (changelog || []).map(function(row,index) {
       return { id:"old-"+index, ts:row.ts, cardId:row.cardId, cardLabel:row.cardLabel,
@@ -8851,7 +8852,8 @@ function ChangelogPanel({ changelog }) {
   const describe = useCallback(function(entry) {
     var card = CARD_BY_ID[entry.cardId];
     return card ? String(card.product || "") + " · #" + (card.cardNumber || "") + " · " + (card.cardSet || "Base")
-      : entry.cardLabel || ("Card #" + entry.cardId);
+      : entry.sourceKey ? String(entry.sourceKey).split("|").join(" · ") :
+        entry.cardLabel || (entry.cardId ? "Card #" + entry.cardId : "Unmatched source");
   }, []);
 
   const matches = useMemo(function() {
@@ -8861,8 +8863,9 @@ function ChangelogPanel({ changelog }) {
       if (filter === "movement" && !["status","location","qty","copy"].includes(row.type)) return false;
       if (filter === "qty" && !["qty","copy"].includes(row.type)) return false;
       if (filter === "location" && row.type !== "location") return false;
-      if (filter === "backend" && row.actor !== "Backend") return false;
-      return !needle || [describe(row), row.field, row.from, row.to, row.actor, row.copyId]
+      if (filter === "backend" && !["Backend","Backfill","Snapshot"].includes(row.actor)) return false;
+      if (["source","catalog","photo","price","review","verification"].includes(filter) && row.type !== filter) return false;
+      return !needle || [describe(row), row.field, row.from, row.to, row.actor, row.copyId, row.evidence, row.sourceKey]
         .map(function(part){return String(part == null ? "" : part);}).join(" ").toLowerCase().includes(needle);
     });
     return rows.sort(function(a,b) {
@@ -8902,11 +8905,18 @@ function ChangelogPanel({ changelog }) {
         className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs">
         <option value="all">All changes</option><option value="movement">Status + Qty + Location</option>
         <option value="status">Status</option><option value="qty">Qty</option>
-        <option value="location">Location</option><option value="backend">Backend only</option>
+        <option value="location">Location</option>
+        <option value="catalog">Catalogue / proofs</option>
+        <option value="source">eBay / COMC sources</option>
+        <option value="photo">Photos</option>
+        <option value="price">Market evidence</option>
+        <option value="review">Review questions</option>
+        <option value="verification">Verified scans</option>
+        <option value="backend">Backend + backfills</option>
       </select>
       <button onClick={function(){setShown(100);refresh(0,false);}}
         className="border border-slate-700 rounded px-2 py-1 text-xs hover:bg-slate-800" disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
-      <span className="text-[10px] text-slate-500 tabular-nums">{matches.length}{auditReady && hasMore ? "+" : ""} records</span>
+      <span className="text-[10px] text-slate-500 tabular-nums">{matches.length}{auditReady && hasMore ? "+" : ""} loaded</span>
     </div>
     {error && <p role="status" className="text-xs text-amber-300 mb-2">{error}{!auditReady ? " · Local history shown." : ""}</p>}
     <div className="overflow-auto max-h-[67vh] border border-slate-800 rounded">
@@ -8927,12 +8937,16 @@ function ChangelogPanel({ changelog }) {
             var oldText = val(row,row.from), newText = val(row,row.to);
             return <tr key={row.id+"-"+index} className="border-b border-slate-800/70 hover:bg-slate-800/60 even:bg-slate-900/20">
               <td className="px-1.5 py-[3px] tabular-nums text-slate-500 whitespace-nowrap">{when(row.ts)}</td>
-              <td className="px-1.5 py-[3px] truncate font-medium" title={name}>{name}</td>
-              <td className="px-1.5 py-[3px] text-slate-400 truncate" title={row.field}>{row.field}</td>
+              <td className="px-1.5 py-[3px] truncate font-medium" title={name + (row.evidence ? " · " + row.evidence : "")}>{name}</td>
+              <td className="px-1.5 py-[3px] text-slate-400 truncate" title={row.field + (row.evidenceLevel ? " · " + row.evidenceLevel : "")}>{row.field}</td>
               <td className="px-1.5 py-[3px] truncate" title={oldText+" → "+newText}>
                 <span className="text-slate-500">{oldText}</span><span className="mx-1 text-slate-600">→</span><span className="text-emerald-300">{newText}</span>
               </td>
-              <td className={"px-1.5 py-[3px] truncate "+(row.actor === "Backend" ? "font-semibold text-amber-300" : "text-slate-500")} title={row.actor}>{row.actor === "Historic" ? "Past" : row.actor}</td>
+              <td className={"px-1.5 py-[3px] truncate "+(["Backend","Backfill","Snapshot"].includes(row.actor) ? "font-semibold text-amber-300" : "text-slate-500")}
+                title={row.actor + (row.evidence ? " · "+row.evidence : "")}>
+                {row.actor === "Historic" ? "Past" : row.actor}
+                {row.sourceUrl && /^https:\/\//i.test(row.sourceUrl) ? <a href={row.sourceUrl} target="_blank" rel="noreferrer" className="ml-1 text-sky-400" title="View original source" onClick={function(e){e.stopPropagation();}}>↗</a> : null}
+              </td>
             </tr>;
           })}
         </tbody>
