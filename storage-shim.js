@@ -634,7 +634,7 @@
       var offset = Math.max(0,Math.floor(Number(options.offset) || 0));
       try {
         var query = supabase.from("tb_collection_activity")
-          .select("id,changed_at,card_id,category,field,old_value,new_value,actor,copy_id,source_ref,evidence_note,evidence_level,source_key");
+          .select("id,changed_at,card_id,category,field,old_value,new_value,actor,copy_id,source_ref,evidence_note,evidence_level,source_key", { count:"exact" });
         if (options.filter === "movement") query = query.in("category",["status","qty","location","copy"]);
         else if (options.filter === "qty") query = query.in("category",["qty","copy"]);
         else if (options.filter === "backend") query = query.in("actor",["Backend","Backfill","Snapshot"]);
@@ -642,7 +642,8 @@
         var result = await query.order("changed_at",{ascending:false}).order("id",{ascending:false})
           .range(offset,offset+limit-1);
         if (result.error) throw new Error(result.error.message || "Activity could not be loaded.");
-        return { ok:true, rows:result.data || [], hasMore:(result.data || []).length === limit };
+        return { ok:true, rows:result.data || [], total:result.count == null ? null : result.count,
+          hasMore:(result.count != null ? offset + (result.data || []).length < result.count : (result.data || []).length === limit) };
       } catch(error) { return { ok:false, error:error.message || "Activity could not be loaded." }; }
     }
   };
