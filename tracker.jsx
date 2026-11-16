@@ -8880,7 +8880,7 @@ function ChangelogPanel({ changelog, onOpenCard }) {
     if (e.type==="status" || e.type==="location") return before+" → "+after;
     if (e.type==="qty") {
       var delta=Number(e.to)-Number(e.from);
-      var suffix=e.from!==null && e.from!=="" && Number.isFinite(delta) && delta!==0
+      var suffix=e.from!==null && e.from!=="" && e.to!==null && e.to!=="" && Number.isFinite(delta) && delta!==0
         ? " ("+(delta>0?"+":"")+delta+")" : "";
       return "Qty "+before+" → "+after+suffix;
     }
@@ -8894,9 +8894,12 @@ function ChangelogPanel({ changelog, onOpenCard }) {
   const eventHint = function(e) {
     if (e.evidenceLevel==="comc_source_matched") return "COMC source matched; NOT in hand";
     if (e.evidenceLevel==="pending") return "Needs your confirmation; not counted";
-    if (e.evidenceLevel==="snapshot_only") return "Snapshot difference; old quantity unknown";
+    if (e.evidenceLevel==="snapshot_only") return "Snapshot value only; prior quantity unknown";
+    if (e.evidenceLevel==="backend_unverified") return "Backend count/status change — check source evidence";
+    if (e.evidenceLevel==="site_recorded") return e.impact==="location_assigned_hand" || e.impact==="location_assigned_transit" ? "Location assigned; not proof of a new arrival" : "Saved tracker edit; not independently verified";
     if (e.evidenceLevel==="recorded_not_physical") return "Original log verified; physical ownership not checked";
-    if (e.evidenceLevel==="corrected_unconfirmed") return "Incorrect provisional count corrected";
+    if (e.evidenceLevel==="corrected_unconfirmed") return "Incorrect provisional count corrected; review before accepting the change";
+    if (e.impact==="location_assigned_hand" || e.impact==="location_assigned_transit") return "Location assigned; not confirmed as a physical movement";
     return e.evidence || "Recorded; physical ownership not implied";
   };
   const sourceLabel = function(e) {
@@ -8904,6 +8907,7 @@ function ChangelogPanel({ changelog, onOpenCard }) {
     if (e.evidenceLevel==="pending") return "Check";
     if (e.actor==="Historic") return "Past";
     if (e.actor==="Snapshot") return "Check";
+    if (e.evidenceLevel==="backend_unverified") return "Check";
     return e.actor || "—";
   };
   const when = function(ts) {
@@ -8935,12 +8939,16 @@ function ChangelogPanel({ changelog, onOpenCard }) {
         <optgroup label="Collection changes">
           <option value="impact">All status & quantity changes</option>
           <option value="received">Transit → Owned / In hand</option>
-          <option value="added">Added / Qty increased or set</option>
+          <option value="site_impact">Tracker edits</option>
+          <option value="historic_impact">Past recorded changes</option>
+          <option value="added">Added / Qty increased</option>
           <option value="removed">Removed / Qty decreased</option>
-          <option value="to_transit">Owned → Transit</option>
+          <option value="to_transit">Moved / assigned to Transit</option>
           <option value="qty">Quantity changes only</option>
+          <option value="qty_set">Qty set / old unknown</option>
           <option value="status">Stoplight changes only</option>
-          <option value="backend_impact">Backend status / count edits</option>
+          <option value="backend_impact">Backend count / status edits</option>
+          <option value="verify_impact">Changes needing verification</option>
         </optgroup>
         <optgroup label="Check or verify">
           <option value="pending">Unconfirmed purchases</option>
@@ -8981,7 +8989,8 @@ function ChangelogPanel({ changelog, onOpenCard }) {
           {visible.map(function(e,index) {
             var title=cardName(e),change=changeText(e);
             var requiresCheck=e.evidenceLevel==="pending" || e.evidenceLevel==="snapshot_only" ||
-              e.evidenceLevel==="recorded_not_physical" || e.evidenceLevel==="corrected_unconfirmed";
+              e.evidenceLevel==="recorded_not_physical" || e.evidenceLevel==="corrected_unconfirmed" ||
+              e.evidenceLevel==="backend_unverified";
             return <React.Fragment key={String(e.id)+"-"+index}>
               <tr className="cursor-pointer border-b border-slate-800/70 even:bg-slate-900/25 hover:bg-slate-800/60"
                 onClick={function(){setExpanded(expanded===e.id ? null:e.id);}}>
