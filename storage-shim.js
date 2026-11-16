@@ -635,9 +635,17 @@
       try {
         var query = supabase.from("tb_collection_activity")
           .select("id,changed_at,card_id,category,field,old_value,new_value,actor,copy_id,source_ref,evidence_note,evidence_level,source_key,impact_kind", { count:"exact" });
-        if (options.filter === "movement") query = query.in("category",["status","qty","location","copy"]);
-        else if (options.filter === "qty") query = query.in("category",["qty","copy"]);
+        if (options.filter === "impact" || options.filter === "movement") query = query.not("impact_kind","is",null);
+        else if (options.filter === "received") query = query.in("impact_kind",["transit_to_owned","location_to_hand"]);
+        else if (options.filter === "added") query = query.in("impact_kind",["added_owned","added_transit","qty_up","qty_set","count_added"]);
+        else if (options.filter === "removed") query = query.in("impact_kind",["removed","owned_to_transit","location_left_hand","qty_down","count_removed"]);
+        else if (options.filter === "to_transit") query = query.in("impact_kind",["owned_to_transit","location_left_hand"]);
+        else if (options.filter === "qty") query = query.in("impact_kind",["qty_up","qty_down","qty_set","count_added","count_removed"]);
+        else if (options.filter === "pending") query = query.or("evidence_level.eq.pending,evidence_level.eq.snapshot_only");
+        else if (options.filter === "comc") query = query.or("evidence_level.eq.comc_source_matched,source_ref.ilike.%comc.com%");
+        else if (options.filter === "backend_impact") query = query.in("actor",["Backend","Backfill","Snapshot"]).not("impact_kind","is",null);
         else if (options.filter === "backend") query = query.in("actor",["Backend","Backfill","Snapshot"]);
+        else if (options.filter === "evidence") query = query.in("category",["source","catalog","photo","price","review","verification","system"]);
         else if (options.filter && options.filter !== "all") query = query.eq("category",options.filter);
         var result = await query.order("changed_at",{ascending:false}).order("id",{ascending:false})
           .range(offset,offset+limit-1);
