@@ -60,7 +60,7 @@ function CopyInventoryPanel({cards = [], statuses = {}, cardDetails = {}, invent
   function openCopy(card, copy) {
     setShowMore(false);
     setError(""); setNotice(""); setCardQuery("");
-    setForm({mode:"edit",cardId:card.id,copyId:copy.id,location:copy.location || "unknown",serial:copy.serial || "",paidPrice:copy.paidPrice || "",currency:copy.currency || "",purchaseDate:copy.purchaseDate || "",notes:copy.notes || "",duplicateConfirmed:!!copy.duplicateConfirmed,saleStatus:copy.saleStatus || "none",currentInventory:copy.currentInventory !== false,listingUrl:copy.listingUrl || "",photos:TM.normalizePhotos(copy.photos),secondaryJerseyNumber:copy.secondaryJerseyNumber || "",secondaryJerseyEvidence:copy.secondaryJerseyEvidence || {}});
+    setForm({mode:"edit",cardId:card.id,copyId:copy.id,location:copy.location || "unknown",serial:copy.serial || "",paidPrice:copy.paidPrice || "",currency:copy.currency || CI.inferredCurrency(copy),purchaseDate:copy.purchaseDate || "",notes:copy.notes || "",duplicateConfirmed:!!copy.duplicateConfirmed,saleStatus:copy.saleStatus || "none",currentInventory:copy.currentInventory !== false,listingUrl:copy.listingUrl || "",photos:TM.normalizePhotos(copy.photos),secondaryJerseyNumber:copy.secondaryJerseyNumber || "",secondaryJerseyEvidence:copy.secondaryJerseyEvidence || {}});
   }
   function openPurchase(observation) {
     setShowMore(false);
@@ -136,8 +136,13 @@ function CopyInventoryPanel({cards = [], statuses = {}, cardDetails = {}, invent
       </div> : <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm">Serial on this copy<input className={controlClass + " mt-1"} value={form.serial} onChange={e => change("serial",e.target.value)} placeholder="For example 07/25 or -3/0" /></label>
         {showMore && <label className="text-sm">Purchase date<input className={controlClass + " mt-1"} value={form.purchaseDate} onChange={e => change("purchaseDate",e.target.value)} placeholder="YYYY-MM-DD" /></label>}
-        <label className="text-sm">Price paid for this copy<input className={controlClass + " mt-1"} inputMode="decimal" value={form.paidPrice} onChange={e => change("paidPrice",e.target.value)} placeholder="Item price" /></label>
-        {showMore && <label className="text-sm">Currency<select className={controlClass + " mt-1"} value={form.currency} onChange={e => change("currency",e.target.value)}><option value="">Choose currency</option><option value="USD">USD</option><option value="CAD">CAD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="AUD">AUD</option></select></label>}
+        <label className="text-sm">Price paid<div className="mt-1 flex gap-1">
+          <input className={controlClass + " flex-1 min-w-0"} inputMode="decimal" value={form.paidPrice} onChange={e => change("paidPrice",e.target.value)} placeholder="$" />
+          <select aria-label="Currency" className="w-[70px] shrink-0 rounded border border-slate-600 bg-slate-900 px-1 py-1 text-xs" value={form.currency || ""}
+            onChange={e => change("currency",e.target.value)}>
+            <option value="">$</option><option value="CAD">CAD</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="AUD">AUD</option>
+          </select>
+        </div></label>
       </div>}
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm">Confirmed location<select className={controlClass + " mt-1"} value={form.location} onChange={e => change("location",e.target.value)}>{Object.entries(CI.LOCATIONS).map(([key,name]) => <option key={key} value={key}>{name}</option>)}</select></label>
