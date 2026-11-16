@@ -60,7 +60,7 @@ function CopyInventoryPanel({cards = [], statuses = {}, cardDetails = {}, invent
   function openCopy(card, copy) {
     setShowMore(false);
     setError(""); setNotice(""); setCardQuery("");
-    setForm({mode:"edit",cardId:card.id,copyId:copy.id,location:copy.location || "unknown",serial:copy.serial || "",paidPrice:copy.paidPrice || "",currency:copy.currency || "",purchaseDate:copy.purchaseDate || "",notes:copy.notes || "",duplicateConfirmed:!!copy.duplicateConfirmed,saleStatus:copy.saleStatus || "none",listingUrl:copy.listingUrl || "",photos:TM.normalizePhotos(copy.photos),secondaryJerseyNumber:copy.secondaryJerseyNumber || "",secondaryJerseyEvidence:copy.secondaryJerseyEvidence || {}});
+    setForm({mode:"edit",cardId:card.id,copyId:copy.id,location:copy.location || "unknown",serial:copy.serial || "",paidPrice:copy.paidPrice || "",currency:copy.currency || "",purchaseDate:copy.purchaseDate || "",notes:copy.notes || "",duplicateConfirmed:!!copy.duplicateConfirmed,saleStatus:copy.saleStatus || "none",currentInventory:copy.currentInventory !== false,listingUrl:copy.listingUrl || "",photos:TM.normalizePhotos(copy.photos),secondaryJerseyNumber:copy.secondaryJerseyNumber || "",secondaryJerseyEvidence:copy.secondaryJerseyEvidence || {}});
   }
   function openPurchase(observation) {
     setShowMore(false);
@@ -89,7 +89,7 @@ function CopyInventoryPanel({cards = [], statuses = {}, cardDetails = {}, invent
         const result = CI.resolveObservation(state, form.observationId, {cardId:Number(form.cardId),existingCopyId:form.existingCopyId === "__new__" ? "" : form.existingCopyId,confirmAdditional:form.existingCopyId === "__new__" && form.confirmAdditional,confirmSingleUnit:form.confirmSingleUnit,location:form.location,duplicateConfirmed:form.duplicateConfirmed}, context);
         await persist(result.inventory, form.existingCopyId === "__new__" ? "Additional copy saved." : "Purchase linked to the copy already counted.");
       } else {
-        const patch = {location:form.location,serial:form.serial,paidPrice:form.paidPrice,currency:form.currency,purchaseDate:form.purchaseDate,notes:form.notes,duplicateConfirmed:form.duplicateConfirmed,saleStatus:form.saleStatus,listingUrl:form.listingUrl,photos:(form.photos || []).filter(photo=>String(photo.url || "").trim()),secondaryJerseyNumber:form.secondaryJerseyNumber,secondaryJerseyEvidence:form.secondaryJerseyNumber ? form.secondaryJerseyEvidence : {}};
+        const patch = {location:form.location,serial:form.serial,paidPrice:form.paidPrice,currency:form.currency,purchaseDate:form.purchaseDate,notes:form.notes,duplicateConfirmed:form.duplicateConfirmed,saleStatus:form.saleStatus,currentInventory:form.currentInventory,listingUrl:form.listingUrl,photos:(form.photos || []).filter(photo=>String(photo.url || "").trim()),secondaryJerseyNumber:form.secondaryJerseyNumber,secondaryJerseyEvidence:form.secondaryJerseyNumber ? form.secondaryJerseyEvidence : {}};
         const next = form.mode === "manual" ? CI.addManualCopy(state, Number(form.cardId), patch, {...context,confirmAdditional:form.confirmAdditional}).inventory : CI.editCopy(state, Number(form.cardId), form.copyId, patch, context);
         await persist(next, form.mode === "manual" ? "Additional copy saved." : "Copy details saved.");
       }
@@ -144,6 +144,7 @@ function CopyInventoryPanel({cards = [], statuses = {}, cardDetails = {}, invent
         {form.mode !== "purchase" ? <label className="text-sm">Sale status<select className={controlClass + " mt-1"} value={form.saleStatus} onChange={e => change("saleStatus",e.target.value)}>{Object.entries(CI.SALE_STATUSES).map(([key,name]) => <option key={key} value={key}>{name}</option>)}</select></label> : null}
       </div>
 
+      {form.mode === "edit" && selectedCard && form.copyId && CI.getCopiesForCard(state, selectedCard.id, statuses, cardDetails).some(c => c.id === form.copyId && c.origin === "purchase") && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.currentInventory === true} onChange={e => change("currentInventory",e.target.checked)} />Count this purchased copy in my collection</label>}
       <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={form.duplicateConfirmed} onChange={e => change("duplicateConfirmed",e.target.checked)} />Extra copy / COMC sale review</label>
       <button type="button" onClick={() => setShowMore(!showMore)} className="text-left text-xs text-cyan-300 underline">{showMore ? "Less" : "More details"}</button>
       {showMore && form.mode !== "purchase" ? <><label className="block text-sm">Existing listing link<input className={controlClass + " mt-1"} value={form.listingUrl} onChange={e => change("listingUrl",e.target.value)} placeholder="https://…" /></label><label className="block text-sm">Copy notes<textarea className={controlClass + " mt-1"} rows="2" value={form.notes} onChange={e => change("notes",e.target.value)} /></label></> : null}
