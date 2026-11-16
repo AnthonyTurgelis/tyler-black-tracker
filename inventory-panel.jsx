@@ -26,7 +26,7 @@ function CopyInventoryPanel({cards = [], statuses = {}, cardDetails = {}, invent
   const observations = Object.values(state.observations);
   const pending = observations.filter(o => !o.matchedCopyId && o.disposition !== "ignored" && o.disposition !== "split");
   const duplicateGroups = TM.comcDuplicateGroups(state);
-  const activeCopies = copies.filter(row => row.copy.saleStatus !== "sold");
+  const activeCopies = copies.filter(row => row.copy.saleStatus !== "sold" && row.copy.currentInventory !== false);
   const locationCounts = activeCopies.reduce((out, row) => { out[row.copy.location] = (out[row.copy.location] || 0) + 1; return out; }, {});
   const label = card => card ? `${card.product} · #${card.cardNumber} · ${card.cardSet || "Base"}` : "Choose a card";
   React.useEffect(() => { if (initialCardId && cardById[initialCardId]) setQuery(label(cardById[initialCardId])); }, [initialCardId]);
