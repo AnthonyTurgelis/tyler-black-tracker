@@ -1363,7 +1363,7 @@ function TylerBlackTracker() {
       }
     }
     if (trackerMode === "tb" && window.CopyInventory.hasStoredCopies(copyStateRef.current.inventory, cardId)) {
-      var rows = window.CopyInventory.getCopiesForCard(copyStateRef.current.inventory,cardId,statuses,cardDetails).filter(function(c){return c.saleStatus !== "sold" && c.currentInventory !== false;});
+      var rows = window.CopyInventory.getCopiesForCard(copyStateRef.current.inventory,cardId,statuses,cardDetails).filter(window.CopyInventory.isCountedCopy);
       var legacy = rows.filter(function(c){return c.origin === "legacy";});
       var explicitHand = rows.filter(function(c){return c.origin !== "legacy" && c.location === "in_hand";}).length;
       if (status === "not_owned") {
@@ -3109,7 +3109,7 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
                 <button onClick={function(){ adjustCardQty(selectedCard.id, 1); }} className="bg-gray-800 border border-gray-700 rounded w-5 h-5 text-gray-400 hover:text-white hover:bg-gray-700 font-bold text-[10px] flex items-center justify-center" title={curQty === 0 ? "Add 1 copy (sets status to in-transit)" : "Increment quantity"}>+</button>
                 {curQty > 1 && <span className="text-green-400 font-black text-[10px] bg-green-950/40 border border-green-800 rounded px-1">{"+" + (curQty - 1) + " extra"}</span>}
                 {trackerMode === "tb" && curQty > 1 && (function(){
-                  var rows = window.CopyInventory.getCopiesForCard(copyInventory, selectedCard.id, statuses, cardDetails).filter(function(c){return c.saleStatus !== "sold" && c.currentInventory !== false;});
+                  var rows = window.CopyInventory.getCopiesForCard(copyInventory, selectedCard.id, statuses, cardDetails).filter(window.CopyInventory.isCountedCopy);
                   var legacy = rows.filter(function(c){return c.origin === "legacy";});
                   var confirmedHand = rows.filter(function(c){return c.origin !== "legacy" && c.location === "in_hand";}).length;
                   var hand = rows.filter(function(c){return c.location === "in_hand" || c.origin === "legacy" && c.location === "unknown" && fs === "owned";}).length;
