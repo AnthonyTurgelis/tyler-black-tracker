@@ -633,9 +633,13 @@
       var limit = Math.min(500,Math.max(1,Math.floor(Number(options.limit) || 500)));
       var offset = Math.max(0,Math.floor(Number(options.offset) || 0));
       try {
-        var result = await supabase.from("tb_collection_activity")
-          .select("id,changed_at,card_id,category,field,old_value,new_value,actor,copy_id")
-          .order("changed_at",{ascending:false}).order("id",{ascending:false})
+        var query = supabase.from("tb_collection_activity")
+          .select("id,changed_at,card_id,category,field,old_value,new_value,actor,copy_id,source_ref,evidence_note,evidence_level,source_key");
+        if (options.filter === "movement") query = query.in("category",["status","qty","location","copy"]);
+        else if (options.filter === "qty") query = query.in("category",["qty","copy"]);
+        else if (options.filter === "backend") query = query.in("actor",["Backend","Backfill","Snapshot"]);
+        else if (options.filter && options.filter !== "all") query = query.eq("category",options.filter);
+        var result = await query.order("changed_at",{ascending:false}).order("id",{ascending:false})
           .range(offset,offset+limit-1);
         if (result.error) throw new Error(result.error.message || "Activity could not be loaded.");
         return { ok:true, rows:result.data || [], hasMore:(result.data || []).length === limit };
