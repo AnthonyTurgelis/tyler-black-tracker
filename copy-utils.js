@@ -322,7 +322,37 @@
     state.updatedAt = at;
     return state;
   }
-  var api = { LOCATIONS: LOCATIONS, SALE_STATUSES: SALE_STATUSES, normalizeState: normalizeState, hasStoredCopies: hasStoredCopies, mergeStates: mergeStates, legacyQuantity: legacyQuantity, getCopiesForCard: getCopiesForCard, summarizeCard: summarizeCard, matchesStatus: matchesStatus, countCards: countCards, needsSaleReview: needsSaleReview, sameSerial: sameSerial, sourceIdentity: sourceIdentity, purchaseUnits: purchaseUnits, upsertPurchase: upsertPurchase, validateCopy: validateCopy, editCopy: editCopy, resolveObservation: resolveObservation, splitObservation: splitObservation, addManualCopy: addManualCopy, quickQuantity: quickQuantity, quickAllocation: quickAllocation };
+  // Selecting a stoplight on a multi-copy variant changes PRESENCE, not all copies.
+  // Keep at least one in hand when adding the first in-transit copy and vice versa.
+  function quickStatusPresence(input, cardId, target, context) {
+    context = context || {};
+    if (target !== "owned" && target !== "in_transit") return { handled:false };
+    var state = normalizeState(input);
+    var rows = getCopiesForCard(state, cardId, context.statuses, context.cardDetails)
+      .filter(function(c){ return c.saleStatus !== "sold" && c.currentInventory !== false; });
+    if (rows.length < 2) return { handled:false };
+    var summary = summarizeCard(state, cardId, context.statuses, context.cardDetails);
+    if ((target === "owned" && summary.owned) || (target === "in_transit" && summary.inTransit))
+      return { handled:true, changed:false, inventory:state };
+    var legacy = rows.filter(function(c){return c.origin === "legacy";});
+    if (!legacy.length) return { handled:true, changed:false, requiresDetails:true, inventory:state };
+    var confirmedHand = rows.filter(function(c){return c.origin !== "legacy" && c.location === "in_hand";}).length;
+    var assumedOwned = ((context.statuses || {})[cardId] || baselineFor(state,cardId,context.statuses,context.cardDetails).status) === "owned";
+    var hand = rows.filter(function(c){ return c.location === "in_hand" || c.origin === "legacy" && c.location === "unknown" && assumedOwned; }).length;
+    var nextHand;
+    if (target === "in_transit") {
+      nextHand = Math.max(confirmedHand, hand - 1);
+      // A two-copy card that was in hand must still have at least one in hand.
+      if (hand > 0) nextHand = Math.max(1, nextHand);
+    } else {
+      nextHand = Math.min(confirmedHand + legacy.length, hand + 1);
+      // Keep an existing transit copy when switching on the Owned light.
+      if (hand === 0 && rows.length > 1) nextHand = Math.min(rows.length - 1, nextHand);
+    }
+    if (nextHand === hand) return { handled:true, changed:false, requiresDetails:true, inventory:state };
+    return { handled:true, changed:true, inventory:quickAllocation(state,cardId,nextHand,context) };
+  }
+  var api = { LOCATIONS: LOCATIONS, SALE_STATUSES: SALE_STATUSES, normalizeState: normalizeState, hasStoredCopies: hasStoredCopies, mergeStates: mergeStates, legacyQuantity: legacyQuantity, getCopiesForCard: getCopiesForCard, summarizeCard: summarizeCard, matchesStatus: matchesStatus, countCards: countCards, needsSaleReview: needsSaleReview, sameSerial: sameSerial, sourceIdentity: sourceIdentity, purchaseUnits: purchaseUnits, upsertPurchase: upsertPurchase, validateCopy: validateCopy, editCopy: editCopy, resolveObservation: resolveObservation, splitObservation: splitObservation, addManualCopy: addManualCopy, quickQuantity: quickQuantity, quickAllocation: quickAllocation, quickStatusPresence: quickStatusPresence };
   if (root) root.CopyInventory = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : null);
