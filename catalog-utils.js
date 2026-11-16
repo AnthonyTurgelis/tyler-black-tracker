@@ -15,12 +15,20 @@
       .replace(/\s*\(not_on_tcdb\)/g, "").replace(/pre[\s-]*production/g, "preproduction").replace(/\s+/g, " ");
   }
   function inferType(card) {
-    var text = String(card.cardSet || "");
+    var text = [card.product,card.cardSet].filter(Boolean).join(" ");
     if (/pre[\s-]*production/i.test(text)) return "pre_production_proof";
     // Artist Proof, Press Proof and Photographer's Proof are regular parallels.
+    if (/\b(?:artist|press|photographer(?:'s|s)?)\s+proof\b/i.test(text)) return card.isCustom ? "unverified" : "standard";
     if (/unsigned proofs?|slabbed proof|proofs?\s+auto|autographed proof/i.test(text)) return "manufacturer_proof";
     if (/\bprototype\b|\btest issue\b/i.test(text)) return "prototype";
     return card.isCustom ? "unverified" : "standard";
+  }
+  function proofType(type) { return ["pre_production_proof", "manufacturer_proof", "prototype"].includes(type); }
+  function signatureFromText(value, proof) {
+    var text = String(value || "");
+    if (/\bunsigned\b|\bnon[ -]?(?:auto(?:graph(?:ed|s)?)?|signed)\b|\bno\s+(?:autograph|signature|auto)\b/i.test(text)) return "unsigned";
+    if (/\bsigned\b|\bautographed\b/i.test(text)) return "signed";
+    return !proof && /\bauto(?:graph)?s?\b|\bsignatures?\b/i.test(text) ? "signed" : "unknown";
   }
   function getInfo(card) {
     card = card || {};
@@ -34,7 +42,9 @@
       info.verification = info.issueType === "standard" && !card.isCustom ? "checklist" : "unverified";
     }
     if (!["signed", "unsigned", "unknown"].includes(info.signature)) {
-      info.signature = /unsigned|non[ -]?auto/i.test(card.cardSet || "") ? "unsigned" : card.isAuto === "Yes" ? "signed" : "unknown";
+      var negative = signatureFromText([card.product,card.cardSet].filter(Boolean).join(" "),true) === "unsigned";
+      // A legacy Autographs family or isAuto flag does not establish a proof's signature.
+      info.signature = negative ? "unsigned" : proofType(info.issueType) ? signatureFromText(card.cardSet,true) : card.isAuto === "Yes" ? "signed" : signatureFromText(card.cardSet,false);
     }
     return info;
   }
@@ -43,13 +53,23 @@
     return !card.archived && info.issueType === "standard" && info.verification !== "unverified";
   }
   function isProof(card) {
-    return ["pre_production_proof", "manufacturer_proof", "prototype"].includes(getInfo(card).issueType);
+    return proofType(getInfo(card).issueType);
   }
+  function hasAutograph(card) { return getInfo(card).signature === "signed"; }
+  function signatureLabel(card) { var signature=getInfo(card).signature; return signature === "signed" ? "Signed" : signature === "unsigned" ? "Unsigned" : "Signature unconfirmed"; }
   function matchesScope(card, scope) {
     if (card.archived) return false;
     if (!scope || scope === "all") return true;
     if (scope === "checklist") return isChecklistCard(card);
-    if (scope === "proofs") return isProof(card);
+    var proofScope = /^(proofs|preproduction|manufacturer_proofs|prototypes)(?:_(signed|unsigned|unknown))?$/.exec(scope);
+    if (proofScope) {
+      var info = getInfo(card);
+      if (!proofType(info.issueType)) return false;
+      if (proofScope[1] === "preproduction" && info.issueType !== "pre_production_proof") return false;
+      if (proofScope[1] === "manufacturer_proofs" && info.issueType !== "manufacturer_proof") return false;
+      if (proofScope[1] === "prototypes" && info.issueType !== "prototype") return false;
+      return !proofScope[2] || info.signature === proofScope[2];
+    }
     if (scope === "custom") return getInfo(card).issueType === "custom";
     if (scope === "review") return getInfo(card).verification === "unverified" || getInfo(card).issueType === "unverified";
     return true;
@@ -96,7 +116,7 @@
     if (info.parentCardId && Number(info.parentCardId) === Number(card.id)) return "A card cannot be linked to itself.";
     return "";
   }
-  var api = { getInfo: getInfo, kindLabel: function (kind) { return labels[kind] || labels.unverified; }, isChecklistCard: isChecklistCard, isProof: isProof, matchesScope: matchesScope, identityKey: identityKey, sameIdentity: sameIdentity, normalizeCustomCards: normalizeCustomCards, nextCustomId: nextCustomId, safeUrl: safeUrl, validate: validate, fields: fields };
+  var api = { getInfo: getInfo, kindLabel: function (kind) { return labels[kind] || labels.unverified; }, isChecklistCard: isChecklistCard, isProof: isProof, hasAutograph: hasAutograph, signatureLabel: signatureLabel, signatureFromText: signatureFromText, matchesScope: matchesScope, identityKey: identityKey, sameIdentity: sameIdentity, normalizeCustomCards: normalizeCustomCards, nextCustomId: nextCustomId, safeUrl: safeUrl, validate: validate, fields: fields };
   if (root) root.CardCatalog = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : null);

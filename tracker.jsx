@@ -412,12 +412,16 @@ function catalogBadge(card) {
   if (window.MODE === "wnba") return null;
   var info = window.CardCatalog.getInfo(card);
   if (info.issueType === "standard" && info.verification !== "unverified") return null;
-  var label = window.CardCatalog.isProof(card) ? "Proof" : info.issueType === "custom" ? "Custom" : "Review";
+  var label = window.CardCatalog.isProof(card) ? "Proof · " + (info.signature === "unknown" ? "signature unconfirmed" : info.signature) : info.issueType === "custom" ? "Custom" : "Review";
   return React.createElement("span", {className:"ml-1 inline-block rounded px-1 text-[9px] text-violet-300 bg-violet-950/70",title:window.CardCatalog.kindLabel(info.issueType)}, label);
+}
+function cardHasAutograph(card) { return window.MODE === "wnba" ? card.isAuto === "Yes" : window.CardCatalog.hasAutograph(card); }
+function listingHasAutograph(record) {
+  return window.CardCatalog.hasAutograph({product:record.product || "",cardSet:record.rawSet || record.title || record.rawTitle || record.variant || "",issueType:record.issueType,signature:record.signature,isAuto:record.isAuto ? "Yes" : ""});
 }
 function CatalogScopeSelect({value, onChange}) {
   if (window.MODE === "wnba") return null;
-  return <label className="inline-flex items-center gap-1 text-[11px] text-gray-400">Show <select aria-label="Card category" value={value} onChange={function(e){onChange(e.target.value);}} className="bg-gray-900 border border-gray-700 text-gray-200 rounded px-1 py-1"><option value="checklist">Checklist</option><option value="proofs">Proofs & prototypes</option><option value="custom">Custom / fantasy</option><option value="review">Needs review</option><option value="all">All cards</option></select></label>;
+  return <label className="inline-flex items-center gap-1 text-[11px] text-gray-400">Show <select aria-label="Card category" value={value} onChange={function(e){onChange(e.target.value);}} className="bg-gray-900 border border-gray-700 text-gray-200 rounded px-1 py-1"><option value="checklist">Checklist</option><option value="proofs">All proofs & prototypes</option><option value="preproduction">Pre-production proofs</option><option value="manufacturer_proofs">Other manufacturer proofs</option><option value="proofs_signed">Proofs · signed</option><option value="proofs_unsigned">Proofs · unsigned</option><option value="proofs_unknown">Proofs · signature unconfirmed</option><option value="custom">Custom / fantasy</option><option value="review">Needs review</option><option value="all">All cards</option></select></label>;
 }
 function useCatalogRevision() {
   var [revision, setRevision] = useState(0);
@@ -2905,19 +2909,19 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
               var vs = varSearch.toLowerCase();
               visibleCards = visibleCards.filter(function(c) { return (c.cardSet || "").toLowerCase().indexOf(vs) !== -1; });
             }
-            if (filterAuto) visibleCards = visibleCards.filter(function(c) { return c.isAuto === "Yes"; });
+            if (filterAuto) visibleCards = visibleCards.filter(function(c) { return cardHasAutograph(c); });
             if (filterSN) visibleCards = visibleCards.filter(function(c) { return c.copies && c.copies !== ""; });
             if (filterMem) visibleCards = visibleCards.filter(function(c) { return c.isMem === "Yes"; });
             if (maxPR) { var maxVal = parseInt(maxPR); if (!isNaN(maxVal)) visibleCards = visibleCards.filter(function(c) { var pr = parseInt(c.copies); return !isNaN(pr) && pr <= maxVal; }); }
-            if (filterAuto) visibleCards = visibleCards.filter(function(c) { return c.isAuto === "Yes"; });
+            if (filterAuto) visibleCards = visibleCards.filter(function(c) { return cardHasAutograph(c); });
             if (filterSN) visibleCards = visibleCards.filter(function(c) { return c.copies && c.copies !== ""; });
             if (filterMem) visibleCards = visibleCards.filter(function(c) { return c.isMem === "Yes"; });
             if (maxPR) { var maxVal = parseInt(maxPR); if (!isNaN(maxVal)) visibleCards = visibleCards.filter(function(c) { var pr = parseInt(c.copies); return !isNaN(pr) && pr <= maxVal; }); }
-            if (filterAuto) visibleCards = visibleCards.filter(function(c) { return c.isAuto === "Yes"; });
+            if (filterAuto) visibleCards = visibleCards.filter(function(c) { return cardHasAutograph(c); });
             if (filterSN) visibleCards = visibleCards.filter(function(c) { return c.copies && c.copies !== ""; });
             if (filterMem) visibleCards = visibleCards.filter(function(c) { return c.isMem === "Yes"; });
             if (maxPR) { var maxVal = parseInt(maxPR); if (!isNaN(maxVal)) visibleCards = visibleCards.filter(function(c) { var pr = parseInt(c.copies); return !isNaN(pr) && pr <= maxVal; }); }
-            if (filterAuto) visibleCards = visibleCards.filter(function(c) { return c.isAuto === "Yes"; });
+            if (filterAuto) visibleCards = visibleCards.filter(function(c) { return cardHasAutograph(c); });
             if (filterSN) visibleCards = visibleCards.filter(function(c) { return c.copies && c.copies !== ""; });
             if (filterMem) visibleCards = visibleCards.filter(function(c) { return c.isMem === "Yes"; });
             if (maxPR) { var maxVal = parseInt(maxPR); if (!isNaN(maxVal)) visibleCards = visibleCards.filter(function(c) { var pr = parseInt(c.copies); return !isNaN(pr) && pr <= maxVal; }); }
@@ -2976,7 +2980,7 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
                           {/* User-entered serial number — yellow when present */}
                           {dd.serial && <span className="text-yellow-300 font-black text-[10px] flex-shrink-0" title="Your serial number">#{dd.serial}</span>}
                           {sspBadge(card.cardSet)}{catalogBadge(card)}
-                          {card.isAuto === "Yes" && <span className="text-yellow-500 text-[8px] font-bold flex-shrink-0 bg-yellow-950/40 px-0.5 rounded">A</span>}
+                          {cardHasAutograph(card) && <span className="text-yellow-500 text-[8px] font-bold flex-shrink-0 bg-yellow-950/40 px-0.5 rounded">A</span>}
                           {card.isMem === "Yes" && <span className="text-purple-500 text-[8px] font-bold flex-shrink-0 bg-purple-950/40 px-0.5 rounded">M</span>}
                           {/* Inline qty +/- — works in any view, click doesn't select */}
                           <div className="flex items-center gap-0.5 flex-shrink-0" onClick={function(e){e.stopPropagation();}}>
@@ -3038,7 +3042,7 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
           </div>
           <div className="text-white font-bold text-[12px]">{selectedCard.product}</div>
           <div className="text-gray-400 text-[10px]">#{selectedCard.cardNumber} -- {selectedCard.cardSet}{selectedCard.copies ? <span className="text-yellow-400 font-black ml-1" style={{fontSize:"12px"}}>{" /" + selectedCard.copies}</span> : ""} {sspBadge(selectedCard.cardSet)}{catalogBadge(selectedCard)}</div>
-          {selectedCard.isAuto === "Yes" && <span className="text-yellow-500 text-[8px] font-bold bg-yellow-950/40 px-1 rounded">AUTO</span>}
+          {cardHasAutograph(selectedCard) && <span className="text-yellow-500 text-[8px] font-bold bg-yellow-950/40 px-1 rounded">AUTO</span>}
           {selectedCard.isMem === "Yes" && <span className="text-purple-500 text-[8px] font-bold bg-purple-950/40 px-1 rounded ml-0.5">MEM</span>}
           <div className="grid grid-cols-2 gap-x-2 gap-y-1 mt-1.5 pt-1.5 border-t border-gray-800 text-[10px]">
             {selectedCard.copies && (
@@ -4181,7 +4185,7 @@ function COMCScannerPanel(props) {
     if (!item) return;
     var p = item.parsed;
     var raw = (p.rawSet || "").toLowerCase();
-    var isAuto = /auto(?:graph)?s?|signatures?|\bsigned\b/i.test(raw);
+    var isAuto = window.CardCatalog.hasAutograph({cardSet:raw});
     var isMem = /relic|patch|jersey|swatch|game.?gear|memorabilia|game.?used|material/i.test(raw);
     var isRC = false;
     var candidates = [];
@@ -4677,7 +4681,7 @@ function COMCScannerPanel(props) {
     var graded = "";
     var gm = title.match(/\b(PSA|BGS|SGC|CGC|HGA|CSG|GMA?)\s*(\d+\.?\d*)/i);
     if (gm) graded = gm[1].toUpperCase() + " " + gm[2];
-    var isAuto = /\b(auto|autograph|signed|on.card auto|on-card auto)\b/i.test(title);
+    var isAuto = window.CardCatalog.hasAutograph({cardSet:title});
     var product = "";
     for (var pi = 0; pi < EBAY_PRODUCTS.length; pi++) {
       if (tl.indexOf(EBAY_PRODUCTS[pi][0]) !== -1) { product = EBAY_PRODUCTS[pi][1]; break; }
@@ -5338,7 +5342,7 @@ function COMCScannerPanel(props) {
       titleNormSet[normW(titleWords[tw])] = true;
     }
 
-    var titleHasAuto = !!(titleNormSet["auto"]);
+    var titleHasAuto = listingHasAutograph(p);
     var titlePrintRun = "";
     var prMatch = rawTitle.match(/\/(\d+)/);
     if (prMatch) titlePrintRun = prMatch[1];
@@ -5526,7 +5530,7 @@ function COMCScannerPanel(props) {
       }
 
       // === AUTO CONSISTENCY (5 pts match / -8 mismatch) ===
-      var cardIsAuto = /auto|sig/i.test(varName) || card.isAuto === "Yes";
+      var cardIsAuto = cardHasAutograph(card);
       var autoScore = 0;
       if (titleHasAuto && cardIsAuto) autoScore = 5;
       else if (!titleHasAuto && !cardIsAuto) autoScore = 5;
@@ -6561,7 +6565,7 @@ function COMCScannerPanel(props) {
   // Apply tag filters (auto, sn, graded)
   var shopFiltered = shopUnblocked.filter(function(r) {
     var p = r.parsed;
-    if (scanTags.auto && !p.isAuto) return false;
+    if (scanTags.auto && !listingHasAutograph(p)) return false;
     if (scanTags.sn && !p.serial && !p.printRun && !(r.match && r.match.score >= 90 && r.match.card.copies)) return false;
     if (scanTags.graded && !p.graded) return false;
     if (scanCardNo && r.match && r.match.score >= 90 && r.match.card.cardNumber !== scanCardNo) return false;
@@ -6919,7 +6923,7 @@ function COMCScannerPanel(props) {
                       {ovEntries.map(function(entry) {
                         var cStatus = statuses[entry.cardId] || "not_owned";
                         var statusDot = cStatus === "owned" ? "bg-green-500" : cStatus === "in_transit" ? "bg-emerald-400" : "bg-gray-600";
-                        var candIsAuto = entry.card.isAuto === "Yes" || /autograph|auto|signature/i.test(entry.card.cardSet || "");
+                        var candIsAuto = cardHasAutograph(entry.card);
                         return (
                           <div key={entry.key} className="flex items-center gap-1.5 bg-gray-800/50 rounded px-2 py-1 text-[10px]">
                             <span className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + statusDot}></span>
@@ -6949,7 +6953,7 @@ function COMCScannerPanel(props) {
                           <span className="text-purple-400 font-mono">#{card.cardNumber}</span>
                           {" " + card.product + " | " + card.cardSet + " | #" + card.cardNumber}
                           {card.copies ? " /" + card.copies : ""}
-                          {card.isAuto === "Yes" ? " [A]" : ""}
+                          {cardHasAutograph(card) ? " [A]" : ""}
                           {card.isMem === "Yes" ? " [M]" : ""}
                           {card.isRC === "Yes" ? " [RC]" : ""}
                         </span>
@@ -7126,7 +7130,7 @@ function COMCScannerPanel(props) {
                                       {p.listingType === "best_offer" && <span className="ml-1 text-cyan-400">(OBO)</span>}
                                     </div>
                                     {p.graded && <div><span className="text-gray-500">Graded: </span><span className="text-purple-400 font-bold">{p.graded}</span></div>}
-                                    {p.isAuto && <div><span className="text-gray-500">Auto: </span><span className="text-yellow-400 font-bold">Yes - Autograph</span></div>}
+                                    {listingHasAutograph(p) && <div><span className="text-gray-500">Auto: </span><span className="text-yellow-400 font-bold">Yes - Autograph</span></div>}
                                     {p.binPrice && <div><span className="text-gray-500">BIN Price: </span><span className="text-green-300">{parsedMoney(p, p.binPrice)}</span></div>}
                                   </React.Fragment>
                                 )}
@@ -7253,7 +7257,7 @@ function COMCScannerPanel(props) {
                                 <div className="bg-gray-800/50 rounded px-2 py-1 text-[10px]">
                                   <span className="text-gray-500">Listing: </span>
                                   <span className="text-yellow-200/80">{p.rawSet || (p.year + " " + p.product + " " + (p.variant || "Base") + " #" + (p.cardNo || "?"))}</span>
-                                  {p.isAuto && <span className="ml-1.5 text-yellow-400 text-[8px] font-bold bg-yellow-900/50 px-0.5 rounded">AU</span>}
+                                  {listingHasAutograph(p) && <span className="ml-1.5 text-yellow-400 text-[8px] font-bold bg-yellow-900/50 px-0.5 rounded">AU</span>}
                                   {(p.serial || p.printRun) && <span className="ml-1.5 text-purple-300 text-[8px] font-bold bg-purple-900/50 px-0.5 rounded">{p.serial ? "#" + p.serial : ""}{p.printRun ? "/" + p.printRun : ""}</span>}
                                   {p.graded && <span className="ml-1.5 text-pink-400 text-[8px] font-bold bg-pink-900/50 px-0.5 rounded">{p.graded}</span>}
                                 </div>
@@ -7298,7 +7302,7 @@ function COMCScannerPanel(props) {
                                           var cStatus = statuses[cand.id] || "not_owned";
                                           var statusColor = cStatus === "owned" ? "text-green-300" : cStatus === "in_transit" ? "text-emerald-300" : "text-gray-400";
                                           var statusLabel = cStatus === "owned" ? "OWN" : cStatus === "in_transit" ? "TRNS" : "";
-                                          var candIsAuto = cand.isAuto === "Yes" || /autograph|auto|signature/i.test(cand.cardSet || "");
+                                          var candIsAuto = cardHasAutograph(cand);
                                           return (
                                             <div key={cand.id} className="flex items-center gap-1.5 bg-gray-800/60 rounded px-2 py-1 hover:bg-gray-700/60">
                                               {statusLabel ? <span className={"text-[8px] font-bold px-1 rounded " + (cStatus === "owned" ? "bg-green-900/60 text-green-300" : cStatus === "in_transit" ? "bg-emerald-900/60 text-emerald-300" : "bg-red-900/60 text-red-400")}>{statusLabel}</span> : <span className="text-[8px] text-gray-600 w-5"></span>}
@@ -7868,7 +7872,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
                           {filtered.map(function(cand) {
                             var cStatus = statuses[cand.id] || "not_owned";
                             var statusLabel = cStatus === "owned" ? "OWN" : cStatus === "in_transit" ? "TRNS" : "";
-                            var candIsAuto = cand.isAuto === "Yes" || /autograph|auto|signature/i.test(cand.cardSet || "");
+                            var candIsAuto = cardHasAutograph(cand);
                             var existingPK = cand.product.slice(0,4) + "|" + cand.product + "|" + cand.cardNumber + "|" + (cand.cardSet || "Base");
                             var hasExisting = ph[existingPK] && ph[existingPK].length > 0;
                             return (
@@ -8125,7 +8129,7 @@ function TargetsPanel({ cards, statuses, setCardStatus, updateCardDetail, setDet
                       <td className="px-1 py-1">
                         <div className="flex items-center gap-1">
                           <span className={card ? "text-gray-200" : "text-gray-400"} title={t.title || cardDesc}>{cardDesc}</span>
-                          {t.isAuto && <span className="text-yellow-400 text-[8px] font-bold bg-yellow-900/50 px-0.5 rounded">AU</span>}
+                          {listingHasAutograph(t) && <span className="text-yellow-400 text-[8px] font-bold bg-yellow-900/50 px-0.5 rounded">AU</span>}
                           {card && sspBadge(card.cardSet)}
                           {t.graded && <span className="text-pink-400 text-[8px] font-bold bg-pink-900/50 px-0.5 rounded">{t.graded}</span>}
                           {t.printRun && <span className="text-purple-400 text-[8px]">{"/" + t.printRun}</span>}
@@ -9049,7 +9053,7 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
       var fullName = buildFullName(card);
       var catalogInfo = window.CardCatalog.getInfo(card);
       var effectiveRun = getEffCopies(card, cardDetails);
-      var isAuto = catalogInfo.signature === "unsigned" ? "" : (card.isAuto === "Yes" || (card.cardSet && /autograph|auto|signature/i.test(card.cardSet))) ? "Yes" : "";
+      var isAuto = cardHasAutograph(card) ? "Yes" : "";
       var isMem = (card.cardSet && /relic|patch|jersey|swatch|material|memorabilia|glove|hat|thread|gear|sock/i.test(card.cardSet)) ? "Yes" : "";
       var isRc = Object.prototype.hasOwnProperty.call(card, "isRC") ? card.isRC : (card.product.match(/^2024/) && !/Draft|Prospect|Pro Debut|Minor|Debut|Inception|Bowman's Best|Bowman Sterling|Bowman Platinum|Chrome Sapphire|Leaf|Panini|Pro Set|Sapphire Edition|Choice/i.test(card.product)) ? "Yes" : "";
       var notOnTcdb = NOT_ON_TCDB.has(card.id);

@@ -65,7 +65,7 @@
       serialMark: info.serialMark || "",
       certification: info.certification || "",
       parentCardId: info.parentCardId != null ? String(info.parentCardId) : "",
-      isAuto: card ? card.isAuto || "" : "",
+      isAuto: card && window.CardCatalog.hasAutograph(card) ? "Yes" : "",
       isMem: card ? card.isMem || "" : "",
       isRC: card ? card.isRC || "" : ""
     };
@@ -76,6 +76,8 @@
     var statuses = props.statuses || {};
     const [filter, setFilter] = React.useState("2026");
     const [search, setSearch] = React.useState("");
+    const [proofTypeFilter, setProofTypeFilter] = React.useState("all");
+    const [proofSignatureFilter, setProofSignatureFilter] = React.useState("all");
     const [shown, setShown] = React.useState(50);
     const [form, setForm] = React.useState(null);
     const [editingCard, setEditingCard] = React.useState(null);
@@ -109,9 +111,11 @@
       return entries.filter(function (entry) {
         if (filter === "archived" && !props.isOwner) return false;
         if (!matchesFilter(entry, filter)) return false;
+        if (filter === "proofs" && proofTypeFilter !== "all" && entry.info.issueType !== proofTypeFilter) return false;
+        if (filter === "proofs" && proofSignatureFilter !== "all" && entry.info.signature !== proofSignatureFilter) return false;
         if (!query) return true;
         var card = entry.card, info = entry.info;
-        return [card.product, card.cardNumber, card.cardSet, info.proofColor, info.proofFinish, info.certification]
+        return [card.product, card.cardNumber, card.cardSet, info.proofColor, info.proofFinish, info.certification, info.signature]
           .join(" ").toLowerCase().indexOf(query) !== -1;
       }).sort(function (a, b) {
         var productOrder = (b.card.product || "").localeCompare(a.card.product || "", undefined, {numeric: true});
@@ -122,13 +126,16 @@
         if (b.card.cardSet === "Base") return 1;
         return (a.card.cardSet || "").localeCompare(b.card.cardSet || "", undefined, {numeric: true});
       });
-    }, [entries, filter, search, props.isOwner]);
+    }, [entries, filter, search, props.isOwner, proofTypeFilter, proofSignatureFilter]);
+    var proofEntries = entries.filter(function(entry){return matchesFilter(entry,"proofs") && (!search || [entry.card.product,entry.card.cardNumber,entry.card.cardSet,entry.info.proofColor,entry.info.proofFinish,entry.info.signature].join(" ").toLowerCase().includes(search.toLowerCase().trim()));});
+    var proofSignatureCounts = {all:0,signed:0,unsigned:0,unknown:0};
+    proofEntries.forEach(function(entry){if(proofTypeFilter === "all" || entry.info.issueType === proofTypeFilter){proofSignatureCounts.all++;proofSignatureCounts[entry.info.signature]++;}});
 
     var owned = filtered.filter(function (entry) { return statuses[entry.card.id] === "owned"; }).length;
     var incoming = filtered.filter(function (entry) { return statuses[entry.card.id] === "in_transit"; }).length;
     var isOpenEnded = filter === "proofs" || filter === "custom" || filter === "review";
 
-    React.useEffect(function () { setShown(50); }, [filter, search]);
+    React.useEffect(function () { setShown(50); }, [filter, search, proofTypeFilter, proofSignatureFilter]);
     React.useEffect(function () {
       function refreshIssues(event) {
         if (!event || !event.detail || ["tb-custom-cards-v1", "tb-catalog-meta-v1"].indexOf(event.detail.key) !== -1) setSyncIssues(readSyncIssues());
@@ -188,6 +195,7 @@
       else next.parentCardId = null;
       if (next.signature === "signed") next.isAuto = "Yes";
       if (next.signature === "unsigned") next.isAuto = "";
+      if (isProof(next.issueType) && next.signature === "unknown") next.isAuto = "";
       setBusy(true);
       setFormError("");
       try {
@@ -313,6 +321,11 @@
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Catalogue category">
             {categoryFilters.map(function (item) { return <button key={item[0]} type="button" aria-pressed={filter === item[0]} onClick={function () { setFilter(item[0]); }} className={"rounded border px-2.5 py-1.5 text-xs font-semibold " + (filter === item[0] ? "border-yellow-500 bg-yellow-500/10 text-yellow-200" : "border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-200")}>{item[1]} <span className="ml-1 text-[10px] opacity-70">{counts[item[0]]}</span></button>; })}
           </div>
+          {filter === "proofs" && <div className="space-y-2 rounded border border-violet-900/60 bg-violet-950/20 p-3">
+            <div className="flex flex-wrap items-center gap-2"><label className="text-xs text-gray-400">Proof category <select aria-label="Proof category" value={proofTypeFilter} onChange={function(event){setProofTypeFilter(event.target.value);}} className="ml-1 rounded border border-gray-600 bg-gray-950 px-2 py-1.5 text-gray-200"><option value="all">All proofs and prototypes ({proofEntries.length})</option>{[["pre_production_proof","Pre-production proofs"],["manufacturer_proof","Other manufacturer proofs"],["prototype","Prototypes / test issues"]].map(function(item){return <option key={item[0]} value={item[0]}>{item[1]} ({proofEntries.filter(function(entry){return entry.info.issueType === item[0];}).length})</option>;})}</select></label></div>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Proof signature">{[["all","All signatures"],["signed","Signed"],["unsigned","Unsigned"],["unknown","Signature unconfirmed"]].map(function(item){return <button type="button" key={item[0]} aria-pressed={proofSignatureFilter === item[0]} onClick={function(){setProofSignatureFilter(item[0]);}} className={"rounded border px-2.5 py-1.5 text-xs " + (proofSignatureFilter === item[0] ? "border-violet-400 bg-violet-950 text-violet-200" : "border-gray-700 text-gray-400")}>{item[1]} ({proofSignatureCounts[item[0]]})</button>;})}</div>
+            <p className="text-xs text-gray-400">Unsigned proofs remain separate from signed proofs even when the product family includes “Autographs.” An unconfirmed signature is not treated as signed. These recorded categories do not enter standard checklist completion.</p>
+          </div>}
           <div className="flex flex-wrap items-center gap-2">
             <label className="min-w-0 flex-1"><span className="sr-only">Search catalogue</span><input aria-label="Search catalogue" type="search" className={INPUT} placeholder="Search product, card # or variant" value={search} onChange={function (event) { setSearch(event.target.value); }} /></label>
             <div className="flex flex-wrap items-center gap-x-2 text-xs">
@@ -344,14 +357,15 @@
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle type={card.archived ? undefined : "button"} onClick={card.archived ? undefined : function () { props.onOpen(card); }} className={"min-w-0 flex-1 text-left " + (card.archived ? "text-gray-400" : "hover:text-yellow-200 focus:outline-none focus:underline")} title={card.archived ? undefined : "Open card details"}>
                     <span className="block break-words text-[11px] text-gray-500">{card.product.replace(/\s*\(NOT_ON_TCDB\)/g, "")} <span className="font-mono text-gray-400">#{card.cardNumber}</span></span>
-                    <span className="block break-words text-sm font-medium leading-snug">{card.cardSet || "Base"}{card.copies != null && String(card.copies) !== "" && <span className="ml-1.5 whitespace-nowrap font-bold text-purple-300">/{card.copies}</span>}</span>
+                    <span className="block break-words text-sm font-medium leading-snug">{card.cardSet || "Base"}{card.copies != null && String(card.copies) !== "" && <span className="ml-1.5 whitespace-nowrap font-bold text-purple-300">{proof && pendingReview?"Recorded /"+card.copies+" · unverified":"/"+card.copies}</span>}</span>
                   </CardTitle>
                   {props.isOwner && !card.archived ? <select aria-label={"Status for " + card.product + " " + card.cardNumber + " " + card.cardSet} value={status === "for_sale" ? "owned" : status} onChange={function (event) { props.onStatusChange(card.id, event.target.value); }} className={"max-w-[112px] shrink-0 rounded border border-gray-700 bg-gray-950 px-1.5 py-1.5 text-xs " + (status === "owned" ? "text-green-300" : status === "in_transit" ? "text-emerald-300" : "text-gray-400")}><option value="not_owned">Not owned</option><option value="in_transit">Incoming</option><option value="owned">Owned</option></select> : <span className={"shrink-0 rounded px-1.5 py-1 text-[11px] " + (status === "owned" ? "bg-green-950 text-green-300" : status === "in_transit" ? "bg-emerald-950 text-emerald-300" : "bg-gray-800 text-gray-500")}>{status === "owned" ? "Owned" : status === "in_transit" ? "Incoming" : "Not owned"}</span>}
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px]">
                   <span className={proof ? "text-purple-300" : info.issueType === "custom" ? "text-pink-300" : "text-gray-500"}>{label}</span>
                   {pendingReview ? <span className="text-amber-400">Needs verification</span> : <span className="text-gray-500">{info.verification === "observed" ? "Observed" : "Checklist documented"}</span>}
-                  {proof && info.signature && info.signature !== "unknown" && <span className="text-gray-400">{info.signature === "signed" ? "Signed" : "Unsigned"}</span>}
+                  {proof && <span data-proof-signature={info.signature} className={info.signature === "unknown" ? "rounded bg-amber-950/40 px-1.5 py-0.5 text-amber-300" : "rounded bg-violet-950/50 px-1.5 py-0.5 text-violet-200"}>{window.CardCatalog.signatureLabel(card)}</span>}
+                  {proof && !card.copies ? <span className="text-gray-500">Print run unknown</span> : null}
                   {source && <a href={source} title={source} target="_blank" rel="noopener noreferrer" className="max-w-full break-all text-blue-300 underline">{readableSource(source)} ↗</a>}
                   {props.isOwner && !card.archived && <button type="button" onClick={function () { openEditor(card, false); }} className="ml-auto px-1 py-0.5 font-semibold text-yellow-400 hover:text-yellow-200">Edit</button>}
                   {props.isOwner && card.isCustom && !card.archived && <button type="button" onClick={function () { setArchiveId(archiveId === card.id ? null : card.id); }} className="px-1 py-0.5 text-gray-500 hover:text-red-300">Archive</button>}

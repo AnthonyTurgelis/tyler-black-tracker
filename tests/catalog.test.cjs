@@ -77,3 +77,34 @@ test('original built-in IDs do not collide with new manifest IDs', () => {
   assert.equal(raw.c.length,1479);
   for (const card of additions) assert.ok(card.id>raw.c.length && card.id<10000);
 });
+
+test('proof signature ignores inherited Autographs product names and isAuto flags', () => {
+  const family={product:'2021 Pro Set Metal Autographs',isAuto:'Yes',issueType:'pre_production_proof'};
+  assert.equal(catalog.getInfo(make('Crystal Blue',{...family})).signature,'unknown');
+  assert.equal(catalog.hasAutograph(make('Crystal Blue',{...family})),false);
+  for(const card of [make('Unsigned Proof',{...family}),make('Crystal Blue',{...family,signature:'unsigned'}),make('Autographed Proof',{...family,signature:'unknown'})]) {
+    assert.equal(catalog.hasAutograph(card),false,card.cardSet);
+    assert.equal(catalog.isChecklistCard(card),false);
+  }
+  assert.equal(catalog.hasAutograph(make('Signed Pre-Production Proof',{...family})),true);
+  assert.equal(catalog.hasAutograph(make('Crystal Blue',{...family,signature:'signed'})),true);
+  assert.equal(catalog.hasAutograph(make('Base',{isAuto:'Yes'})),true,'standard autograph remains an autograph');
+});
+
+test('proof type and signature scopes stay explicit and exclude every proof from standard completion', () => {
+  const scopes={pre_production_proof:'preproduction',manufacturer_proof:'manufacturer_proofs',prototype:'prototypes'};
+  const proofs=Object.entries(scopes).flatMap(([issueType,scope])=>['signed','unsigned','unknown'].map(signature=>({card:make('Legacy Autographs',{issueType,signature,isAuto:'Yes',verification:'observed'}),scope,signature})));
+  for(const {card,scope,signature} of proofs){
+    assert.equal(catalog.matchesScope(card,scope),true);
+    assert.equal(catalog.matchesScope(card,scope+'_'+signature),true);
+    assert.equal(catalog.matchesScope(card,'proofs_'+signature),true);
+    assert.equal(catalog.matchesScope(card,'checklist'),false);
+    assert.equal(catalog.matchesScope(card,scope+'_'+(signature==='unsigned'?'signed':'unsigned')),false);
+  }
+  for(const cardSet of ['Artist Proof Autographs','Press Proof Gold Autographs',"Photographer's Proof"]){
+    const card=make(cardSet,{product:'2024 Donruss'});
+    assert.equal(catalog.matchesScope(card,'checklist'),true);
+    assert.equal(catalog.matchesScope(card,'proofs'),false);
+  }
+  assert.equal(catalog.isProof(make('Blue',{product:'2021 Leaf Pre-Production Proof'})),true);
+});

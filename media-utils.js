@@ -22,7 +22,9 @@
       seen.add(url);
       output.push({ id: text(photo.id) || "photo:" + index + ":" + url, url: url,
         side: photo.side === "back" ? "back" : "front", kind: kind,
-        sourceUrl: safeImageUrl(photo.sourceUrl), caption: text(photo.caption) });
+        sourceUrl: safeImageUrl(photo.sourceUrl), caption: text(photo.caption),
+        ...(kind === "copy_scan" && photo.context === "purchase_source" ? {context:"purchase_source"} : {}),
+        ...(kind === "reference" && photo.referenceScope === "exact_variant" && Number.isSafeInteger(Number(photo.referenceCardId)) && Number(photo.referenceCardId) > 0 ? {referenceScope:"exact_variant",referenceCardId:Number(photo.referenceCardId)} : {}) });
     });
     return output;
   }
@@ -59,6 +61,55 @@
       if (photos.length || item.secondaryJerseyNumber) output.cards[id] = item;
     });
     return output;
+  }
+  function exactVariantPhotos(cardId, publicMedia) {
+    cardId = Number(cardId);
+    if (!Number.isSafeInteger(cardId) || cardId < 1) return [];
+    var item = publicMedia && publicMedia.cards && publicMedia.cards[cardId];
+    return normalizePhotos(item && item.photos,{publicOnly:true}).map(function(photo) {
+      return Object.assign({},photo,{referenceScope:"exact_variant",referenceCardId:cardId});
+    });
+  }
+  function photosForCopy(record, cardId, publicMedia) { return mergePhotos(record && record.photos,exactVariantPhotos(cardId,publicMedia)); }
+  function photoSourceLabel(photo) { return photo && photo.kind === "reference" && photo.referenceScope === "exact_variant" ? "Reference / exact variant" : photo && photo.kind === "copy_scan" && photo.context === "purchase_source" ? "Purchase source photo" : KINDS[photo && photo.kind] || "Reference"; }
+  var REVIEW_LABELS = {identity:"Identity pending",duplicate:"Copy overlap / extras",serial:"Serial to verify",location:"Location unconfirmed",purchase:"Purchase status",copy_match:"Copy match pending"};
+  function reviewFlags(observation) {
+    observation = observation || {};
+    var categories = Array.isArray(observation.reviewCategories) ? observation.reviewCategories : [];
+    var candidateIds = Array.from(new Set((observation.candidateCardIds || []).map(Number).filter(function(id){return Number.isSafeInteger(id) && id > 0;})));
+    var exactConfidence = ["exact_normalized_metadata","high_reviewed_alias","high_reviewed_name_match","scan_verified_identity","image_verified","image_reviewed_proof_identity","exact_catalogue_identity","confirmed"].includes(observation.identityConfidence);
+    var identityConfirmed = !!observation.cardId && (!!observation.matchedCopyId || observation.identityConfirmed === true || observation.identityStatus === "confirmed" || observation.identityConfirmed !== false && !observation.identityStatus && !categories.includes("identity") && candidateIds.every(function(id){return id === Number(observation.cardId);}) && exactConfidence);
+    var decision = text(observation.reconciliationDecision);
+    var copyMatch = !observation.matchedCopyId && !["ignored","split"].includes(observation.disposition);
+    return {identity:!identityConfirmed,identityConfirmed:identityConfirmed,copy_match:copyMatch,
+      duplicate:categories.includes("duplicate") || observation.duplicateGroupConfirmed === true || ["no_exact_serial_or_comc_date_and_price_match","manual_owned_preserved","legacy_baseline_slot_already_linked","different_serial_requires_copy_review"].includes(decision),
+      serial:categories.includes("serial") || observation.serialConflict === true || decision === "different_serial_requires_copy_review" || !!(observation.reportedSerial || observation.tentativeSerial) && !(observation.serial && credibleSerial(observation)),
+      location:categories.includes("location") || !observation.location || observation.location === "unknown",
+      purchase:categories.includes("purchase") || categories.includes("retention") || observation.refundOrCancellationReview === true || observation.retainedCopyStatus === "unresolved"};
+  }
+  function observationPhotoPlan(observation, cardById, publicMedia) {
+    observation = observation || {}; cardById = cardById || {};
+    var flags = reviewFlags(observation), card = cardById[observation.cardId];
+    var confirmed = !!card && flags.identityConfirmed;
+    var ids = confirmed ? [] : Array.from(new Set((observation.candidateCardIds || []).concat(observation.cardId || []).map(Number)));
+    var sourcePhotos = preferredPhotos(observation.photos).map(function(photo){return photo.kind === "copy_scan" && !observation.matchedCopyId ? Object.assign({},photo,{context:"purchase_source"}) : photo;});
+    return {identityConfirmed:confirmed,card:confirmed ? card : null,
+      photos:confirmed ? mergePhotos(sourcePhotos,exactVariantPhotos(card.id,publicMedia)) : sourcePhotos,
+      candidates:ids.filter(function(id){return !!cardById[id];}).map(function(id){return {card:cardById[id],photos:exactVariantPhotos(id,publicMedia)};})};
+  }
+  function observationFacts(observation) {
+    observation = observation || {};
+    var observed = Array.isArray(observation.observedCards) && observation.observedCards.length === 1 ? observation.observedCards[0] : {};
+    return {issueType:observed.issueType || observation.issueType || "",signature:observed.signature || observation.signature || "unknown",serialMark:observed.serialMark || "",variantDescription:observed.variantDescription || "",yearEvidence:observed.yearEvidence || "",cardSet:"",isCustom:true,verification:"observed"};
+  }
+  function observationMatchesScope(observation, scope, cardById, catalog) {
+    if (!scope || scope === "all") return true;
+    catalog = catalog || root && root.CardCatalog;
+    if (!catalog) return true;
+    var card = cardById[observation.cardId], facts = observationFacts(observation);
+    if (card && reviewFlags(observation).identityConfirmed) return catalog.matchesScope(card,scope);
+    if (facts.issueType) return catalog.matchesScope(facts,scope);
+    return Array.from(new Set((observation.candidateCardIds || []).concat(observation.cardId || []))).some(function(id){return cardById[id] && catalog.matchesScope(cardById[id],scope);});
   }
   function serialNumbers(value) {
     var result = [];
@@ -107,6 +158,7 @@
   }
   var api = { KINDS: KINDS, safeImageUrl: safeImageUrl, normalizePhotos: normalizePhotos, preferredPhotos: preferredPhotos,
     mergePhotos: mergePhotos, normalizePublicMedia: normalizePublicMedia, serialNumbers: serialNumbers,
+    exactVariantPhotos:exactVariantPhotos,photosForCopy:photosForCopy,photoSourceLabel:photoSourceLabel,REVIEW_LABELS:REVIEW_LABELS,reviewFlags:reviewFlags,observationPhotoPlan:observationPhotoPlan,observationFacts:observationFacts,observationMatchesScope:observationMatchesScope,
     credibleSerial: credibleSerial, secondaryEvidence: secondaryEvidence, jerseyMatches: jerseyMatches, comcDuplicateGroups: comcDuplicateGroups };
   if (root) root.TrackerMedia = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

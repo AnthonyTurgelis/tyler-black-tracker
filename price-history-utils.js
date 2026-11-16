@@ -7,9 +7,21 @@
     return value && typeof value === "object" && !Array.isArray(value) ? value : {};
   }
   function copy(value) { return value === undefined ? undefined : JSON.parse(JSON.stringify(value)); }
+  // JSONB does not retain object insertion order. Keep graded legacy identities
+  // stable across a browser object, a database round trip and an older tombstone.
+  function canonicalJson(value) {
+    if (Array.isArray(value)) return "[" + value.map(canonicalJson).join(",") + "]";
+    if (value && typeof value === "object") return "{" + Object.keys(value).filter(function(key) { return value[key] !== undefined; }).sort().map(function(key) { return JSON.stringify(key) + ":" + canonicalJson(value[key]); }).join(",") + "}";
+    return JSON.stringify(value === undefined ? null : value);
+  }
+  function normalizeIdentity(value) {
+    if (typeof value !== "string" || value.indexOf("legacy:") !== 0) return value;
+    try { var parts = JSON.parse(value.slice(7)); return Array.isArray(parts) && parts.length === 10 ? "legacy:" + canonicalJson(parts) : value; }
+    catch (_) { return value; }
+  }
   function identity(entry) {
     if (entry.observationKey) return String(entry.observationKey);
-    return "legacy:" + JSON.stringify([entry.date || entry.observedAt || "", entry.source || "", entry.itemId || entry.itemUrl || "", entry.price,
+    return "legacy:" + canonicalJson([entry.date || entry.observedAt || "", entry.source || "", entry.itemId || entry.itemUrl || "", entry.price,
       entry.currency || "", entry.kind || entry.type || "", entry.priceBasis || "", entry.condition || "", entry.grading || "",
       (entry.titles || []).map(String).sort()]);
   }
@@ -27,8 +39,11 @@
       Object.entries(eventMap(history)).forEach(function(pair) {
         var cardKey = pair[0]; if (!events[cardKey]) events[cardKey] = Object.create(null);
         Object.entries(pair[1] || {}).forEach(function(record) {
-          var old = events[cardKey][record[0]], next = record[1];
-          if (next && (!old || (Date.parse(next.updatedAt) || 0) >= (Date.parse(old.updatedAt) || 0))) events[cardKey][record[0]] = copy(next);
+          var id = normalizeIdentity(record[0]), old = events[cardKey][id], next = record[1];
+          var nextAt = Date.parse(next && next.updatedAt) || 0, oldAt = Date.parse(old && old.updatedAt) || 0;
+          // A restore produced by applyChanges is newer. Equal-time aliases
+          // retain the removal instead of reviving evidence by key order.
+          if (next && (!old || nextAt > oldAt || nextAt === oldAt && (next.deleted === true || old.deleted !== true))) events[cardKey][id] = copy(next);
         });
       });
     });
@@ -71,7 +86,7 @@
     if (Object.keys(meta.events).length) result[META] = meta;
     return merge(result,null);
   }
-  var api = {META:META,identity:identity,merge:merge,visible:visible,applyChanges:applyChanges};
+  var api = {META:META,identity:identity,normalizeIdentity:normalizeIdentity,merge:merge,visible:visible,applyChanges:applyChanges};
   if (root) root.PriceHistoryUtils = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : null);

@@ -1,5 +1,5 @@
 /* Shared photo previews and the image-led card gallery. */
-function CardPhotoThumbnail({photos = [], title = "Card photo", onOpen, compact = false}) {
+function CardPhotoThumbnail({photos = [], title = "Card photo", onOpen, compact = false, emptyLabel = "No photo yet", emptyDetail = ""}) {
   const TM = window.TrackerMedia;
   const ordered = React.useMemo(() => TM.preferredPhotos(photos), [photos]);
   const [failed, setFailed] = React.useState({});
@@ -7,9 +7,9 @@ function CardPhotoThumbnail({photos = [], title = "Card photo", onOpen, compact 
   React.useEffect(() => setFailed({}), [signature]);
   const photo = ordered.find(item => !failed[item.url]);
   const content = <>
-    {photo ? <img src={photo.url} alt={title + " — " + photo.side} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(previous => ({...previous, [photo.url]: true}))} className="h-full w-full object-contain p-2" /> : <span className="flex h-full min-h-20 items-center justify-center px-3 text-center text-xs text-slate-500">{ordered.length ? "Image unavailable" : "No photo yet"}</span>}
-    {photo && !compact ? <span className="absolute bottom-2 left-2 rounded border border-slate-600 bg-slate-950/90 px-2 py-1 text-[10px] text-slate-200">{TM.KINDS[photo.kind]}</span> : null}
-    {photo && compact ? <span className="absolute bottom-0 inset-x-0 bg-slate-950/90 px-1 py-1 text-center text-[8px] text-slate-300">{TM.KINDS[photo.kind]}</span> : null}
+    {photo ? <img src={photo.url} alt={title + " — " + photo.side + " — " + TM.photoSourceLabel(photo)} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(previous => ({...previous, [photo.url]: true}))} className="h-full w-full object-contain p-2" /> : <span className="flex h-full min-h-20 flex-col items-center justify-center gap-2 px-2 py-3 text-center"><span className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-400">{ordered.length ? "Image unavailable" : emptyLabel}</span>{emptyDetail?<span className="text-[9px] leading-snug text-slate-500">{emptyDetail}</span>:null}</span>}
+    {photo && !compact ? <span className="absolute bottom-2 left-2 rounded border border-slate-600 bg-slate-950/90 px-2 py-1 text-[10px] text-slate-200">{TM.photoSourceLabel(photo)}</span> : null}
+    {photo && compact ? <span className="absolute bottom-0 inset-x-0 bg-slate-950/90 px-1 py-1 text-center text-[8px] text-slate-300">{TM.photoSourceLabel(photo)}</span> : null}
   </>;
   const className = "relative block shrink-0 overflow-hidden rounded-lg border border-slate-700 bg-slate-950 " + (compact ? "h-24 w-20" : "w-full aspect-[5/7]");
   return onOpen && ordered.length ? <button type="button" className={className + " transition-colors hover:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400"} onClick={() => onOpen(ordered)} aria-label={"Open photos: " + title}>{content}</button> : <div className={className}>{content}</div>;
@@ -43,12 +43,13 @@ function CardPhotoViewer({photos = [], title = "Card photos", onClose}) {
   if (!photo) return null;
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3" onClick={event => {if (event.target === event.currentTarget) onClose();}}>
     <section ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} className="flex max-h-[95vh] w-full max-w-4xl flex-col rounded-xl border border-slate-600 bg-slate-900 p-4 shadow-2xl">
-      <header className="mb-3 flex items-start justify-between gap-3"><div><h2 className="text-base font-bold text-amber-300">{title}</h2><p className="mt-1 text-xs text-slate-400">{TM.KINDS[photo.kind]} · {photo.side === "back" ? "Back" : "Front"}{photo.caption ? " · " + photo.caption : ""}</p></div><button type="button" onClick={onClose} aria-label="Close photo preview" className="shrink-0 rounded border border-slate-600 px-3 py-1 text-sm text-slate-200 hover:bg-slate-800">Close</button></header>
+      <header className="mb-3 flex items-start justify-between gap-3"><div><h2 className="text-base font-bold text-amber-300">{title}</h2><p className="mt-1 text-xs text-slate-400">{TM.photoSourceLabel(photo)} · {photo.side === "back" ? "Back" : "Front"}{photo.caption ? " · " + photo.caption : ""}</p></div><button type="button" onClick={onClose} aria-label="Close photo preview" className="shrink-0 rounded border border-slate-600 px-3 py-1 text-sm text-slate-200 hover:bg-slate-800">Close</button></header>
+      {photo.kind === "reference" ? <p className="mb-3 rounded border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-300">Reference image only. It does not confirm your copy’s serial, condition, signature, or ownership.</p> : photo.context === "purchase_source" ? <p className="mb-3 rounded border border-amber-900/60 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">Purchase source photo. Catalogue identity and retained-copy status must be reviewed separately.</p> : null}
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-slate-950" style={{minHeight:"240px"}}>
-        {!failed[photo.url] ? <img key={photo.url} src={photo.url} alt={title + " — " + photo.side + " — " + TM.KINDS[photo.kind]} referrerPolicy="no-referrer" onError={() => setFailed(previous => ({...previous, [photo.url]: true}))} className="max-h-[65vh] w-full object-contain" /> : <p role="status" className="px-5 py-20 text-center text-sm text-slate-400">This image could not load. Choose another photo or open its source.</p>}
+        {!failed[photo.url] ? <img key={photo.url} src={photo.url} alt={title + " — " + photo.side + " — " + TM.photoSourceLabel(photo)} referrerPolicy="no-referrer" onError={() => setFailed(previous => ({...previous, [photo.url]: true}))} className="max-h-[65vh] w-full object-contain" /> : <p role="status" className="px-5 py-20 text-center text-sm text-slate-400">This image could not load. Choose another photo or open its source.</p>}
       </div>
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1" aria-label="Front and back photos">
-        {ordered.map((item, position) => <button type="button" key={item.url} onClick={() => setIndex(position)} aria-pressed={position === index} className={"shrink-0 rounded border px-3 py-2 text-xs " + (position === index ? "border-amber-400 bg-amber-400 text-slate-950" : "border-slate-600 text-slate-300 hover:border-slate-400")}>{item.side === "back" ? "Back" : "Front"} · {TM.KINDS[item.kind]}{ordered.length > 2 ? " " + (position + 1) : ""}</button>)}
+        {ordered.map((item, position) => <button type="button" key={item.url} onClick={() => setIndex(position)} aria-pressed={position === index} className={"shrink-0 rounded border px-3 py-2 text-xs " + (position === index ? "border-amber-400 bg-amber-400 text-slate-950" : "border-slate-600 text-slate-300 hover:border-slate-400")}>{item.side === "back" ? "Back" : "Front"} · {TM.photoSourceLabel(item)}{ordered.length > 2 ? " " + (position + 1) : ""}</button>)}
       </div>
       <footer className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-slate-400"><span>{index + 1} of {ordered.length} photos{!ordered.some(item => item.side === "back") ? " · Back photo not recorded" : ""}</span><a href={photo.sourceUrl || photo.url} target="_blank" rel="noreferrer" className="text-sky-300 underline">Open photo source</a></footer>
     </section>
@@ -76,15 +77,66 @@ function CopyPhotoFields({value, onChange, controlClass}) {
   </div>;
 }
 
-function CopyObservationEvidence({observation, cardById = {}, onChooseCard}) {
+function CopyObservationEvidence({observation, cardById = {}, onChooseCard, showCandidates = true}) {
   const candidates = (observation.candidateCardIds || []).map(id=>cardById[id]).filter(Boolean);
   const serialLabel = observation.imageVerified === true ? "Image-verified serial" : observation.serialEvidence === "comc_inventory" ? "COMC inventory serial" : "Recorded serial";
   return <div className="mt-2 space-y-2 text-xs">
     {observation.serial?<p className="text-slate-300">{serialLabel}: {observation.serial}{observation.printRun && !String(observation.serial).includes("/") ? " / "+observation.printRun : ""}</p>:null}
     {observation.reviewReason?<p className="rounded border border-amber-800/60 bg-amber-950/30 px-2 py-1 text-amber-200">{observation.reviewReason}</p>:null}
     {observation.notes?<p className="whitespace-pre-wrap text-slate-400">{String(observation.notes)}</p>:null}
-    {candidates.length?<div className="space-y-1"><p className="text-slate-400">Catalogue candidates to check:</p>{candidates.slice(0,8).map(card=><div key={card.id}>{onChooseCard?<button type="button" onClick={()=>onChooseCard(card.id)} className="text-left text-sky-300 underline">{card.product} · #{card.cardNumber} · {card.cardSet || "Base"}{card.copies?" /"+card.copies:""}</button>:<span className="text-slate-300">{card.product} · #{card.cardNumber} · {card.cardSet || "Base"}{card.copies?" /"+card.copies:""}</span>}</div>)}</div>:null}
+    {showCandidates && candidates.length?<div className="space-y-1"><p className="text-slate-400">Catalogue candidates to check:</p>{candidates.slice(0,8).map(card=><div key={card.id}>{onChooseCard?<button type="button" onClick={()=>onChooseCard(card.id)} className="text-left text-sky-300 underline">{card.product} · #{card.cardNumber} · {card.cardSet || "Base"}{card.copies?" /"+card.copies:""}</button>:<span className="text-slate-300">{card.product} · #{card.cardNumber} · {card.cardSet || "Base"}{card.copies?" /"+card.copies:""}</span>}</div>)}</div>:null}
   </div>;
+}
+
+function ProofClassificationBadge({card, prefix = ""}) {
+  if (!card || !window.CardCatalog.isProof(card)) return null;
+  const info = window.CardCatalog.getInfo(card);
+  return <span data-proof-signature={info.signature} className="inline-block rounded border border-violet-800/60 bg-violet-950/40 px-2 py-1 text-[10px] text-violet-200">{prefix}{window.CardCatalog.kindLabel(info.issueType)} · {window.CardCatalog.signatureLabel(card)}</span>;
+}
+
+function ProofScopeSelect({value, onChange, className = "", label = "Card category"}) {
+  return <select aria-label={label} value={value} onChange={event=>onChange(event.target.value)} className={className}>
+    <option value="all">All card categories</option><option value="checklist">Standard checklist</option>
+    {[{key:"proofs",label:"All proofs & prototypes"},{key:"preproduction",label:"Pre-production proofs"},{key:"manufacturer_proofs",label:"Other manufacturer proofs"},{key:"prototypes",label:"Prototypes / test issues"}].map(group=><optgroup key={group.key} label={group.label}><option value={group.key}>{group.label} · all signatures</option><option value={group.key+"_signed"}>{group.label} · signed</option><option value={group.key+"_unsigned"}>{group.label} · unsigned</option><option value={group.key+"_unknown"}>{group.label} · signature unconfirmed</option></optgroup>)}
+    <option value="review">Catalogue details to review</option>
+  </select>;
+}
+
+function ProofReviewDetails({card}) {
+  if (!card || !window.CardCatalog.isProof(card)) return null;
+  const info=window.CardCatalog.getInfo(card), source=window.CardCatalog.safeUrl(info.sourceUrl);
+  return <div className="flex flex-wrap gap-x-2 gap-y-1 text-[10px] text-slate-400"><span>{card.copies ? (info.verification === "unverified" ? "Recorded /"+card.copies+" · unverified" : "Print run /"+card.copies) : "Print run unknown"}</span>{info.verification === "unverified"?<span className="text-amber-300">Catalogue details unverified</span>:null}{source?<a href={source} target="_blank" rel="noreferrer" className="text-sky-300 underline">Catalogue source</a>:null}</div>;
+}
+
+function ReviewStateBadges({observation}) {
+  const TM=window.TrackerMedia,flags=TM.reviewFlags(observation);
+  return <div className="flex flex-wrap gap-1.5 text-[10px]" aria-label="Review state">
+    {flags.identityConfirmed?<span className="rounded bg-sky-950 px-2 py-1 text-sky-300">Catalogue identity confirmed</span>:null}
+    {Object.entries(TM.REVIEW_LABELS).filter(([key])=>flags[key]).map(([key,label])=><span key={key} data-review-reason={key} className={"rounded border px-2 py-1 "+(key === "identity" || key === "serial" || key === "purchase" ? "border-amber-800/60 bg-amber-950/40 text-amber-200" : "border-slate-700 bg-slate-800 text-slate-300")}>{label}</span>)}
+  </div>;
+}
+
+function ObservationReferencePhotos({observation, cardById = {}, publicMedia, onPreview, onChooseCard}) {
+  const TM=window.TrackerMedia,plan=TM.observationPhotoPlan(observation,cardById,publicMedia),facts=TM.observationFacts(observation);
+  const [showAll,setShowAll]=React.useState(false);
+  const label=card=>card.product+" · #"+card.cardNumber+" · "+(card.cardSet || "Base");
+  const title=observation.title || (plan.card ? label(plan.card) : "Unidentified purchase");
+  return <section className="space-y-3" data-observation-identity={plan.identityConfirmed?"confirmed":"pending"}>
+    <ReviewStateBadges observation={observation} />
+    <div className="flex items-start gap-3">
+      <CardPhotoThumbnail compact photos={plan.photos} title={title} onOpen={photos=>onPreview({photos,title})} emptyLabel={plan.identityConfirmed?"Exact reference unavailable":"Identity pending"} emptyDetail={plan.identityConfirmed?"Add a scan of this copy":"Compare candidates below"} />
+      <div className="min-w-0 space-y-2">
+        {plan.card?<p className="text-xs text-slate-300">{label(plan.card)}</p>:<p className="text-xs text-amber-200">The purchase is not assigned to a confirmed catalogue variant.</p>}
+        {facts.issueType?<ProofClassificationBadge card={facts} prefix={Array.isArray(observation.observedCards) && observation.observedCards.length === 1 ? "Source photo: " : "Recorded category: "}/>:plan.card?<ProofClassificationBadge card={plan.card}/>:null}
+        {plan.card?<ProofReviewDetails card={plan.card}/>:null}
+        {facts.variantDescription?<p className="text-xs text-slate-400">Visible appearance: {facts.variantDescription}</p>:null}
+        {facts.yearEvidence === "unresolved"?<p className="text-xs text-amber-300">Exact year / official variant unresolved</p>:null}
+        {facts.serialMark?<p className="text-xs text-slate-400">Source-photo marking: {facts.serialMark}</p>:null}
+        {plan.photos.some(photo=>photo.kind === "reference")?<p className="text-[10px] text-slate-400">Reference images show the catalogue variant. They do not establish your copy’s serial, condition, signature, or ownership.</p>:null}
+      </div>
+    </div>
+    {plan.candidates.length?<div className="space-y-2 rounded border border-amber-900/50 bg-slate-950/40 p-3"><p className="text-xs font-semibold text-amber-200">Catalogue candidates to check ({plan.candidates.length}) · no candidate selected automatically</p><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{plan.candidates.slice(0,showAll?plan.candidates.length:6).map(candidate=><article key={candidate.card.id} data-reference-candidate-id={candidate.card.id} className="flex gap-2 rounded border border-slate-700 bg-slate-900/70 p-2"><CardPhotoThumbnail compact photos={candidate.photos} title={"Candidate reference: "+label(candidate.card)} onOpen={photos=>onPreview({photos,title:"Candidate reference: "+label(candidate.card)})} emptyLabel="No exact reference" emptyDetail={"#"+candidate.card.cardNumber} /><div className="min-w-0 space-y-1"><p className="text-[10px] font-semibold text-amber-300">Candidate · identity pending</p><p className="text-[10px] text-slate-400">{candidate.card.product} · #{candidate.card.cardNumber}</p><p className="text-xs text-slate-200">{candidate.card.cardSet || "Base"}{candidate.card.copies && !window.CardCatalog.isProof(candidate.card)?" /"+candidate.card.copies:""}</p><ProofClassificationBadge card={candidate.card}/><ProofReviewDetails card={candidate.card}/>{onChooseCard?<button type="button" onClick={()=>onChooseCard(candidate.card.id)} className="text-left text-xs text-sky-300 underline">Choose this catalogue card</button>:null}</div></article>)}</div>{plan.candidates.length>6?<button type="button" onClick={()=>setShowAll(!showAll)} className="text-xs text-sky-300 underline">{showAll?"Show fewer candidates":"Show all "+plan.candidates.length+" candidates"}</button>:null}<p className="text-[10px] text-slate-500">Each reference belongs to its labelled catalogue variant. Similar parallels are never substituted for a missing exact reference.</p></div>:!plan.identityConfirmed?<p className="text-xs text-slate-400">No catalogue candidate is confirmed. Use the purchase source and search the exact card before linking a copy.</p>:null}
+  </section>;
 }
 
 function ComcDuplicateReview({inventory, cardById, publicMedia, query = "", canEdit, busy, onReview, onEdit, onPreview}) {
@@ -96,7 +148,7 @@ function ComcDuplicateReview({inventory, cardById, publicMedia, query = "", canE
   const money = observation => window.TrackerMarket.formatMoney(observation.askingPrice == null ? observation.listedPrice : observation.askingPrice,observation.currency);
   return <div className="space-y-4"><p className="text-xs text-slate-400">These groups come from confirmed current COMC inventory. A record awaiting a match is shown here without becoming another counted copy. Choose your keeper, then review the other copies for sale.</p>{groups.map(group=>{
     const card=cardById[group.cardId],title=card ? card.product+" · #"+card.cardNumber+" · "+(card.cardSet || "Base") : "Catalogue card "+group.cardId;
-    return <section key={group.cardId} data-comc-duplicate-card-id={group.cardId} className="overflow-hidden rounded-lg border border-amber-800/60 bg-slate-900"><header className="space-y-1 border-b border-slate-700 bg-amber-950/20 p-3"><h3 className="text-sm font-semibold text-amber-200">{title}</h3><p className="text-sm font-bold text-amber-300">At least {group.minimumExtras} extra at COMC—choose keeper</p><p className="text-xs text-slate-400">{group.count} confirmed copies at COMC · {group.observations.length} inventory records shown</p></header><div className="divide-y divide-slate-800">{group.observations.map(observation=><article key={observation.id} className="p-3"><div className="flex items-start gap-3"><CardPhotoThumbnail photos={observation.photos} compact title={title+(observation.serial?" · Serial "+observation.serial:"")} onOpen={photos=>onPreview({photos,title})} /><div className="min-w-0 flex-1"><div className="flex flex-wrap gap-2 text-xs"><span className={"rounded px-2 py-1 "+(observation.saleState==="listed"?"bg-cyan-950 text-cyan-300":"bg-slate-800 text-slate-300")}>{observation.saleState==="listed"?"Already listed":observation.saleState==="not_for_sale"?"Not for sale":"Listing status unknown"}</span><span className="rounded bg-slate-800 px-2 py-1 text-slate-400">{observation.matchedCopyId?"Linked to counted copy":"Awaiting copy match"}</span><JerseyBadges record={observation} cardMedia={publicMedia && publicMedia.cards && publicMedia.cards[group.cardId]} /></div><p className="mt-2 text-xs text-slate-400">COMC item {observation.sourceItemId || observation.id}</p>{observation.saleState==="listed" && (observation.askingPrice != null || observation.listedPrice != null)?<p className="mt-1 text-xs text-cyan-300">Asking {money(observation)}</p>:null}<CopyObservationEvidence observation={observation} cardById={cardById} />{TM.safeImageUrl(observation.sourceUrl)?<a href={TM.safeImageUrl(observation.sourceUrl)} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs text-sky-300 underline">View COMC item</a>:null}<div className="mt-2"><button className="rounded border border-slate-600 px-3 py-1 text-xs disabled:opacity-40" disabled={!canEdit || busy} onClick={()=>observation.matchedCopyId?onEdit(observation):onReview(observation)}>{observation.matchedCopyId?"Review linked copy":"Match this copy"}</button></div></div></div></article>)}</div></section>;
+    return <section key={group.cardId} data-comc-duplicate-card-id={group.cardId} className="overflow-hidden rounded-lg border border-amber-800/60 bg-slate-900"><header className="space-y-1 border-b border-slate-700 bg-amber-950/20 p-3"><h3 className="text-sm font-semibold text-amber-200">{title}</h3><p className="text-sm font-bold text-amber-300">At least {group.minimumExtras} extra at COMC—choose keeper</p><p className="text-xs text-slate-400">{group.count} confirmed copies at COMC · {group.observations.length} inventory records shown</p></header><div className="divide-y divide-slate-800">{group.observations.map(observation=><article key={observation.id} className="p-3"><div className="flex items-start gap-3"><CardPhotoThumbnail photos={TM.photosForCopy(observation,group.cardId,publicMedia)} compact emptyLabel="Exact reference unavailable" title={title+(observation.serial?" · Serial "+observation.serial:"")} onOpen={photos=>onPreview({photos,title})} /><div className="min-w-0 flex-1"><div className="flex flex-wrap gap-2 text-xs"><span className={"rounded px-2 py-1 "+(observation.saleState==="listed"?"bg-cyan-950 text-cyan-300":"bg-slate-800 text-slate-300")}>{observation.saleState==="listed"?"Already listed":observation.saleState==="not_for_sale"?"Not for sale":"Listing status unknown"}</span><span className="rounded bg-slate-800 px-2 py-1 text-slate-400">{observation.matchedCopyId?"Linked to counted copy":"Awaiting copy match"}</span><JerseyBadges record={observation} cardMedia={publicMedia && publicMedia.cards && publicMedia.cards[group.cardId]} /></div><p className="mt-2 text-xs text-slate-400">COMC item {observation.sourceItemId || observation.id}</p>{observation.saleState==="listed" && (observation.askingPrice != null || observation.listedPrice != null)?<p className="mt-1 text-xs text-cyan-300">Asking {money(observation)}</p>:null}<CopyObservationEvidence observation={observation} cardById={cardById} />{TM.safeImageUrl(observation.sourceUrl)?<a href={TM.safeImageUrl(observation.sourceUrl)} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs text-sky-300 underline">View COMC item</a>:null}<div className="mt-2"><button className="rounded border border-slate-600 px-3 py-1 text-xs disabled:opacity-40" disabled={!canEdit || busy} onClick={()=>observation.matchedCopyId?onEdit(observation):onReview(observation)}>{observation.matchedCopyId?"Review linked copy":"Match this copy"}</button></div></div></div></article>)}</div></section>;
   })}{!groups.length?<p className="rounded border border-slate-700 p-5 text-sm text-slate-400">No confirmed COMC duplicate groups match this view.</p>:null}</div>;
 }
 
@@ -106,6 +158,7 @@ function CardGalleryPanel({cards = [], statuses = {}, cardDetails = {}, inventor
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [sourceFilter, setSourceFilter] = React.useState("all");
   const [jerseyFilter, setJerseyFilter] = React.useState("all");
+  const [scope, setScope] = React.useState("all");
   const [includeMissing, setIncludeMissing] = React.useState(false);
   const [limit, setLimit] = React.useState(48);
   const [preview, setPreview] = React.useState(null);
@@ -113,9 +166,11 @@ function CardGalleryPanel({cards = [], statuses = {}, cardDetails = {}, inventor
   const [error, setError] = React.useState("");
   const media = React.useMemo(() => TM.normalizePublicMedia(publicMedia), [publicMedia]);
   const state = React.useMemo(() => CI.normalizeState(isOwner ? inventory : null), [inventory, isOwner]);
+  const proofScope = /^(proofs|preproduction|manufacturer_proofs|prototypes)(?:_(signed|unsigned|unknown))?$/.test(scope);
+  const showMissingForScope = proofScope || scope === "review";
   const entries = React.useMemo(() => {
     const observationsByCard = {};
-    if (isOwner) Object.values(state.observations).forEach(observation => { if (observation.cardId && !["ignored","split"].includes(observation.disposition)) { if (!observationsByCard[observation.cardId]) observationsByCard[observation.cardId] = []; observationsByCard[observation.cardId].push(observation); } });
+    if (isOwner) Object.values(state.observations).forEach(observation => { if (observation.cardId && TM.reviewFlags(observation).identityConfirmed && !["ignored","split"].includes(observation.disposition)) { if (!observationsByCard[observation.cardId]) observationsByCard[observation.cardId] = []; observationsByCard[observation.cardId].push(observation); } });
     return cards.filter(card => card.id !== 1 && !card.archived && !card.hiddenDuplicate).map(card => {
       const copies = isOwner ? CI.getCopiesForCard(state, card.id, statuses, cardDetails).filter(copy => copy.saleStatus !== "sold") : [];
       const observations = observationsByCard[card.id] || [];
@@ -123,10 +178,10 @@ function CardGalleryPanel({cards = [], statuses = {}, cardDetails = {}, inventor
       let photos = [];
       records.forEach(record => {
         const context = record.serial ? "Serial " + record.serial : record.location && CI.LOCATIONS[record.location] || "";
-        const labelled = TM.normalizePhotos(record.photos).map(photo => ({...photo, caption:[photo.caption, context, record.source && !record.matchedCopyId ? "Purchase awaiting copy match" : ""].filter(Boolean).join(" · ")}));
+        const labelled = TM.normalizePhotos(record.photos).map(photo => ({...photo, context:photo.kind === "copy_scan" && record.source && !record.matchedCopyId ? "purchase_source" : photo.context,caption:[photo.caption,photo.kind !== "reference" ? context : "",record.source && !record.matchedCopyId ? "Purchase awaiting copy match" : ""].filter(Boolean).join(" · ")}));
         photos = TM.mergePhotos(photos, labelled);
       });
-      photos = TM.mergePhotos(photos, (media.cards[card.id] || {}).photos);
+      photos = TM.mergePhotos(photos, TM.exactVariantPhotos(card.id,media));
       const legacy = TM.jerseyMatches({}, (cardDetails[card.id] || {}).serial, media.cards[card.id]);
       const matches = records.map(record => TM.jerseyMatches(record, "", media.cards[card.id]));
       const primary = legacy.primary || matches.some(match => match.primary);
@@ -137,26 +192,29 @@ function CardGalleryPanel({cards = [], statuses = {}, cardDetails = {}, inventor
     });
   }, [cards, state, media, isOwner, statuses, cardDetails]);
   const filtered = entries.filter(entry => {
+    if (!window.CardCatalog.matchesScope(entry.card,scope)) return false;
     if (query && !entry.text.includes(query.toLowerCase())) return false;
     if (!CI.matchesStatus(entry.summary, statusFilter)) return false;
     if (jerseyFilter === "primary" && !entry.primary || jerseyFilter === "secondary" && !entry.secondary.length || jerseyFilter === "any" && !entry.primary && !entry.secondary.length) return false;
     if (sourceFilter !== "all" && !entry.photos.some(photo => photo.kind === sourceFilter)) return false;
-    return includeMissing || entry.photos.length > 0;
+    return showMissingForScope || includeMissing || entry.photos.length > 0;
   });
-  React.useEffect(() => setLimit(48), [query, statusFilter, sourceFilter, jerseyFilter, includeMissing]);
+  React.useEffect(() => setLimit(48), [query, statusFilter, sourceFilter, jerseyFilter, includeMissing, scope]);
   const control = "rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-200";
   return <section className="space-y-4 text-slate-100">
     <header className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-2xl font-bold text-amber-300">Card gallery</h2><p className="mt-1 max-w-3xl text-sm text-slate-400">Your own photos appear first, followed by scans of your copies and labelled references. Open a card for its front and back.</p></div>{onRefresh ? <button className={control + " disabled:opacity-40"} disabled={loading || refreshing} onClick={async()=>{setRefreshing(true);setError("");try {const result=await onRefresh();if(result && result.ok===false)throw Error(result.error || "Photos could not be refreshed.");}catch(err){setError(err.message);}finally{setRefreshing(false);}}}>{refreshing || loading ? "Refreshing…" : "Refresh photos"}</button> : null}</header>
     <div className="flex flex-wrap gap-2"><input aria-label="Search gallery" className={control + " min-w-52 flex-1"} placeholder="Search product, variant, card number or serial" value={query} onChange={event=>setQuery(event.target.value)} /><select aria-label="Gallery ownership" className={control} value={statusFilter} onChange={event=>setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="owned">Owned / in hand</option><option value="in_transit">In transit / awaiting receipt</option><option value="acquired">All acquired</option><option value="not_owned">Needed</option></select><select aria-label="Gallery photo source" className={control} value={sourceFilter} onChange={event=>setSourceFilter(event.target.value)}><option value="all">All photo sources</option>{Object.entries(TM.KINDS).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select><select aria-label="Gallery jersey matches" className={control} value={jerseyFilter} onChange={event=>setJerseyFilter(event.target.value)}><option value="all">All serials</option><option value="primary">Primary jersey #7</option><option value="secondary">Verified on-card jersey</option><option value="any">Any jersey match</option></select></div>
-    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400"><span>{filtered.length} card{filtered.length===1 ? "" : "s"} · {entries.filter(entry=>entry.photos.length).length} have photos</span><label className="flex items-center gap-2"><input type="checkbox" checked={includeMissing} onChange={event=>setIncludeMissing(event.target.checked)} />Include cards without photos</label></div>
+    <div className="flex flex-wrap items-center gap-2"><ProofScopeSelect label="Gallery card category" value={scope} onChange={value=>{setScope(value);setSourceFilter("all");}} className={control} />{proofScope?<p className="text-xs text-violet-300">All recorded proofs in this segment are shown, including cards without photos. Proofs do not count toward standard checklist completion.</p>:scope === "review"?<p className="text-xs text-amber-300">Records needing catalogue verification remain visible even without a photo.</p>:null}</div>
+    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400"><span>{filtered.length} card{filtered.length===1 ? "" : "s"} · {filtered.filter(entry=>entry.photos.length).length} have photos</span>{showMissingForScope?<span>Missing photos shown as labelled placeholders</span>:<label className="flex items-center gap-2"><input type="checkbox" checked={includeMissing} onChange={event=>setIncludeMissing(event.target.checked)} />Include cards without photos</label>}</div>
     {error || loadError ? <p role="alert" className="rounded border border-red-800 bg-red-950/40 p-3 text-sm text-red-200">{error || loadError}</p> : null}
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
       {filtered.slice(0,limit).map(entry=>{
-        const card=entry.card, title=card.product+" · #"+card.cardNumber+" · "+(card.cardSet||"Base");
+        const card=entry.card, title=card.product+" · #"+card.cardNumber+" · "+(card.cardSet||"Base"), info=window.CardCatalog.getInfo(card), sourceUrl=window.CardCatalog.safeUrl(info.sourceUrl), isProof=window.CardCatalog.isProof(card);
         const photos=sourceFilter === "all" ? entry.photos : entry.photos.filter(photo=>photo.kind===sourceFilter);
         return <article key={card.id} data-gallery-card-id={card.id} className="overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-lg">
-          <CardPhotoThumbnail photos={photos} title={title} onOpen={items=>setPreview({photos:items,title})} />
-          <div className="space-y-2 p-3"><p className="text-[10px] uppercase tracking-wide text-slate-400">{card.product}</p><h3 className="text-sm font-semibold text-white">#{card.cardNumber} · {card.cardSet||"Base"}</h3><div className="flex flex-wrap gap-1 text-[10px]">{entry.summary.owned?<span className="rounded bg-green-950 px-2 py-1 text-green-300">Owned</span>:null}{entry.summary.inTransit?<span className="rounded bg-cyan-950 px-2 py-1 text-cyan-300">Awaiting receipt</span>:null}{entry.summary.notOwned?<span className="rounded bg-slate-800 px-2 py-1 text-slate-400">Needed</span>:null}{card.copies?<span className="rounded bg-slate-800 px-2 py-1 text-amber-300">/{card.copies}</span>:null}</div>
+          <CardPhotoThumbnail photos={photos} title={title} onOpen={items=>setPreview({photos:items,title})} emptyLabel="Exact reference unavailable" emptyDetail={"#"+card.cardNumber+" · "+(card.cardSet||"Base")} />
+          <div className="space-y-2 p-3"><p className="text-[10px] uppercase tracking-wide text-slate-400">{card.product}</p><h3 className="text-sm font-semibold text-white">#{card.cardNumber} · {card.cardSet||"Base"}</h3><ProofClassificationBadge card={card}/><div className="flex flex-wrap gap-1 text-[10px]">{entry.summary.owned?<span className="rounded bg-green-950 px-2 py-1 text-green-300">Owned</span>:null}{entry.summary.inTransit?<span className="rounded bg-cyan-950 px-2 py-1 text-cyan-300">Awaiting receipt</span>:null}{entry.summary.notOwned?<span className="rounded bg-slate-800 px-2 py-1 text-slate-400">Needed</span>:null}{card.copies?<span className="rounded bg-slate-800 px-2 py-1 text-amber-300">{isProof && info.verification === "unverified" ? "Recorded /"+card.copies+" · unverified" : "/"+card.copies}</span>:isProof?<span className="rounded bg-slate-800 px-2 py-1 text-slate-400">Print run unknown</span>:null}{!photos.length?<span className="rounded bg-slate-800 px-2 py-1 text-slate-400">Reference photo needed</span>:null}{info.verification === "unverified"?<span className="rounded bg-amber-950/50 px-2 py-1 text-amber-300">Catalogue details unverified</span>:null}</div>
+            {sourceUrl?<a href={sourceUrl} target="_blank" rel="noreferrer" className="inline-block text-[10px] text-sky-300 underline">Catalogue source</a>:null}
             {entry.primary || entry.secondary.length ? <div className="flex flex-wrap gap-1">{entry.primary?<span className="rounded border border-amber-600 bg-amber-950/50 px-2 py-1 text-[10px] font-bold text-amber-200" title="A recorded serial for this card is 7; the displayed photo may be a reference">Recorded jersey #7</span>:null}{entry.secondary.map(number=><span key={number} className="rounded border border-violet-700 bg-violet-950/40 px-2 py-1 text-[10px] text-violet-200">On-card jersey #{number}</span>)}</div>:null}
             {isOwner?<div className="flex flex-wrap items-center justify-between gap-1 border-t border-slate-800 pt-2 text-[10px] text-slate-400"><span>{entry.summary.total} counted{entry.pending ? " · "+entry.pending+" awaiting match" : ""}</span>{onOpenCopies?<button onClick={()=>onOpenCopies(card.id)} className="font-semibold text-sky-300 underline">Copies &amp; photos</button>:null}</div>:null}
           </div>
@@ -174,4 +232,9 @@ window.JerseyBadges = JerseyBadges;
 window.CopyPhotoFields = CopyPhotoFields;
 window.CopyObservationEvidence = CopyObservationEvidence;
 window.ComcDuplicateReview = ComcDuplicateReview;
+window.ProofClassificationBadge = ProofClassificationBadge;
+window.ProofScopeSelect = ProofScopeSelect;
+window.ProofReviewDetails = ProofReviewDetails;
+window.ReviewStateBadges = ReviewStateBadges;
+window.ObservationReferencePhotos = ObservationReferencePhotos;
 window.CardGalleryPanel = CardGalleryPanel;

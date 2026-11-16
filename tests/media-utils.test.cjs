@@ -55,3 +55,54 @@ test('COMC duplicate review includes linked and pending observations without usi
   assert.equal(groups.length,1);assert.equal(groups[0].count,3);assert.equal(groups[0].minimumExtras,2);assert.equal(groups[0].observations.length,3);
   assert.equal(JSON.stringify(state),before);
 });
+
+test('copy image fallback uses only the exact catalogue variant and preserves own-photo priority',()=>{
+  const exact={...front,id:'exact',url:'https://images.example.test/exact.jpg',kind:'reference'};
+  const similar={...front,id:'similar',url:'https://images.example.test/similar.jpg',kind:'reference'};
+  const media={cards:{7:{photos:[exact]},8:{photos:[similar]}}};
+  assert.deepEqual(TM.exactVariantPhotos(9,media),[],'no product, parent or similar-parallel substitution');
+  const own={...back,kind:'own_photo'};
+  const photos=TM.photosForCopy({photos:[own]},7,media);
+  assert.equal(photos[0].kind,'own_photo');assert.equal(photos.length,2);
+  assert.equal(photos[1].referenceCardId,7);assert.equal(TM.photoSourceLabel(photos[1]),'Reference / exact variant');
+  assert.equal(photos.some(photo=>photo.url===similar.url),false);
+  assert.deepEqual(TM.exactVariantPhotos(7,{cards:{7:{photos:[front]}}}),[],'private scans are not accepted as public references');
+});
+
+test('unidentified purchases keep source photos separate from all explicitly tentative candidate references',()=>{
+  const cards={7:{id:7,product:'2021 Leaf',cardSet:'Blue'},8:{id:8,product:'2021 Leaf',cardSet:'Orange'}};
+  const media={cards:{7:{photos:[{...front,kind:'reference',url:'https://images.example.test/blue.jpg'}]},8:{photos:[{...front,kind:'reference',url:'https://images.example.test/orange.jpg'}]}}};
+  const observation={cardId:7,identityConfirmed:false,identityConfidence:'image_verified',candidateCardIds:[7,8,7],photos:[front],sourceOrderId:'private-order',source:'ebay'};
+  const before=JSON.stringify({observation,media}),plan=TM.observationPhotoPlan(observation,cards,media);
+  assert.equal(plan.identityConfirmed,false);assert.equal(plan.card,null);
+  assert.equal(plan.photos.length,1);assert.equal(plan.photos[0].context,'purchase_source');assert.equal(TM.photoSourceLabel(plan.photos[0]),'Purchase source photo');
+  assert.deepEqual(plan.candidates.map(candidate=>candidate.card.id),[7,8]);
+  assert.ok(plan.candidates.every(candidate=>candidate.photos[0].referenceCardId===candidate.card.id));
+  assert.equal(JSON.stringify({observation,media}),before,'display planning never rewrites private observations or public media');
+  const confirmed=TM.observationPhotoPlan({...observation,identityConfirmed:true,candidateCardIds:[]},cards,media);
+  assert.equal(confirmed.card.id,7);assert.equal(confirmed.candidates.length,0);assert.equal(confirmed.photos.length,2);
+  const empty=TM.observationPhotoPlan({cardId:7,identityConfirmed:false},cards,{});
+  assert.equal(empty.photos.length,0);assert.equal(empty.candidates[0].card.id,7,'a proposed cardId remains a visible candidate even without an image');
+});
+
+test('review reasons overlap without treating pending identity or refund evidence as a counted copy',()=>{
+  const observation={cardId:7,identityConfirmed:false,disposition:'pending',location:'unknown',duplicateGroupConfirmed:true,reconciliationDecision:'different_serial_requires_copy_review',refundOrCancellationReview:true};
+  const flags=TM.reviewFlags(observation);
+  for(const key of ['identity','duplicate','serial','location','purchase','copy_match'])assert.equal(flags[key],true,key);
+  assert.equal(flags.identityConfirmed,false);
+  const linked=TM.reviewFlags({...observation,matchedCopyId:'one',location:'comc',reconciliationDecision:'',duplicateGroupConfirmed:false,refundOrCancellationReview:false});
+  assert.equal(linked.identity,false);assert.equal(linked.copy_match,false);assert.equal(linked.location,false);
+});
+
+test('unsigned Top100 source facts filter as pre-production proofs while catalogue identity remains pending',()=>{
+  const catalog=require('../catalog-utils.js');
+  const cards={1476:{id:1476,issueType:'pre_production_proof',signature:'unknown'},10011:{id:10011,issueType:'manufacturer_proof',signature:'unknown'}};
+  const observation={cardId:1476,identityConfirmed:false,candidateCardIds:[1476,10011],refundOrCancellationReview:true,observedCards:[{signature:'unsigned',issueType:'pre_production_proof',serialMark:'1/1 PRE-PRODUCTION PROOF (front)',yearEvidence:'unresolved',variantDescription:'Blue geometric'}]};
+  assert.equal(TM.observationMatchesScope(observation,'preproduction_unsigned',cards,catalog),true);
+  assert.equal(TM.observationMatchesScope(observation,'manufacturer_proofs',cards,catalog),false);
+  assert.equal(TM.observationMatchesScope(observation,'proofs_unknown',cards,catalog),false);
+  assert.equal(TM.observationMatchesScope(observation,'checklist',cards,catalog),false);
+  assert.equal(TM.observationFacts(observation).variantDescription,'Blue geometric');
+  assert.equal(TM.reviewFlags(observation).identity,true);
+  assert.equal(observation.serial,undefined,'a visible source marking never becomes a physical-copy serial');
+});

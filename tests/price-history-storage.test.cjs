@@ -73,3 +73,37 @@ test('queued same-tab writes preserve observations added while an earlier reques
  const one=h.window.storage.set(KEY,{card:[observation('one')]});await entered;const two=h.window.storage.set(KEY,{card:[observation('two')]});release();
  const results=await Promise.all([one,two]);assert.ok(results.every(result=>result.cloudSaved));assert.deepEqual(h.db.row.value.card.map(PH.identity).sort(),['cloud','one','two']);
 });
+
+test('graded legacy identity is stable across object key order and preserves simple/string identities',()=>{
+ const base={date:'2026-11-16',source:'eBay',price:15,titles:['Proof']};
+ const a={...base,grading:{company:'SGC',cardGrade:'10',extra:{z:1,a:2}}};
+ const b={...base,grading:{extra:{a:2,z:1},cardGrade:'10',company:'SGC'}};
+ assert.equal(PH.identity(a),PH.identity(b));
+ assert.equal(PH.merge({card:[a]},{card:[b]}).card.length,1);
+ assert.equal(PH.identity(base),'legacy:["2026-11-16","eBay","",15,"","","","","",["Proof"]]');
+ assert.equal(PH.identity({...base,grading:'SGC 10'}),'legacy:["2026-11-16","eBay","",15,"","","","","SGC 10",["Proof"]]');
+ assert.equal(PH.identity({...a,observationKey:'unchanged-modern-key'}),'unchanged-modern-key');
+});
+
+test('old object-grading tombstones normalize before stale merges and only a newer restore revives evidence',()=>{
+ const row={date:'2026-11-16',source:'eBay',price:15,titles:['Proof'],grading:{company:'SGC',cardGrade:'10'}};
+ const oldKey='legacy:'+JSON.stringify([row.date,row.source,'',row.price,'','','','',row.grading,row.titles]);
+ const canonical=PH.identity(row);assert.notEqual(oldKey,canonical);
+ const history={__historyMeta:{version:1,events:{card:{[oldKey]:{deleted:true,updatedAt:'2026-11-16T01:00:00Z'}}}}};
+ const stale={card:[{...row,grading:{cardGrade:'10',company:'SGC'}}]};
+ let result=PH.merge(history,stale);assert.equal(result.card,undefined);assert.equal(result.__historyMeta.events.card[canonical].deleted,true);
+ result=PH.merge(result,{...stale,__historyMeta:{version:1,events:{card:{[oldKey]:{deleted:false,updatedAt:'2026-11-15T23:00:00-02:00'}}}}});
+ assert.equal(result.card,undefined,'equal instant restores do not override an explicit removal');
+ result=PH.applyChanges(result,[],[{cardKey:'card',entries:[row]}],'2026-11-16T01:00:00.001Z');
+ assert.equal(result.card.length,1);assert.equal(result.__historyMeta.events.card[canonical].deleted,false);
+});
+
+test('partial duplicate evidence preserves older fields and unions notes/titles using actual timestamp order',()=>{
+ const existing=observation('same',{observedAt:'2026-11-16T01:00:00Z',seller:'Verified seller',grading:{company:'SGC',cardGrade:'10'},notes:['Reviewed front'],titles:['Original title']});
+ const incoming={observationKey:'same',observedAt:'2026-11-15T23:30:00-02:00',price:12,seller:'',notes:['Cached title'],titles:['Revised title']};
+ const row=PH.merge({card:[existing]},{card:[incoming]}).card[0];
+ assert.equal(row.price,12);assert.equal(row.currency,'USD');assert.equal(row.seller,'Verified seller');assert.deepEqual(row.grading,existing.grading);
+ assert.deepEqual(row.notes,['Reviewed front','Cached title']);assert.deepEqual(row.titles,['Original title','Revised title']);
+ const equal=PH.merge({card:[existing]},{card:[{...incoming,observedAt:existing.observedAt}]}).card[0];
+ assert.equal(equal.price,12);assert.equal(equal.currency,'USD');assert.equal(equal.seller,'Verified seller');
+});
