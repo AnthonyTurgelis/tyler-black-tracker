@@ -21,12 +21,16 @@ test('linked marketplace scans retain their source label and never become privat
   assert.equal(TM.isExternalSourceScan({...front,kind:'own_photo',url:'https://img.comc.com/i/Baseball/example.jpg'}),false);
 });
 
-test('COMC thumbnails use smaller scans without modifying full-resolution or back URLs',()=>{
+test('COMC and eBay thumbnails use smaller scans without modifying full-resolution or back URLs',()=>{
   const front='https://img.comc.com/i/Baseball/2024/Test.jpg?id=abc&size=original';
   const back=front+'&side=back';
   assert.equal(TM.thumbnailUrl({url:front}),'https://img.comc.com/i/Baseball/2024/Test.jpg?id=abc&size=biggerthumb');
   assert.equal(TM.thumbnailUrl({url:back}),'https://img.comc.com/i/Baseball/2024/Test.jpg?id=abc&size=biggerthumb&side=back');
-  assert.equal(TM.thumbnailUrl({url:'https://i.ebayimg.com/images/g/id/s-l1600.jpg'}),'https://i.ebayimg.com/images/g/id/s-l1600.jpg');
+  assert.equal(TM.thumbnailUrl({url:'https://i.ebayimg.com/images/g/id/s-l1600.jpg'}),'https://i.ebayimg.com/images/g/id/s-l500.jpg');
+  assert.equal(TM.thumbnailUrl({url:'https://i.ebayimg.com/images/g/id/s-l1600.webp'}),'https://i.ebayimg.com/images/g/id/s-l500.webp');
+  assert.equal(TM.thumbnailUrl({url:'https://i.ebayimg.com/images/g/id/s-l1200.webp'}),'https://i.ebayimg.com/images/g/id/s-l500.webp');
+  assert.equal(TM.thumbnailUrl({url:'https://i.ebayimg.com/images/g/id/s-l500.webp'}),'https://i.ebayimg.com/images/g/id/s-l500.webp');
+  assert.equal(TM.thumbnailUrl({url:'https://i.ebayimg.com/00/s/X/$_57.JPG'}),'https://i.ebayimg.com/00/s/X/$_57.JPG');
   assert.equal(TM.thumbnailUrl({url:'javascript:alert(1)'}),'');
 });
 
