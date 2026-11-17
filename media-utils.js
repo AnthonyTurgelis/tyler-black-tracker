@@ -28,7 +28,7 @@
     });
     return output;
   }
-  // COMC exposes smaller public catalogue scans for grid thumbnails.
+  // Use smaller COMC and eBay reference scans for gallery thumbnails.
   // Keep the exact original URL for the full-screen card viewer.
   function thumbnailUrl(photo) {
     var original = safeImageUrl(photo && photo.url);
@@ -39,6 +39,13 @@
           && u.pathname.indexOf("/i/Baseball/") === 0
           && ["original", "zoom"].indexOf(u.searchParams.get("size")) >= 0) {
         u.searchParams.set("size", "biggerthumb");
+        return u.href;
+      }
+      // An eBay seller scan displayed in a 120px gallery tile should not fetch
+      // a 1600px listing image. The card viewer still opens the original URL.
+      if (u.hostname.toLowerCase() === "i.ebayimg.com"
+          && /^\/images\/g\/[^/]+\/s-l(?:1200|1600)\.(?:webp|jpe?g)$/i.test(u.pathname)) {
+        u.pathname = u.pathname.replace(/\/s-l(?:1200|1600)\./i, "/s-l500.");
         return u.href;
       }
     } catch (_) {}
