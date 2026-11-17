@@ -28,6 +28,22 @@
     });
     return output;
   }
+  // COMC exposes smaller public catalogue scans for grid thumbnails.
+  // Keep the exact original URL for the full-screen card viewer.
+  function thumbnailUrl(photo) {
+    var original = safeImageUrl(photo && photo.url);
+    if (!original) return "";
+    try {
+      var u = new URL(original);
+      if (u.hostname.toLowerCase() === "img.comc.com"
+          && u.pathname.indexOf("/i/Baseball/") === 0
+          && ["original", "zoom"].indexOf(u.searchParams.get("size")) >= 0) {
+        u.searchParams.set("size", "biggerthumb");
+        return u.href;
+      }
+    } catch (_) {}
+    return original;
+  }
   function preferredPhotos(input) {
     return normalizePhotos(input).map(function(photo, index) { return { photo: photo, index: index }; })
       .sort(function(a, b) { return KIND_ORDER[a.photo.kind] - KIND_ORDER[b.photo.kind] || (a.photo.side === "back" ? 1 : 0) - (b.photo.side === "back" ? 1 : 0) || a.index - b.index; })
@@ -165,7 +181,7 @@
     });
     return Object.values(groups).sort(function(a, b) { return b.minimumExtras - a.minimumExtras || a.cardId - b.cardId; });
   }
-  var api = { KINDS: KINDS, safeImageUrl: safeImageUrl, normalizePhotos: normalizePhotos, preferredPhotos: preferredPhotos,
+  var api = { KINDS: KINDS, safeImageUrl: safeImageUrl, thumbnailUrl: thumbnailUrl, normalizePhotos: normalizePhotos, preferredPhotos: preferredPhotos,
     mergePhotos: mergePhotos, normalizePublicMedia: normalizePublicMedia, serialNumbers: serialNumbers,
     exactVariantPhotos:exactVariantPhotos,photosForCopy:photosForCopy,photoSourceLabel:photoSourceLabel,isExternalSourceScan:isExternalSourceScan,REVIEW_LABELS:REVIEW_LABELS,reviewFlags:reviewFlags,observationPhotoPlan:observationPhotoPlan,observationFacts:observationFacts,observationMatchesScope:observationMatchesScope,
     credibleSerial: credibleSerial, secondaryEvidence: secondaryEvidence, jerseyMatches: jerseyMatches, comcDuplicateGroups: comcDuplicateGroups };
