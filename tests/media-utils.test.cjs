@@ -21,6 +21,15 @@ test('linked marketplace scans retain their source label and never become privat
   assert.equal(TM.isExternalSourceScan({...front,kind:'own_photo',url:'https://img.comc.com/i/Baseball/example.jpg'}),false);
 });
 
+test('COMC thumbnails use smaller scans without modifying full-resolution or back URLs',()=>{
+  const front='https://img.comc.com/i/Baseball/2024/Test.jpg?id=abc&size=original';
+  const back=front+'&side=back';
+  assert.equal(TM.thumbnailUrl({url:front}),'https://img.comc.com/i/Baseball/2024/Test.jpg?id=abc&size=biggerthumb');
+  assert.equal(TM.thumbnailUrl({url:back}),'https://img.comc.com/i/Baseball/2024/Test.jpg?id=abc&size=biggerthumb&side=back');
+  assert.equal(TM.thumbnailUrl({url:'https://i.ebayimg.com/images/g/id/s-l1600.jpg'}),'https://i.ebayimg.com/images/g/id/s-l1600.jpg');
+  assert.equal(TM.thumbnailUrl({url:'javascript:alert(1)'}),'');
+});
+
 test('photo URLs accept HTTPS and reject scripts, embedded credentials and local files',()=>{
   for(const url of ['javascript:alert(1)','data:image/png;base64,a','file:///tmp/photo.jpg','http://example.test/a','https://me:secret@example.test/a','/image.jpg']) assert.equal(TM.safeImageUrl(url),'');
   assert.equal(TM.safeImageUrl(front.url),front.url);
