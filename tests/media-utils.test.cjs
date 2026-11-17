@@ -4,6 +4,23 @@ const TM = require('../media-utils.js');
 const front = {id:'front',url:'https://images.example.test/front.jpg',side:'front',kind:'copy_scan'};
 const back = {id:'back',url:'https://images.example.test/back.jpg',side:'back',kind:'copy_scan'};
 
+test('linked marketplace scans retain their source label and never become private photos',()=>{
+  const cases = [
+    {id:'comc:123:front:1',url:'https://img.comc.com/i/Baseball/2024/Test.jpg',sourceUrl:'https://www.comc.com/item/123'},
+    {id:'ebay:123:front:1',url:'https://i.ebayimg.com/images/g/example/s-l1600.jpg',sourceUrl:'https://www.ebay.ca/itm/123'},
+    {id:'second-pass:123:front:1',url:'https://images.example.test/source.jpg'},
+    {id:'external',url:'https://images.example.test/scan.jpg',sourceUrl:'https://www.ebay.com/itm/123'}
+  ];
+  for (const c of cases) {
+    const photo = {...c,kind:'copy_scan',side:'front'};
+    assert.equal(TM.isExternalSourceScan(photo),true);
+    const normalized = TM.normalizePhotos([{...photo,context:TM.isExternalSourceScan(photo)?'purchase_source':''}])[0];
+    assert.equal(TM.photoSourceLabel(normalized),'Purchase source photo');
+  }
+  assert.equal(TM.isExternalSourceScan({...front,url:'https://my-photo-host.test/my-scan.jpg'}),false);
+  assert.equal(TM.isExternalSourceScan({...front,kind:'own_photo',url:'https://img.comc.com/i/Baseball/example.jpg'}),false);
+});
+
 test('photo URLs accept HTTPS and reject scripts, embedded credentials and local files',()=>{
   for(const url of ['javascript:alert(1)','data:image/png;base64,a','file:///tmp/photo.jpg','http://example.test/a','https://me:secret@example.test/a','/image.jpg']) assert.equal(TM.safeImageUrl(url),'');
   assert.equal(TM.safeImageUrl(front.url),front.url);
