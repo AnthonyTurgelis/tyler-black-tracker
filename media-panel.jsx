@@ -3,11 +3,21 @@ function CardPhotoThumbnail({photos = [], title = "Card photo", onOpen, compact 
   const TM = window.TrackerMedia;
   const ordered = React.useMemo(() => TM.preferredPhotos(photos), [photos]);
   const [failed, setFailed] = React.useState({});
+  const [thumbnailFailed, setThumbnailFailed] = React.useState({});
   const signature = ordered.map(photo => photo.url).join("|");
-  React.useEffect(() => setFailed({}), [signature]);
+  React.useEffect(() => { setFailed({}); setThumbnailFailed({}); }, [signature]);
   const photo = ordered.find(item => !failed[item.url]);
+  const thumbnail = photo ? (thumbnailFailed[photo.url] ? photo.url : TM.thumbnailUrl(photo)) : "";
+  function onThumbnailError() {
+    if (!photo) return;
+    if (thumbnail !== photo.url) {
+      setThumbnailFailed(previous => ({...previous, [photo.url]: true}));
+    } else {
+      setFailed(previous => ({...previous, [photo.url]: true}));
+    }
+  }
   const content = <>
-    {photo ? <img src={photo.url} alt={title + " — " + photo.side + " — " + TM.photoSourceLabel(photo)} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(previous => ({...previous, [photo.url]: true}))} className="h-full w-full object-contain p-2" /> : <span className="flex h-full min-h-20 flex-col items-center justify-center gap-2 px-2 py-3 text-center"><span className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-400">{ordered.length ? "Image unavailable" : emptyLabel}</span>{emptyDetail?<span className="text-[9px] leading-snug text-slate-500">{emptyDetail}</span>:null}</span>}
+    {photo ? <img src={thumbnail} alt={title + " — " + photo.side + " — " + TM.photoSourceLabel(photo)} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={onThumbnailError} className="h-full w-full object-contain p-2" /> : <span className="flex h-full min-h-20 flex-col items-center justify-center gap-2 px-2 py-3 text-center"><span className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-400">{ordered.length ? "Image unavailable" : emptyLabel}</span>{emptyDetail?<span className="text-[9px] leading-snug text-slate-500">{emptyDetail}</span>:null}</span>}
     {photo && !compact ? <span className="absolute bottom-2 left-2 rounded border border-slate-600 bg-slate-950/90 px-2 py-1 text-[10px] text-slate-200">{TM.photoSourceLabel(photo)}</span> : null}
     {photo && compact ? <span className="absolute bottom-0 inset-x-0 bg-slate-950/90 px-1 py-1 text-center text-[8px] text-slate-300">{TM.photoSourceLabel(photo)}</span> : null}
   </>;
