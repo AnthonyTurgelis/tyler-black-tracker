@@ -71,6 +71,15 @@
     });
   }
   function photosForCopy(record, cardId, publicMedia) { return mergePhotos(record && record.photos,exactVariantPhotos(cardId,publicMedia)); }
+  // Marketplace scans remain source photos, even after an observation is linked
+  // to a counted copy. Linking a source does not make its image a personal scan.
+  function isExternalSourceScan(photo) {
+    if (!photo || photo.kind !== "copy_scan") return false;
+    var image = text(photo.url), source = text(photo.sourceUrl), id = text(photo.id);
+    return /^https:\/\/(?:img\.comc\.com|i\.ebayimg\.com)\//i.test(image)
+      || /^https:\/\/(?:www\.)?(?:comc\.com|ebay\.(?:com|ca|co\.uk))\//i.test(source)
+      || /^(?:comc:|ebay:|second-pass:)/i.test(id);
+  }
   function photoSourceLabel(photo) { return photo && photo.kind === "reference" && photo.referenceScope === "exact_variant" ? "Reference / exact variant" : photo && photo.kind === "copy_scan" && photo.context === "purchase_source" ? "Purchase source photo" : KINDS[photo && photo.kind] || "Reference"; }
   var REVIEW_LABELS = {identity:"Identity pending",duplicate:"Copy overlap / extras",serial:"Serial to verify",location:"Location unconfirmed",purchase:"Purchase status",copy_match:"Copy match pending"};
   function reviewFlags(observation) {
@@ -158,7 +167,7 @@
   }
   var api = { KINDS: KINDS, safeImageUrl: safeImageUrl, normalizePhotos: normalizePhotos, preferredPhotos: preferredPhotos,
     mergePhotos: mergePhotos, normalizePublicMedia: normalizePublicMedia, serialNumbers: serialNumbers,
-    exactVariantPhotos:exactVariantPhotos,photosForCopy:photosForCopy,photoSourceLabel:photoSourceLabel,REVIEW_LABELS:REVIEW_LABELS,reviewFlags:reviewFlags,observationPhotoPlan:observationPhotoPlan,observationFacts:observationFacts,observationMatchesScope:observationMatchesScope,
+    exactVariantPhotos:exactVariantPhotos,photosForCopy:photosForCopy,photoSourceLabel:photoSourceLabel,isExternalSourceScan:isExternalSourceScan,REVIEW_LABELS:REVIEW_LABELS,reviewFlags:reviewFlags,observationPhotoPlan:observationPhotoPlan,observationFacts:observationFacts,observationMatchesScope:observationMatchesScope,
     credibleSerial: credibleSerial, secondaryEvidence: secondaryEvidence, jerseyMatches: jerseyMatches, comcDuplicateGroups: comcDuplicateGroups };
   if (root) root.TrackerMedia = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
