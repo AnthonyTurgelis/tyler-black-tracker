@@ -178,7 +178,7 @@ function CardGalleryPanel({cards = [], statuses = {}, cardDetails = {}, inventor
       let photos = [];
       records.forEach(record => {
         const context = record.serial ? "Serial " + record.serial : record.location && CI.LOCATIONS[record.location] || "";
-        const labelled = TM.normalizePhotos(record.photos).map(photo => ({...photo, context:photo.kind === "copy_scan" && record.source && !record.matchedCopyId ? "purchase_source" : photo.context,caption:[photo.caption,photo.kind !== "reference" ? context : "",record.source && !record.matchedCopyId ? "Purchase awaiting copy match" : ""].filter(Boolean).join(" · ")}));
+        const labelled = TM.normalizePhotos(record.photos).map(photo => ({...photo, context:(TM.isExternalSourceScan(photo) || photo.kind === "copy_scan" && record.source && !record.matchedCopyId) ? "purchase_source" : photo.context,caption:[photo.caption,photo.kind !== "reference" ? context : "",record.source && !record.matchedCopyId ? "Purchase awaiting copy match" : ""].filter(Boolean).join(" · ")}));
         photos = TM.mergePhotos(photos, labelled);
       });
       photos = TM.mergePhotos(photos, TM.exactVariantPhotos(card.id,media));
