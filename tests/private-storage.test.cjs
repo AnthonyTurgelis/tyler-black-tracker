@@ -49,7 +49,7 @@ async function boot() {
       return query;
     }
   };
-  const window = {SUPABASE_URL:'https://example.invalid',SUPABASE_ANON_KEY:'public-test-key',supabase:{createClient:()=>client},dispatchEvent(event){auth.events.push(event);}};
+  const window = {CollectionSync:require("../collection-sync.js"),SUPABASE_URL:'https://example.invalid',SUPABASE_ANON_KEY:'public-test-key',supabase:{createClient:()=>client},dispatchEvent(event){auth.events.push(event);}};
   const localStorage = {get length(){return cache.size;},key:i=>[...cache.keys()][i],getItem:k=>cache.get(k)||null,setItem:(k,v)=>cache.set(k,v),removeItem:k=>cache.delete(k)};
   vm.runInNewContext(source,{window,localStorage,console:{log(){},warn(){},error(){}},CustomEvent:function(type,options){this.type=type;this.detail=options.detail;},setTimeout(){}});
   await window.storageReady;

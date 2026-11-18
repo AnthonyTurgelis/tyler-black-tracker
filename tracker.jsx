@@ -657,6 +657,7 @@ function TylerBlackTracker() {
   }, []);
   const [editingCustom, setEditingCustom] = useState(null); // {idx, product, cardSet, cardNumber, copies}
   const [storageDiag, setStorageDiag] = useState("");
+  const [collectionIssue,setCollectionIssue] = useState(() => window.storageSyncIssues["tb-alldata-v1"] || null);
   const exportCsvRef = useRef(null);
   const undoStack = useRef([]);
   const [undoLen, setUndoLen] = useState(0);
@@ -818,6 +819,7 @@ function TylerBlackTracker() {
   }
   useEffect(() => {
     function handleBeforeUnload() {
+      if (window.MODE !== "wnba") return; // Tyler Black edits are journaled at the point of change.
       if (window._skipBeforeUnloadSave) return;
       // GUARD: abort if mode toggled mid-flight (data is for old mode, would contaminate new mode's storage)
       if (loadedModeRef.current && loadedModeRef.current !== window.MODE) return;
@@ -831,6 +833,7 @@ function TylerBlackTracker() {
       }
     }
     function handleVisibilityChange() {
+      if (window.MODE !== "wnba") return;
       if (window._skipBeforeUnloadSave) return;
       // GUARD: abort if mode toggled mid-flight
       if (loadedModeRef.current && loadedModeRef.current !== window.MODE) return;
@@ -848,6 +851,7 @@ function TylerBlackTracker() {
   // Periodic backup -- just force-flush allDataRef
   useEffect(() => {
     if (loading) return;
+    if (window.MODE !== "wnba") return;
     function doBackup() {
       if (!loadComplete.current) return;
       // GUARD: abort if mode toggled mid-flight (timer captured stale closure)
@@ -931,6 +935,7 @@ function TylerBlackTracker() {
   // Update a field in allDataRef and schedule save
   const persistField = useCallback((field, value) => {
     allDataRef.current[field] = value;
+    if (window.MODE !== "wnba") window.trackerCollection.stage(allDataRef.current);
     allDataRef.current._saveTimestamp = Date.now();
     // IMMEDIATE sync backup to localStorage on every change (sync = guaranteed)
     try { localStorage.setItem(tbk("alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
@@ -974,55 +979,12 @@ function TylerBlackTracker() {
       } catch (e) {
         diagParts.push("Consolidated read error: " + e.message);
       }
-      // ALWAYS check localStorage backup and compare timestamps - use whichever is newer
-      var lsData = null;
+      // Tyler Black replays individual pending edits. A newer local backup can
+      // just be an idle tab. Only use it as a fallback if no saved copy is available.
       try {
-        var lsBackup = localStorage.getItem(tbk("alldata-backup-v1"));
-        if (lsBackup) { lsData = JSON.parse(lsBackup); }
-      } catch(e2) {}
-      if (allData && lsData) {
-        var wsTs = allData._saveTimestamp || 0;
-        var lsTs = lsData._saveTimestamp || 0;
-        if (lsTs > wsTs) {
-          diagParts.push("localStorage backup NEWER (" + new Date(lsTs).toLocaleTimeString() + " vs " + new Date(wsTs).toLocaleTimeString() + ") - using localStorage");
-          allData = lsData;
-        } else {
-          diagParts.push("window.storage is current");
-        }
-      } else if (!allData && lsData) {
-        allData = lsData;
-        diagParts.push("Restored from localStorage backup");
-      }
-      // FALLBACK: If window.storage returned nothing, try localStorage backup
-      if (!allData) {
-        try {
-          var lsBackup = localStorage.getItem(tbk("alldata-backup-v1"));
-          if (lsBackup) {
-            allData = JSON.parse(lsBackup);
-            diagParts.push("Restored from localStorage backup");
-          }
-        } catch(e2) { diagParts.push("localStorage backup read error: " + e2.message); }
-      }
-      // FALLBACK: If window.storage returned nothing, try localStorage backup
-      if (!allData) {
-        try {
-          var lsBackup = localStorage.getItem(tbk("alldata-backup-v1"));
-          if (lsBackup) {
-            allData = JSON.parse(lsBackup);
-            diagParts.push("Restored from localStorage backup");
-          }
-        } catch(e2) { diagParts.push("localStorage backup read error: " + e2.message); }
-      }
-      // FALLBACK: If window.storage returned nothing, try localStorage backup
-      if (!allData) {
-        try {
-          var lsBackup = localStorage.getItem(tbk("alldata-backup-v1"));
-          if (lsBackup) {
-            allData = JSON.parse(lsBackup);
-            diagParts.push("Restored from localStorage backup");
-          }
-        } catch(e2) { diagParts.push("localStorage backup read error: " + e2.message); }
-      }
+        const backup = JSON.parse(localStorage.getItem(tbk("alldata-backup-v1")) || "null");
+        if (backup && (!allData || (window.MODE==="wnba" && backup._saveTimestamp>allData._saveTimestamp))) allData=backup;
+      } catch (_) {}
       // If no consolidated data, or consolidated data is missing the migration flag
       // (meaning a broken build may have written partial data), try legacy keys.
       // GUARD: legacy keys are TB-only (`tb-statuses-v2`, etc.). In WNBA mode we must
@@ -1136,6 +1098,7 @@ function TylerBlackTracker() {
         changelog: changelogArr,
         _migrationComplete: true
       };
+      if (window.MODE !== "wnba") window.trackerCollection.begin(allDataRef.current);
       loadComplete.current = true; // Now safe to save
       // Capture which mode this data was loaded for. Saves that fire from
       // stale closures after a mode toggle will see a mismatch and abort.
@@ -1147,6 +1110,54 @@ function TylerBlackTracker() {
     }
     load();
   }, []);
+  useEffect(function() {
+    if (trackerMode !== "tb") return;
+    let active=true, refreshRequest=0;
+    function applySaved(data) {
+      if (!active || !data || !loadComplete.current || window.MODE==="wnba" || window.trackerCollection.hasPending()) return;
+      const marked={...data.statuses}, sale={...data.forsale}, detail={};
+      PRESET_OWNED.forEach(id=>{if(!marked[id]) marked[id]="owned";});
+      PRESET_INTRANSIT.forEach(id=>{if(!marked[id]) marked[id]="in_transit";});
+      for(const [id,st] of Object.entries(marked)) if(st==="for_sale"){ marked[id]="owned";sale[id]=true; }
+      const projected={...data,statuses:marked,forsale:sale};
+      if(!window.CollectionSync.changes(allDataRef.current,projected).length) return;
+      for(const [id,d] of Object.entries(PRESET_DETAILS)) {
+        detail[id]={};
+        for(const [field,short] of Object.entries({serial:"s",price:"p",date:"d",notes:"n",printRun:"pr"}))
+          if(d[short]) detail[id][field]=d[short];
+      }
+      for(const [id,d] of Object.entries(data.details || {})) detail[id]={...detail[id],...d};
+      for(const [id,extra] of Object.entries(DUPE_QTY_INIT)){
+        if(!detail[id]) detail[id]={};
+        if(!detail[id].qty) detail[id].qty=String(1+extra);
+      }
+      allDataRef.current=projected;
+      window.trackerCollection.begin(projected);
+      setStatuses(marked);setCardDetails(detail);setForSaleFlags(sale);
+      setSyncedIds(new Set(data.synced));setDirtyIds(new Set(data.dirty));
+      setChangelog(data.changelog || []);setLastCheckpoint(data.checkpoint || null);
+      // Undo-all must never restore another device's older state.
+      sessionInitial.current={statuses:{...marked},cardDetails:JSON.parse(JSON.stringify(detail)),forSaleFlags:{...sale},dirtyIds:new Set(data.dirty)};
+      undoStack.current=[];setUndoLen(0);setSessionChanges(0);
+    }
+    async function refresh() {
+      if(document.hidden || !loadComplete.current) return;
+      const request=++refreshRequest, stamp=allDataRef.current._saveTimestamp;
+      try {
+        if(window.trackerCollection.hasPending()) {await window.trackerCollection.sync();return;}
+        const current=await window.trackerCollection.read();
+        if(request===refreshRequest && stamp===allDataRef.current._saveTimestamp) applySaved(current);
+      } catch (_) {}
+    }
+    function saved(e){++refreshRequest;setCollectionIssue(null);applySaved(e.detail);}
+    function issue(e){if(e.detail.key==="tb-alldata-v1") setCollectionIssue(e.detail);}
+    setCollectionIssue(window.storageSyncIssues["tb-alldata-v1"] || null);
+    document.addEventListener("visibilitychange",refresh);
+    window.addEventListener("online",refresh);
+    window.addEventListener("collection-synced",saved);
+    window.addEventListener("storage-sync-issue",issue);
+    return ()=>{active=false;document.removeEventListener("visibilitychange",refresh);window.removeEventListener("online",refresh);window.removeEventListener("collection-synced",saved);window.removeEventListener("storage-sync-issue",issue);};
+  },[trackerMode,loading]);
   const saveStatuses = useCallback(async (newStatuses) => {
     persistField("statuses", newStatuses);
   }, [persistField]);
@@ -1349,6 +1360,7 @@ function TylerBlackTracker() {
   const setCardStatus = useCallback((cardId, status) => {
     if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
     if (trackerMode === "tb") {
+      if (!copyStateRef.current.ready) { window.alert("Copy inventory is still loading. Try the status edit again once it is ready."); return false; }
       var quick = window.CopyInventory.quickStatusPresence(copyStateRef.current.inventory,cardId,status,{statuses:statuses,cardDetails:cardDetails});
       if (quick.handled) {
         if (quick.requiresDetails) { setCopyCardId(cardId); setActiveTab("copies"); }
@@ -2186,6 +2198,20 @@ function TylerBlackTracker() {
           </div>
         </div>
       )}
+      {trackerMode==="tb" && collectionIssue && <div role="alert" className="fixed bottom-12 right-3 left-3 sm:left-auto max-w-lg bg-gray-950 text-amber-200 border border-amber-600 rounded p-3 text-xs z-50">
+        <strong>Collection edits pending</strong> · {collectionIssue.error}
+        {(collectionIssue.conflicts || []).slice(0,1).map(c=>{
+          const card=CARD_BY_ID[c.path[1]];
+          const label=card ? "#"+card.cardNumber+" "+card.cardSet : c.path.join(" / ");
+          const show=v=>v==null ? "blank" : typeof v==="object" ? JSON.stringify(v).slice(0,100) : String(v);
+          return <div key={JSON.stringify(c.path)} className="mt-2">{label} · {c.path[2] || c.path[0]}
+            <div className="flex gap-3 mt-1">
+              <button className="underline" onClick={()=>window.trackerCollection.resolve(collectionIssue.journal,c,false)}>Keep saved {show(c.actual)}</button>
+              <button className="underline" onClick={()=>window.trackerCollection.resolve(collectionIssue.journal,c,true)}>Apply my {show(c.desired)}</button>
+            </div></div>;
+        })}
+        {!(collectionIssue.conflicts || []).length && <button className="underline ml-2" onClick={()=>window.trackerCollection.sync()}>Retry</button>}
+      </div>}
       {/* Floating save toast */}
       {saveToast && (
         <div className={"fixed bottom-3 right-3 border px-3 py-1.5 rounded shadow-lg font-medium z-50 " + (saveToast.includes("WARN") ? "bg-red-900 border-red-700 text-red-300" : "bg-yellow-900 border-yellow-700 text-yellow-300")} style={{fontSize:"clamp(9px,1.1vw,12px)"}}>

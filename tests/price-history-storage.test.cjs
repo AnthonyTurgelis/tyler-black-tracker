@@ -17,7 +17,7 @@ async function boot(initial) {
     db.row={value:clone(payload.value),updated_at:'v'+(++db.version)};return{data:clone(db.row),error:null};
    }};return query;
  }};
- const events=[],window={SUPABASE_URL:'https://example.invalid',SUPABASE_ANON_KEY:'public',PriceHistoryUtils:PH,supabase:{createClient:()=>client},dispatchEvent:event=>events.push(event)};
+ const events=[],window={CollectionSync:require("../collection-sync.js"),SUPABASE_URL:'https://example.invalid',SUPABASE_ANON_KEY:'public',PriceHistoryUtils:PH,supabase:{createClient:()=>client},dispatchEvent:event=>events.push(event)};
  const localStorage={get length(){return cache.size;},key:i=>[...cache.keys()][i],getItem:key=>cache.has(key)?cache.get(key):null,setItem:(key,value)=>cache.set(key,String(value)),removeItem:key=>cache.delete(key)};
  vm.runInNewContext(source,{window,localStorage,console:{log(){},warn(){},error(){}},CustomEvent:function(type,options){this.type=type;this.detail=options.detail;},setTimeout(){}});
  await window.storageReady;return{window,cache,db,calls,events};

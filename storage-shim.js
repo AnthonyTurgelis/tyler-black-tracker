@@ -258,6 +258,7 @@
         try {
           var val = localStorage.getItem(key);
           if (val !== null) {
+            if (key === "tb-alldata-v1") continue; // Ownership syncs only explicit edits.
             if (isCatalogKey(key)) {
               var catalogResult = await window.storage.set(key, val);
               if (catalogResult.cloudSaved) migrated++;
@@ -373,6 +374,55 @@
   // ── Hydrate: pull ALL cloud data into localStorage on startup ──
   // Now queries BOTH tables. Tempo table only queried if owner is logged in     // + TEMPO
   // (anon SELECT is denied on tempo_collection_kv anyway).                       // + TEMPO
+  const collectionKey = "tb-alldata-v1";
+  async function readCollection() {
+    const row = await supabase.from("collection_kv").select("value, updated_at").eq("key",collectionKey).single();
+    if(row.error || !row.data || !row.data.updated_at) throw Error(row.error && row.error.message || "Could not read the saved collection.");
+    return row.data;
+  }
+  const collection = window.CollectionSync.create({
+    storage:localStorage, owner:()=>privateOwnerId, read:readCollection,
+    id:Date.now().toString(36)+"-"+Math.random().toString(36).slice(2),
+    issue:message=>reportSyncIssue(collectionKey,message),
+    write: async function(value,version) {
+      const result=await supabase.from("collection_kv").update({value}).eq("key",collectionKey).eq("updated_at",version).select("value,updated_at").maybeSingle();
+      if(result.error && result.error.code!=="40001") throw Error(result.error.message);
+      return result.data;
+    }
+  });
+  function reportCollectionError(error) {
+    const detail={key:collectionKey,error:error.message,conflicts:error.conflicts || [],journal:error.journal};
+    window.storageSyncIssues[collectionKey]=detail;
+    window.dispatchEvent(new CustomEvent("storage-sync-issue",{detail}));
+  }
+  let savedCollection = null;
+  function cacheCollection(value) {
+    savedCollection = value;
+    // Never substitute a cache timestamp for the database version.
+    try { localStorage.setItem(collectionKey,JSON.stringify(value)); } catch (_) {}
+    return value;
+  }
+  window.trackerCollection = {
+    begin:collection.begin, stage:collection.stage, hasPending:collection.hasPending,
+    read:async function() {return cacheCollection((await readCollection()).value);},
+    resolve:async function(key,conflict,local) {collection.resolve(key,conflict,local);return saveCollection();},
+    sync:saveCollection
+  };
+  async function saveCollection(value) {
+    if(!isOwner) return {cloudSaved:false,error:"Sign in to sync collection edits."};
+    try {
+      if(value) collection.stage(typeof value==="string" ? JSON.parse(value) : value);
+      const saved=await collection.flush();
+      if(saved) cacheCollection(saved);
+      delete window.storageSyncIssues[collectionKey];
+      window.dispatchEvent(new CustomEvent("collection-synced",{detail:saved}));
+      return {cloudSaved:true};
+    } catch(error) {
+      reportCollectionError(error);
+      return {cloudSaved:false,error:error.message};
+    }
+  }
+
   async function hydrateFromCloud() {
     if (!supabase || hydrated) return;
     try {
@@ -400,6 +450,25 @@
         var row = rows[i];
         try {
           var cloudVal = typeof row.value === "string" ? row.value : JSON.stringify(row.value);
+          if (row.key === collectionKey) {
+            let saved = row.value;
+            // Retain old browser-only evidence before upgrading the cache.
+            for(const suffix of ["", "-backup"]) {
+              const key = "tb-alldata"+suffix+"-v1";
+              const local = localStorage.getItem(key);
+              if(!local) continue;
+              try {
+                const previous=JSON.parse(local);
+                collection.recoverLegacy(previous,saved);
+              } catch(error) {console.warn("[storage] Could not read the older collection cache:",error.message);}
+            }
+            if(isOwner) {
+              try { saved = await collection.resume() || (await readCollection()).value; }
+              catch(error) {reportCollectionError(error);}
+            }
+            cacheCollection(saved);
+            continue;
+          }
           if (row.key === "tb-price-history-v1") {
             localStorage.setItem(row.key, JSON.stringify(window.PriceHistoryUtils.merge(row.value, localStorage.getItem(row.key))));
             continue;
@@ -421,7 +490,7 @@
           }
           // For alldata keys, compare timestamps — don't overwrite newer local data
           // Apply same logic to BOTH tb-alldata-v1 and tempo-alldata-v1            // + TEMPO
-          if (row.key === "tb-alldata-v1" || row.key === "tempo-alldata-v1") {     // + TEMPO modified condition
+          if (row.key === "tempo-alldata-v1") {     // + TEMPO modified condition
             var localVal = localStorage.getItem(row.key);
             if (localVal) {
               try {
@@ -550,6 +619,7 @@
   // ── window.storage API (same interface tracker already uses) ──
   window.storage = {
     async get(key) {
+      if (key===collectionKey && savedCollection) return {key,value:JSON.stringify(savedCollection)};
       // Fast path: localStorage cache
       try {
         var val = localStorage.getItem(key);
@@ -573,6 +643,7 @@
     },
 
     async set(key, value) {
+      if (key === collectionKey) return saveCollection(value);
       if (key === "tb-card-media-v1") value = window.TrackerMedia.normalizePublicMedia(value);
       if (key === "tb-price-history-v1") value = window.PriceHistoryUtils.merge(localStorage.getItem(key),value);
       if (typeof value !== "string") value = JSON.stringify(value);

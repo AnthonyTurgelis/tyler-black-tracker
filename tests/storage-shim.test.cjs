@@ -57,6 +57,7 @@ async function boot({ local = {}, cloud = {}, owner = true } = {}) {
     }
   };
   const window = {
+    CollectionSync: require("../collection-sync.js"),
     TrackerMedia: require('../media-utils.js'),
     PriceHistoryUtils: require('../price-history-utils.js'),
     SUPABASE_URL: 'https://example.invalid', SUPABASE_ANON_KEY: 'test-publishable-key',
@@ -201,13 +202,13 @@ test('viewer writes never use authenticated cloud mutation and report local-only
   assert.equal(h.calls.writes.length, 0);
 });
 
-test('other hydration keys and consolidated collection timestamp behavior stay unchanged', async () => {
+test('server collection wins even when an idle local tab has a newer clock', async () => {
   const h = await boot({
     local: { 'tb-targets-v1': { local: 1 }, 'tb-alldata-v1': { statuses: { 10: 'owned' }, _saveTimestamp: 50 } },
     cloud: { 'tb-targets-v1': { cloud: 1 }, 'tb-alldata-v1': { statuses: { 20: 'owned' }, _saveTimestamp: 40 } }
   });
   assert.deepEqual(h.read('tb-targets-v1'), { local: 1 });
-  assert.deepEqual(h.read('tb-alldata-v1').statuses, { 10: 'owned' });
+  assert.deepEqual(h.read('tb-alldata-v1').statuses, { 20: 'owned' });
 });
 
 test('catalogue writes are serialized so an older request cannot finish last', async () => {
