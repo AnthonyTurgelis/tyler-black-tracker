@@ -53,6 +53,13 @@
   }
   function parseListings(text, options) {
     options = options || {};
+    // Receipt recommendations are separate offers. Totals may follow them.
+    var recommendationBlock=false;
+    text = String(text || "").split(/\r?\n/).filter(function(line){
+      if (/^\s*(?:Inspired by your (?:recent views|activity)|Pick up where you left off|Related Searches|Recommended for you|You may also like|You might also like|Popular in your interests|Sponsored items to complement your purchase)\s*$/i.test(line)){recommendationBlock=true;return false;}
+      if (recommendationBlock && /^\s*(?:Order total|Order summary|Payment details)\s*:?\s*$/i.test(line))recommendationBlock=false;
+      return !recommendationBlock;
+    }).join("\n");
     var lines = String(text || "").split(/\r?\n/), results = [];
     var source = options.source || (/Sold Via:|Current Price:/i.test(text) ? "130point" : /Low Price:|Total Quantity:/i.test(text) ? "SportLots" : /Opens in a new window or tab/.test(text) ? "eBay" : /Whatnot|Ships from|Card image/i.test(text) ? "Whatnot" : /COMC|NM or Better/i.test(text) ? "COMC" : "Scan");
     if (source === "SportLots" && /Low Price:/i.test(text)) return parseSportLots(text, options);

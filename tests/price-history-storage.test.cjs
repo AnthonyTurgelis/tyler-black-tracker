@@ -20,7 +20,7 @@ async function boot(initial, key=KEY) {
  const events=[],window={CollectionSync:require("../collection-sync.js"),SUPABASE_URL:'https://example.invalid',SUPABASE_ANON_KEY:'public',PriceHistoryUtils:PH,supabase:{createClient:()=>client},dispatchEvent:event=>events.push(event)};
  const localStorage={get length(){return cache.size;},key:i=>[...cache.keys()][i],getItem:key=>cache.has(key)?cache.get(key):null,setItem:(key,value)=>cache.set(key,String(value)),removeItem:key=>cache.delete(key)};
  vm.runInNewContext(source,{window,localStorage,console:{log(){},warn(){},error(){}},CustomEvent:function(type,options){this.type=type;this.detail=options.detail;},setTimeout(){}});
- await window.storageReady;return{window,cache,db,calls,events};
+ await window.storageReady;return{window,cache,db,calls,events,localStorage};
 }
 
 test('a stale price-history save merges fresh cloud observations before a timestamp-conditional update',async()=>{
@@ -115,4 +115,22 @@ for(const key of ['tb-price-history-v1','tempo-price-history-v1']) test(key+' pr
  assert.equal((await h.window.storage.set(key,{card:[a,b,observation('new')]})).cloudSaved,true);
  assert.deepEqual(h.db.row.value.card.map(PH.identity).sort(),['b','new']);
  assert.equal(h.calls.writes.length,2);assert.equal(h.calls.writes[1].filters.updated_at,'v2');
+});
+
+for(const key of ['tb-price-history-v1','tempo-price-history-v1']) test(key+' confirms committed cloud saves even when the browser cache is full and reads current memory',async()=>{
+ const h=await boot({card:[observation('cloud')]},key);h.cache.set(key,JSON.stringify({card:[observation('stale')]}));
+ h.localStorage.setItem=()=>{throw Error('QuotaExceededError')};
+ const result=await h.window.storage.set(key,{card:[observation('new')]});assert.equal(result.cloudSaved,true);assert.equal(result.localSaved,false);assert.match(result.localError,/Quota/);
+ assert.deepEqual(h.db.row.value.card.map(PH.identity).sort(),['cloud','new','stale']);
+ const read=JSON.parse((await h.window.storage.get(key)).value);assert.deepEqual(read.card.map(PH.identity).sort(),['cloud','new','stale']);
+ assert.equal(h.cache.get(key).includes('new'),false,'unchanged stale disk cache is superseded by fresh in-memory evidence');
+});
+
+test('actual tracker price helpers still enqueue cloud writes and read fresh memory when localStorage is full',async()=>{
+ const h=await boot({card:[observation('cloud')]});h.localStorage.setItem=()=>{throw Error('QuotaExceededError')};
+ const tracker=fs.readFileSync(path.join(__dirname,'../tracker.jsx'),'utf8'),start=tracker.indexOf('function loadPriceHistory()'),end=tracker.indexOf('var TCDB_FLAGS',start);
+ const ctx={window:h.window,localStorage:h.localStorage,tbk:()=>KEY,PRICE_HISTORY:{},CustomEvent:function(type,options){this.type=type;this.detail=options.detail;}};
+ vm.createContext(ctx);vm.runInContext(tracker.slice(start,end),ctx);ctx.savePriceHistory({card:[observation('new')]});
+ await new Promise(setImmediate);assert.equal(h.calls.writes.length,1);assert.equal(ctx.loadPriceHistory().card.some(row=>row.observationKey==='new'),true);
+ assert.deepEqual(h.db.row.value.card.map(PH.identity).sort(),['cloud','new']);
 });

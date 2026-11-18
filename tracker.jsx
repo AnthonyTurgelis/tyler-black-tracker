@@ -137,14 +137,14 @@ function useIsOwner() {
 }
 // ──────────────────────────────────────────────────────────────────────────
 
-function loadPriceHistory() { try { var k=tbk("price-history-v1"), raw=JSON.parse(localStorage.getItem(k) || "{}"); return /^(tb|tempo)-price-history-v1$/.test(k) ? window.PriceHistoryUtils.visible(raw) : raw; } catch(e) { return {}; } }
+function loadPriceHistory() { try { var k=tbk("price-history-v1"), raw=JSON.parse((window.storage?.peek ? window.storage.peek(k) : localStorage.getItem(k)) || "{}"); return /^(tb|tempo)-price-history-v1$/.test(k) ? window.PriceHistoryUtils.visible(raw) : raw; } catch(e) { return {}; } }
 function savePriceHistory(obj, changes) {
   var k = tbk("price-history-v1"), value=obj;
   if (/^(tb|tempo)-price-history-v1$/.test(k)) {
-    value=window.PriceHistoryUtils.merge(localStorage.getItem(k),obj);
+    value=window.PriceHistoryUtils.merge(window.storage?.peek ? window.storage.peek(k) : localStorage.getItem(k),obj);
     if (changes) value=window.PriceHistoryUtils.applyChanges(value,changes.removals,changes.restores);
   }
-  localStorage.setItem(k,JSON.stringify(value));
+  try {localStorage.setItem(k,JSON.stringify(value));} catch(e) {}
   try { var pending=window.storage.set(k,JSON.stringify(value)); if(pending && pending.catch) pending.catch(function(error){window.dispatchEvent(new CustomEvent("storage-sync-issue",{detail:{key:k,error:error.message || "Price history could not be saved."}}));}); } catch(e) {}
   PRICE_HISTORY = /^(tb|tempo)-price-history-v1$/.test(k) ? window.PriceHistoryUtils.visible(value) : value;
 }
@@ -430,6 +430,40 @@ function CatalogScopeSelect({value, onChange}) {
   if (window.MODE === "wnba") return null;
   return <label className="inline-flex items-center gap-1 text-[11px] text-gray-400">Show <select aria-label="Card category" value={value} onChange={function(e){onChange(e.target.value);}} className="bg-gray-900 border border-gray-700 text-gray-200 rounded px-1 py-1"><option value="checklist">Checklist</option><option value="proofs">All proofs & prototypes</option><option value="preproduction">Pre-production proofs</option><option value="manufacturer_proofs">Other manufacturer proofs</option><option value="proofs_signed">Proofs · signed</option><option value="proofs_unsigned">Proofs · unsigned</option><option value="proofs_unknown">Proofs · signature unconfirmed</option><option value="custom">Custom / fantasy</option><option value="review">Needs review</option><option value="all">All cards</option></select></label>;
 }
+function privatePanelHasEdits() { return !!(window.AutographPanel?.hasPending() || window.PurchaseReceiptsPanel?.hasPending()); }
+function TempoFocusSelect({value, onChange, counts, wants, wantsError}) {
+  if (!counts) return null;
+  var options = [["primary", "Primary"], ["all", "All"], ["uniform", "Tempo jersey"], ["rookies", "Rookies"]];
+  if (counts.wanted != null) options.push(["wanted", "Wantlist"]);
+  return <div className="mb-1 border-b border-purple-900/60 pb-1" style={{fontSize:"clamp(9px,1vw,11px)"}}>
+    <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Tempo collection focus">
+      <span className="text-purple-300 font-bold mr-1">Focus:</span>
+      {options.map(function(option, index) {
+        var selected = value === option[0];
+        return <button key={option[0]} aria-pressed={selected} onClick={function(){onChange(option[0]);}}
+          className={"rounded px-1.5 py-0.5 " + (index < 2 ? "font-bold border " : "font-medium ") + (selected ? "bg-purple-700 border-purple-500 text-white" : index < 2 ? "bg-gray-900 border-gray-700 text-gray-200 hover:border-purple-600" : "text-gray-400 hover:text-purple-200")}>{option[1]} <span className="opacity-70 tabular-nums">{counts[option[0]] || 0}</span></button>;
+      })}
+      <select aria-label="More Tempo views" value={value === "other" || value === "unverified" ? value : ""} onChange={function(e){if(e.target.value) onChange(e.target.value);}}
+        className={"bg-gray-900 border rounded px-1 py-0.5 " + (value === "other" || value === "unverified" ? "border-purple-500 text-purple-200" : "border-gray-800 text-gray-400")}>
+        <option value="">More views</option><option value="other">Outside Primary ({counts.other || 0})</option><option value="unverified">Jersey unverified ({counts.unverified || 0})</option>
+      </select>
+    </div>
+    <div className="text-gray-500 mt-0.5" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>Primary = verified Tempo jersey or rookie. Header totals cover the full checklist. Jersey evidence is incomplete.{value === "wanted" && <span className="text-amber-300 ml-1">TCDB want evidence; ownership unchanged.</span>}</div>
+    {wantsError && <p role="status" className="text-amber-300 text-[10px]">Wantlist unavailable: {wantsError}</p>}
+    {wants && Object.keys(wants.heldAliases || {}).length > 0 && <details className="text-[10px] text-amber-300 mt-0.5"><summary className="cursor-pointer">{Object.keys(wants.heldAliases).length} TCDB want aliases held for review</summary><div className="text-gray-400 max-h-24 overflow-auto">{Object.entries(wants.heldAliases).map(function(entry) { var value=entry[1],evidence=(wants.evidence || {})[(value.evidenceRefs || [])[0]],url=evidence && evidence.sourceUrl;return <div key={entry[0]}>{value.reason}{url && /^https?:\/\//i.test(url) && <a href={url} target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-300 underline">TCDB source</a>}</div>;})}</div></details>}
+  </div>;
+}
+function TempoCardEvidence({card}) {
+  if (!window.TempoProfile) return null;
+  var profile = window.TempoProfile.classify(card);
+  function evidenceLink(label, source) {
+    return /^https?:\/\//i.test(source || "") ? <a href={source} target="_blank" rel="noopener noreferrer" className="text-purple-300 underline decoration-purple-800 hover:text-purple-200">{label}</a> : <span>{label}</span>;
+  }
+  return <div className="col-span-2 flex flex-wrap gap-x-2 text-[10px] text-gray-500">
+    {profile.uniformKnown ? evidenceLink(profile.tempoUniform ? "Tempo jersey verified" : "Pictured jersey: " + (profile.evidence.depictedTeam || "not Tempo"), profile.uniformSourceUrl) : <span>Jersey not verified</span>}
+    {profile.rookieKnown && evidenceLink(profile.rookie ? "Rookie verified" : "Non-rookie verified", profile.rookieSourceUrl)}
+  </div>;
+}
 function useCatalogRevision() {
   var [revision, setRevision] = useState(0);
   useEffect(function() {
@@ -641,6 +675,20 @@ function TylerBlackTracker() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [copyCardId, setCopyCardId] = useState(null);
   const [catalogScope, setCatalogScope] = useState("checklist");
+  const [tempoFocus, setTempoFocus] = useState("primary");
+  const [tempoWants, setTempoWants] = useState(null), [tempoWantsError, setTempoWantsError] = useState("");
+  useEffect(function() {
+    var generation=0,disposed=false;
+    async function readWants() {
+      var request=++generation,ownerId=window.trackerAuth?.userId && window.trackerAuth.userId();
+      setTempoWants(null);setTempoWantsError("");
+      if (trackerMode !== "wnba" || !window.trackerAuth?.isOwner()) return;
+      try { var result=await window.trackerPrivateStore.load("tempo-wants-v1");if(disposed || request!==generation || ownerId!==(window.trackerAuth?.userId && window.trackerAuth.userId()))return;if(!result.ok)throw Error(result.error || "Reload to retry.");setTempoWants(result.value || {wants:{},evidence:{},heldAliases:{}}); }
+      catch(error) { if(!disposed && request===generation)setTempoWantsError(error.message); }
+    }
+    readWants();window.addEventListener("authchange",readWants);
+    return function(){disposed=true;generation++;window.removeEventListener("authchange",readWants);};
+  }, [trackerMode,isOwner]);
   // Collection: filter to a single WNBA player. null = all. Hidden/unused in TB mode.
   const [filterPlayer, setFilterPlayer] = useState(null);
   // Collection: filter by extracted color/parallel keyword. null = all.
@@ -1496,35 +1544,46 @@ function TylerBlackTracker() {
     const notOwned1of1 = total1of1 - owned1of1;
     return { ...window.CopyInventory.countCards(collectionViews), owned1of1, total1of1, notOwned1of1, forSale, dupeTransit, dupeSale, dupeComc, notSynced, totalSpent, recordedCosts: window.TrackerMarket.summarizeAmounts(recordedCosts) };
   }, [statuses, cardDetails, copySummaries, forSaleFlags, customEditVer, needsSync]);
+  const tempoProfileEnabled = trackerMode === "wnba" && !!window.TempoProfile;
+  const tempoFocusCounts = useMemo(function() {
+    if (!tempoProfileEnabled) return null;
+    var counts=window.TempoProfile.counts(ALL_CARDS.filter(function(card) { return !card.isTestCard && !HIDDEN_DUPES.has(card.id); }));
+    if(tempoWants)counts.wanted=ALL_CARDS.filter(function(card){return !card.isTestCard && !!tempoWants.wants?.[card.id];}).length;
+    return counts;
+  }, [trackerMode, tempoProfileEnabled, customEditVer, tempoWants]);
+  const collectionFocusCards = useMemo(function() {
+    return tempoProfileEnabled ? ALL_CARDS.filter(function(card) { return tempoFocus === "wanted" ? !!tempoWants?.wants?.[card.id] : window.TempoProfile.matches(card, tempoFocus); }) : ALL_CARDS;
+  }, [trackerMode, tempoProfileEnabled, tempoFocus, customEditVer, tempoWants]);
+  const tempoFocusLabel = {primary:"Primary",all:"All cards",uniform:"Tempo jersey",rookies:"Rookies",other:"Outside Primary",unverified:"Jersey unverified",wanted:"TCDB Wantlist"}[tempoFocus];
   // Smart filters: each dropdown only shows options that are still valid given the OTHER active filters.
   // years respects player+product (so picking a player narrows the year dropdown to that player's cards)
   const years = useMemo(() => {
-    var cards = ALL_CARDS;
+    var cards = collectionFocusCards;
     if (filterPlayer) cards = cards.filter(c => c.player === filterPlayer);
     if (filterProduct !== "all") cards = cards.filter(c => c.product === filterProduct);
     return [...new Set(cards.map(c => cardYear(c) || c.product.match(/^\d{4}/)?.[0]).filter(Boolean))].sort();
-  }, [filterPlayer, filterProduct, customEditVer]);
+  }, [filterPlayer, filterProduct, collectionFocusCards, customEditVer]);
   // cardNumbers respects player+year+product
   const cardNumbers = useMemo(() => {
-    var cards = ALL_CARDS;
+    var cards = collectionFocusCards;
     if (filterPlayer) cards = cards.filter(c => c.player === filterPlayer);
     if (filterYear !== "all") cards = cards.filter(c => cardYear(c) === filterYear);
     if (filterProduct !== "all") cards = cards.filter(c => c.product === filterProduct);
     var nums = [...new Set(cards.map(c => c.cardNumber))];
     nums.sort((a, b) => { var an = parseInt(a), bn = parseInt(b); if (!isNaN(an) && !isNaN(bn)) return an - bn; return a.localeCompare(b); });
     return nums;
-  }, [filterPlayer, filterYear, filterProduct, customEditVer]);
+  }, [filterPlayer, filterYear, filterProduct, collectionFocusCards, customEditVer]);
   const filteredProducts = useMemo(() => {
-    let cards = ALL_CARDS;
+    let cards = collectionFocusCards;
     // Use cardYear() so WNBA cards (numeric `year` field) work, not just TB prefix-style
     if (filterYear !== "all") cards = cards.filter(c => cardYear(c) === filterYear);
     if (filterPlayer) cards = cards.filter(c => c.player === filterPlayer);
     return [...new Set(cards.map(c => c.product))].sort();
-  }, [filterYear, filterPlayer, customEditVer]);
+  }, [filterYear, filterPlayer, collectionFocusCards, customEditVer]);
   const filtered = useMemo(() => {
     const s = search.toLowerCase();
     const cn = filterCardNum;
-    return ALL_CARDS.filter(card => {
+    return collectionFocusCards.filter(card => {
       if (HIDDEN_DUPES.has(card.id)) return false;
       if (!matchesCatalogScope(card, catalogScope)) return false;
       const cardStatus = statuses[card.id] || "not_owned";
@@ -1542,19 +1601,19 @@ function TylerBlackTracker() {
       else if (s && !card.product.toLowerCase().includes(s) && !card.cardSet.toLowerCase().includes(s) && !card.cardNumber.toLowerCase().includes(s)) return false;
       return true;
     });
-  }, [statuses, cardDetails, copySummaries, forSaleFlags, tcdbFlags, tcdbFixes, filterYear, filterProduct, filterCardNum, filterStatus, search, filterPlayer, filterColor, catalogScope, customEditVer]);
+  }, [statuses, cardDetails, copySummaries, forSaleFlags, tcdbFlags, tcdbFixes, filterYear, filterProduct, filterCardNum, filterStatus, search, filterPlayer, filterColor, catalogScope, collectionFocusCards, customEditVer]);
   const totalPages = Math.ceil(filtered.length / pageSize);
   const pageCards = filtered.slice(page * pageSize, (page + 1) * pageSize);
-  useEffect(() => { setPage(0); }, [filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer, filterColor, catalogScope, customEditVer]);
-  useEffect(() => { if (filterProduct !== "all" && !filteredProducts.includes(filterProduct)) setFilterProduct("all"); }, [filterYear, filterPlayer]);
+  useEffect(() => { setPage(0); }, [filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer, filterColor, catalogScope, collectionFocusCards, customEditVer]);
+  useEffect(() => { if (filterProduct !== "all" && !filteredProducts.includes(filterProduct)) setFilterProduct("all"); }, [filterYear, filterPlayer, collectionFocusCards]);
   // Auto-reset year if it's no longer valid for the new player
-  useEffect(() => { if (filterYear !== "all" && !years.includes(filterYear)) setFilterYear("all"); }, [filterPlayer, filterProduct]);
+  useEffect(() => { if (filterYear !== "all" && !years.includes(filterYear)) setFilterYear("all"); }, [filterPlayer, filterProduct, collectionFocusCards]);
   // Auto-reset card# if it's no longer valid for current filters
-  useEffect(() => { if (filterCardNum && !cardNumbers.includes(filterCardNum)) setFilterCardNum(""); }, [filterPlayer, filterYear, filterProduct]);
+  useEffect(() => { if (filterCardNum && !cardNumbers.includes(filterCardNum)) setFilterCardNum(""); }, [filterPlayer, filterYear, filterProduct, collectionFocusCards]);
   // Auto-reset color if no longer present in current context
-  useEffect(() => { if (filterColor && !colorFrequencies.some(function(e){return e[0]===filterColor;})) setFilterColor(null); }, [filterPlayer, filterYear, filterProduct]);
+  useEffect(() => { if (filterColor && !colorFrequencies.some(function(e){return e[0]===filterColor;})) setFilterColor(null); }, [filterPlayer, filterYear, filterProduct, collectionFocusCards]);
   // Reset focus when page/filters change
-  useEffect(function() { setFocusIdx(-1); }, [page, filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer]);
+  useEffect(function() { setFocusIdx(-1); }, [page, filterYear, filterProduct, filterCardNum, filterStatus, search, pageSize, filterPlayer, collectionFocusCards]);
   // Build the WNBA player list for filter chips. Derived from actual cards in DB so
   // anyone with at least one card appears (including waived / inactive / non-roster
   // players). TEMPO_ROSTER is consulted only to look up display names.
@@ -1562,14 +1621,15 @@ function TylerBlackTracker() {
     if (trackerMode !== "wnba") return [];
     var roster = (typeof window !== "undefined" && window.TEMPO_ROSTER) ? window.TEMPO_ROSTER : {};
     var keysSeen = {};
-    ALL_CARDS.forEach(function(card) {
+    collectionFocusCards.forEach(function(card) {
       if (card.player && !keysSeen[card.player]) keysSeen[card.player] = true;
     });
     return Object.keys(keysSeen).map(function(k) {
       var name = (roster[k] && roster[k].name) ? roster[k].name : (k.charAt(0).toUpperCase() + k.slice(1));
       return { key: k, name: name, last: name.split(" ").pop() };
     }).sort(function(a, b) { return a.last.localeCompare(b.last); });
-  }, [trackerMode]);
+  }, [trackerMode, collectionFocusCards]);
+  useEffect(function() { if (trackerMode === "wnba" && filterPlayer && !collectionPlayerList.some(function(player) { return player.key === filterPlayer; })) setFilterPlayer(null); }, [trackerMode, filterPlayer, collectionPlayerList]);
   // Lookup map for fast player-name resolution in card rows
   const playerNameByKey = useMemo(function() {
     if (typeof window === "undefined" || !window.TEMPO_ROSTER) return {};
@@ -1580,7 +1640,7 @@ function TylerBlackTracker() {
   // Color slicer: compute keyword frequency from cards matching all OTHER filters
   // (excluding the color filter itself, so the chips reflect what's available to pick).
   const colorFrequencies = useMemo(function() {
-    var ctx = ALL_CARDS.filter(function(c) {
+    var ctx = collectionFocusCards.filter(function(c) {
       if (HIDDEN_DUPES.has(c.id)) return false;
       if (filterPlayer && c.player !== filterPlayer) return false;
       if (filterYear !== "all" && cardYear(c) !== filterYear) return false;
@@ -1594,7 +1654,7 @@ function TylerBlackTracker() {
       });
     });
     return Object.entries(freq).sort(function(a, b) { return b[1] - a[1]; });
-  }, [filterPlayer, filterYear, filterProduct, statuses]);
+  }, [filterPlayer, filterYear, filterProduct, statuses, collectionFocusCards]);
   useEffect(function() { if (!storageDiag) return; var t = setTimeout(function() { setStorageDiag(""); }, 5000); return function() { clearTimeout(t); }; }, [storageDiag]);
   // Auto-scroll focused card into view
   useEffect(function() {
@@ -1656,6 +1716,8 @@ function TylerBlackTracker() {
     {id:"catalog",label:"Catalogue",color:"purple",tbOnly:true},
     {id:"gallery",label:"Gallery",color:"amber"},
     {id:"copies",label:"Copies",color:"cyan",ownerOnly:true},
+    {id:"autographs",label:"IP autos",color:"purple",ownerOnly:true},
+    {id:"receipts",label:"Receipts",color:"cyan",ownerOnly:true},
     {id:"lookup",label:"Lookup",color:"purple"},
     {id:"detailed",label:"Detailed",color:"emerald"},
     {id:"summary",label:"Summary",color:"cyan"},
@@ -1680,6 +1742,7 @@ function TylerBlackTracker() {
         <div className="flex items-center gap-1.5">
           <span className="font-black tracking-tight whitespace-nowrap" style={{color: trackerMode === "wnba" ? "#a855f7" : "#FFC52F", fontSize:"clamp(13px,1.8vw,18px)"}}>{trackerMode === "wnba" ? "TORONTO TEMPO" : "TYLER BLACK"}</span>
           {trackerMode === "wnba" && window.Tempo2026 && <details className="relative text-[10px] text-purple-300"><summary className="cursor-pointer whitespace-nowrap" title="2026 checklist coverage">2026 coverage</summary><div className="absolute left-0 top-5 w-72 max-w-[85vw] p-2 rounded border border-purple-800 bg-slate-950 text-slate-300 z-50">{window.Tempo2026.coverageNote}</div></details>}
+          {trackerMode === "wnba" && <span className="text-gray-500 text-[9px]" title="Totals across the full Tempo collection">Overall</span>}
           <div className="flex-1 rounded-full h-1.5 overflow-hidden min-w-8 max-w-24" style={{background:"#1a2d4a"}}>
             <div className="h-full flex">
               <button 
@@ -1762,6 +1825,7 @@ function TylerBlackTracker() {
             {isOwner && (
               <button
                 onClick={function() {
+                  if (privatePanelHasEdits()) { setSaveToast("Save or cancel the open autograph / receipt edit before switching collections."); return; }
                   if (typeof window !== "undefined" && window.setMode) {
                     window.setMode(trackerMode === "tb" ? "wnba" : "tb");
                   }
@@ -1809,7 +1873,9 @@ function TylerBlackTracker() {
       </div>
       {/* SCROLLABLE CONTENT */}
       <div className="flex-1 flex flex-col overflow-hidden" style={{padding:"clamp(2px,0.3vw,6px) clamp(4px,0.6vw,12px)"}}>
-        {activeTab === "collection" ? (
+        {isOwner && window.AutographPanel && <div className={activeTab === "autographs" ? "flex-1 min-h-0 overflow-auto" : "hidden"}><window.AutographPanel key={trackerMode} scope={trackerMode === "wnba" ? "tempo" : "tb"} cards={ALL_CARDS} statuses={statuses} details={cardDetails} copyInventory={copyInventory} inventoryReady={copyStorage.ready} inventoryError={copyStorage.error} onRefreshInventory={refreshCopyInventory} isOwner={isOwner} active={activeTab === "autographs"}/></div>}
+        {isOwner && window.PurchaseReceiptsPanel && <div className={activeTab === "receipts" ? "flex-1 min-h-0 overflow-auto" : "hidden"}><window.PurchaseReceiptsPanel key={trackerMode} scope={trackerMode === "wnba" ? "tempo" : "tb"} cards={ALL_CARDS} isOwner={isOwner} active={activeTab === "receipts"}/></div>}
+        {activeTab === "autographs" || activeTab === "receipts" ? null : activeTab === "collection" ? (
         <div className="mx-auto flex-1 flex flex-col min-h-0 w-full" style={{maxWidth:"min(100%, 1800px)"}}>
         {/* COLLECTION TAB */}
         <div className="flex items-center justify-between mb-1">
@@ -1859,6 +1925,7 @@ function TylerBlackTracker() {
             <button onClick={function() { if (confirm("Mark all " + stats.notSynced + " cards as synced to TCDB?")) markAllSynced(); }} className="px-2 py-0 rounded bg-pink-900/50 hover:bg-pink-800/60 text-pink-300 border border-pink-800/40 ml-2 flex-shrink-0">Mark All Synced</button>
           </div>
         )}
+        {tempoProfileEnabled && <TempoFocusSelect value={tempoFocus} onChange={setTempoFocus} counts={tempoFocusCounts} wants={tempoWants} wantsError={tempoWantsError}/>}
         {/* WNBA-only: player filter chip row. Single click to filter Collection to one player. */}
         {trackerMode === "wnba" && collectionPlayerList.length > 0 && (
           <div className="flex flex-wrap gap-1 items-center mb-1 pb-1" style={{borderBottom:"1px solid #1a2d4a"}}>
@@ -1936,7 +2003,7 @@ function TylerBlackTracker() {
         </div>
         {/* Results toolbar */}
         <div className="flex items-center justify-between mb-0.5" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
-          <span className="text-gray-500">{filtered.length} shown {saving && <span className="text-yellow-400 ml-1">saving...</span>}</span>
+          <span className="text-gray-500">{filtered.length} shown{tempoProfileEnabled && <span className="text-purple-300 ml-1">· {tempoFocusLabel}</span>} {saving && <span className="text-yellow-400 ml-1">saving...</span>}</span>
           <div className="flex gap-1">
             <button onClick={function(){ var urls = []; var seen = {}; filtered.slice(0, 30).forEach(function(c){ var u = tcdbUrl(c); if (u !== TCDB_PLAYER && !seen[u]) { seen[u] = true; urls.push(u); }}); urls.forEach(function(u){window.open(u, "_blank");}); }} className="px-1.5 py-0 bg-cyan-950/60 border border-cyan-800 text-cyan-400 rounded hover:bg-cyan-900/60">TCDB</button>
             <button onClick={function(){ if (superSearchMode) { filtered.slice(0, 30).forEach(function(c){ ebayUrlsSuper(c).forEach(function(url){ window.open(url, "_blank"); }); }); } else { filtered.slice(0, 30).forEach(function(c){window.open(ebayUrl(c), "_blank");}); } }} className="px-1.5 py-0 bg-yellow-950/60 border border-yellow-800 text-yellow-400 rounded hover:bg-yellow-900/60">eBay</button>
@@ -1950,6 +2017,7 @@ function TylerBlackTracker() {
             var details = cardDetails[card.id] || {};
             var isExpanded = expandedCard === card.id;
             var copySummary = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+            var tempoProfile = tempoProfileEnabled ? window.TempoProfile.classify(card) : null;
             var displayStatus = copySummary.owned ? "owned" : copySummary.inTransit ? "in_transit" : status;
             var cfg = STATUS_CONFIG[displayStatus];
             var copyLocations = copySummary ? Object.keys(copySummary.locations).filter(function(location) { return location !== "unknown" && copySummary.locations[location] > 0; }).map(function(location) { return window.CopyInventory.LOCATIONS[location] + " " + copySummary.locations[location]; }).join(" · ") : "";
@@ -1979,6 +2047,8 @@ function TylerBlackTracker() {
                       <span className="text-gray-300 truncate">{card.cardSet}</span>
                     )}
                     {sspBadge(card.cardSet)}{catalogBadge(card)}
+                    {tempoProfile && tempoProfile.tempoUniform && <span className="rounded bg-purple-950 px-1 text-purple-200 text-[8px] whitespace-nowrap" title="Tempo jersey verified from card image; expand for source">Tempo</span>}
+                    {tempoProfile && tempoProfile.rookie && <span className="rounded bg-amber-950 px-1 text-amber-300 text-[8px] whitespace-nowrap" title="Rookie card verified; expand for source">RC</span>}
                     {(card.copies || (details.printRun && details.printRun !== "?")) ? <span className="text-yellow-400 font-black whitespace-nowrap" style={{fontSize:"clamp(9px,1vw,12px)"}}>/{details.printRun && details.printRun !== "?" ? details.printRun : card.copies}</span> : null}
                     {isMissingSN(card, cardDetails) && <span className="text-orange-400 font-bold text-[8px] whitespace-nowrap ml-0.5" title="SN but print run unknown">SN?</span>}
                     {details.serial ? <span className="text-yellow-300 font-black whitespace-nowrap" style={{fontSize:"clamp(9px,1vw,12px)"}}>{"#" + details.serial}</span> : null}
@@ -2023,6 +2093,7 @@ function TylerBlackTracker() {
                 </div>
                 {isExpanded && (
                   <div className="border-t border-gray-800 grid grid-cols-2 gap-1" style={{padding:"clamp(3px,0.4vw,6px) clamp(4px,0.6vw,10px)",fontSize:"clamp(9px,1.1vw,11px)"}} onClick={function(e){e.stopPropagation();}}>
+                    {tempoProfileEnabled && <TempoCardEvidence card={card}/>}
                     <div>
                       <label className="text-yellow-500 font-black" style={{fontSize:"clamp(7px,0.8vw,9px)"}}>Serial # {isMissingSN(card, cardDetails) && <span className="text-orange-400">(SN?)</span>}</label>
                       {(card.copies || isMissingSN(card, cardDetails)) ? <input type="text" value={details.serial || ""} onChange={function(e){updateCardDetail(card.id, "serial", e.target.value);}} placeholder="e.g. 13/25" className="w-full bg-gray-950 border-2 border-yellow-700 rounded px-1.5 py-0.5 text-yellow-300 font-black focus:border-yellow-500 outline-none" /> : <span className="text-gray-700">N/A</span>}
@@ -4780,7 +4851,7 @@ function COMCScannerPanel(props) {
       var line = lines[i].trim();
       // Stop parsing at eBay recommendation/watchlist sections — these have abbreviated data
       // (no bid counts, no listing type) which causes auctions to appear as BIN deals
-      if (/^Inspired by your activity|^Pick up where you left off|^Related Searches$/i.test(line)) { stopParsing = true; }
+      if (/^Inspired by your (?:activity|recent views)|^Pick up where you left off|^Related Searches$|^Recommended for you$|^You (?:may|might) also like$/i.test(line)) { stopParsing = true; }
       if (stopParsing) continue;
       if (line.indexOf("Opens in a new window or tab") === -1) continue;
       var title = line.replace(/Opens in a new window or tab$/, "").trim();
@@ -9540,6 +9611,7 @@ window.addEventListener("error", function(e) {
       useEffect(function() {
         async function open(event) {
           if (!window.trackerAuth.isOwner() || navigationBusy.current) return;
+          if (privatePanelHasEdits()) { setNavigationError("Save or cancel the open autograph / receipt edit before switching collections."); if (!showingCollections.current) history.replaceState(null,"",location.pathname+location.search); return; }
           var sport = event && event.detail && event.detail.sport || collectionRoute() || "racing";
           if (!window.CollectionsUtils.SPORTS.includes(sport)) sport = "racing";
           if (showingCollections.current) { updateSport(sport); return; }

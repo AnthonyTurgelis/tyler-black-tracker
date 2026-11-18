@@ -53,6 +53,7 @@
   }
   var catalogWrites = {};
   var priceHistoryWrites = {};
+  var priceHistoryMemory = {};
   function isPriceHistoryKey(key) { return key === "tb-price-history-v1" || key === "tempo-price-history-v1"; }
   window.storageSyncIssues = {};
 
@@ -521,7 +522,8 @@
             continue;
           }
           if (isPriceHistoryKey(row.key)) {
-            localStorage.setItem(row.key, JSON.stringify(window.PriceHistoryUtils.merge(row.value, localStorage.getItem(row.key))));
+            priceHistoryMemory[row.key]=JSON.stringify(window.PriceHistoryUtils.merge(row.value,priceHistoryMemory[row.key] || localStorage.getItem(row.key)));
+            localStorage.setItem(row.key,priceHistoryMemory[row.key]);
             continue;
           }
           if (row.key === "tb-card-media-v1") {
@@ -569,7 +571,7 @@
       if (!isOwner) throw new Error("Sign in to save price history.");
       var current = await supabase.from(table).select("value, updated_at").eq("key", key).maybeSingle();
       if (current.error) throw new Error(current.error.message || "Could not read current cloud price history.");
-      var merged = helper.merge(current.data && current.data.value, helper.merge(value, localStorage.getItem(key)));
+      var merged = helper.merge(current.data && current.data.value, helper.merge(value, priceHistoryMemory[key] || localStorage.getItem(key)));
       var query;
       if (current.data) {
         if (!current.data.updated_at) throw new Error("Cloud price-history revision is missing. Refresh before saving.");
@@ -578,11 +580,13 @@
       var saved = await query.select("value, updated_at").maybeSingle();
       if (saved.error && saved.error.code !== "23505") throw new Error(saved.error.message || "Could not save price history.");
       if (!saved.error && saved.data) {
-        var cached = helper.merge(saved.data.value, localStorage.getItem(key));
-        localStorage.setItem(key,JSON.stringify(cached));
+        var cached = helper.merge(saved.data.value, priceHistoryMemory[key] || localStorage.getItem(key));
+        var cachedText=JSON.stringify(cached),cacheError="";
+        priceHistoryMemory[key]=cachedText;
+        try {localStorage.setItem(key,cachedText);} catch(error) {cacheError=error.message || "Browser cache quota exceeded.";}
         delete window.storageSyncIssues[key];
         window.dispatchEvent(new CustomEvent("price-history-saved",{detail:{key:key}}));
-        return {cloudSaved:true,value:JSON.stringify(cached)};
+        return {cloudSaved:true,value:cachedText,...(cacheError?{localError:cacheError,localSaved:false}:{})};
       }
       // Another tab won the timestamp comparison, or inserted the first row.
       // Re-read and merge that winner before the next conditional write.
@@ -644,7 +648,12 @@
 
   // ── window.storage API (same interface tracker already uses) ──
   window.storage = {
+    peek(key) {
+      if(isPriceHistoryKey(key) && priceHistoryMemory[key]) return priceHistoryMemory[key];
+      try {return localStorage.getItem(key);} catch(_) {return null;}
+    },
     async get(key) {
+      if(isPriceHistoryKey(key) && priceHistoryMemory[key]) return {key:key,value:priceHistoryMemory[key],shared:false};
       const collectionScope=collectionScopeForKey(key);
       if(collectionScope) {
         if(collectionScope.mode!=="tb" && !isOwner) return null;
@@ -680,8 +689,9 @@
       const collectionScope=collectionScopeForKey(key);
       if(collectionScope) return collectionScope.api.sync(value);
       if (key === "tb-card-media-v1") value = window.TrackerMedia.normalizePublicMedia(value);
-      if (isPriceHistoryKey(key)) value = window.PriceHistoryUtils.merge(localStorage.getItem(key),value);
+      if (isPriceHistoryKey(key)) value = window.PriceHistoryUtils.merge(priceHistoryMemory[key] || localStorage.getItem(key),value);
       if (typeof value !== "string") value = JSON.stringify(value);
+      if(isPriceHistoryKey(key)) priceHistoryMemory[key]=value;
 
       var localSaved = true;
       var localError = "";
@@ -714,6 +724,7 @@
 
     async delete(key) {
       if(collectionScopeForKey(key)) return {key,deleted:false,error:"Change collection entries individually."};
+      if(isPriceHistoryKey(key)) delete priceHistoryMemory[key];
       try { localStorage.removeItem(key); } catch (e) {}
       if (isCloudKey(key)) deleteFromCloud(key);
       return { key: key, deleted: true, shared: false };

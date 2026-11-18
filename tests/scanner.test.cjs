@@ -58,6 +58,23 @@ test('generic listings preserve currency and purchase/market distinction for all
   assert.equal(receipt.price,'10');assert.equal(receipt.rawPrice,'US $10.00');
 });
 
+test('receipt recommendation cards and currencies never become purchase evidence', () => {
+  const text='2026 Panini Prizm WNBA #10 Kiki Rice\nUS $10.00\nInspired by your recent views\n2026 Panini Prizm WNBA #10 Nyara Sabally\nC $90.00';
+  const result=scan.parseListings(text,{cards,roster,source:'eBay',recordType:'purchase'});
+  assert.equal(result.length,1);assert.equal(result[0].subject,'Kiki Rice');
+  assert.equal(result[0].price,'10');assert.equal(result[0].currency,'USD');
+  const f=legacyFunctions(['parseEbaySearchResults']);
+  const legacy=f.parseEbaySearchResults('2021 Bowman #10 Tyler Black Opens in a new window or tab\nUS $10.00\nInspired by your recent views\n2021 Bowman #10 Tyler Black Opens in a new window or tab\nC $90.00');
+  assert.equal(legacy.length,1);
+});
+
+test('receipt recommendations are skipped while the later order totals remain available', () => {
+  const text='Your order details\n2026 Panini Prizm WNBA #10 Kiki Rice\nPrice: US $12.51\nPopular in your interests\n2026 Panini Prizm WNBA #10 Nyara Sabally\nC $16.12\nSponsored items to complement your purchase\n2026 Panini Prizm WNBA #10 Kiki Rice Gold /10\nC $82.71\nOrder total:\nSubtotal US $12.51\nShipping US $6.00\nSales tax US $1.12\nTotal in USD US $19.63\nTotal charged to C $29.00';
+  const result=scan.parseListings(text,{cards,roster,source:'eBay',recordType:'purchase'});
+  assert.equal(result.length,1);assert.equal(result[0].price,'12.51');assert.equal(result[0].currency,'USD');
+  assert.match(result[0].currencyText,/Order total:/);assert.doesNotMatch(result[0].currencyText,/82\.71|16\.12/);
+});
+
 test('legacy eBay parses prefixed CAD/USD and keeps mixed shipping totals separate', () => {
   const f=legacyFunctions(['parseEbaySearchResults']);
   const result=f.parseEbaySearchResults('Ship to Canada\n2021 Bowman #10 Tyler Black Opens in a new window or tab\nUS $10.00\nC $5.00 shipping\n2021 Bowman #10 Tyler Black Opens in a new window or tab\nC $15.00\nC $2.00 shipping');
