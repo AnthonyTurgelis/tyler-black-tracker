@@ -108,3 +108,17 @@ test('invalid cloud payloads fail closed; labels preserve explicit currencies an
  assert.equal(U.money(null),'Not stated');assert.equal(U.safeUrl('javascript:alert(1)'),'');assert.equal(U.safeUrl('https://user:password@example.test'),'');
  assert.equal(U.safeUrl('https://mail.google.com/mail/u/#all/example'),'https://mail.google.com/mail/u/#all/example');
 });
+
+test('COMC proof and item links preserve their platform; unknown numeric IDs are not eBay items',()=>{
+ const comc={platform:'COMC',itemId:'123456789',receipt:{sourceUrl:'https://www.comc.com/item/123456789',events:[{eventType:'purchase',sourceUrl:'https://www.comc.com/item/123456789'}]}};
+ assert.deepEqual(clone(U.itemLink(comc)),{label:'COMC item',url:'https://www.comc.com/item/123456789'});
+ assert.equal(U.proofLabel(U.receiptSources(comc)[0].sourceUrl),'COMC proof');
+ assert.equal(U.itemLink({platform:'eBay',itemId:'987654321'}).url,'https://www.ebay.com/itm/987654321');
+ assert.equal(U.itemLink({itemId:'123456789'}),null);
+ assert.equal(U.itemLink({platform:'COMC',itemId:'123?x=1'}),null);
+ assert.equal(U.proofLabel('https://mail.google.com/mail/u/#all/example'),'Email proof');
+ assert.equal(U.proofLabel('https://comc.com.evil.test/example'),'Source proof');
+ assert.equal(U.receiptSources({receipt:{sourceUrl:comc.receipt.sourceUrl}}).length,1);
+ assert.equal(U.receiptSources({receipt:{sourceUrl:'javascript:alert(1)',events:[]}}).length,0);
+ assert.equal(comc.receipt.events[0].eventType,'purchase');
+});

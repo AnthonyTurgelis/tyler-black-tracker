@@ -51,51 +51,122 @@
     });
     return candidates.length === 1 ? {card:candidates[0],score:100,subjectVerified:true} : null;
   }
+  function titleLine(line, options) {
+    line=String(line||'').trim();
+    if(!/\b(?:19|20)\d{2}(?:-\d{2})?\s+\S/.test(line)||/^(?:order\s+(?:date|total)|(?:sale|purchase|sold|end|delivery)?\s*date|delivered|expected|estimated|ship(?:ping|ped)?)\b/i.test(line))return false;
+    return subjects(line,options.cards,options.roster).length>0 || /\b(?:topps|panini|bowman|donruss|prizm|national treasures|flawless|impeccable|leaf|upper deck|fleer|parkhurst|parkside|press pass|traks|action packed|score|finest|hoops|select|metal|allen.*ginter|stadium club)\b/i.test(line) || /#\S+|Opens in a new window or tab|\b(?:autographs?|refractors?|rookie|trading card|RC|PSA|BGS|SGC)\b/i.test(line);
+  }
+  function safeSourceUrl(value) {try {var u=new URL(String(value||''));return /^https?:$/.test(u.protocol)&&!u.username&&!u.password?u.href:'';}catch(_){return '';}}
+  function metadata(p,block,options) {
+    options=options||{};block=String(block||'');
+    function fieldIn(value,re){var m=String(value||'').match(re);return m?m[1].trim():'';}
+    function field(re){return fieldIn(block,re);}
+    var pageOrders=Array.from(String(options.fullText||'').matchAll(/Order\s*(?:number|ID|#)\s*:?\s*([A-Za-z0-9][A-Za-z0-9-]*)/gi)).map(function(m){return m[1];}),uniqueOrders=Array.from(new Set(pageOrders)),page=uniqueOrders.length===1?String(options.fullText||''):'';
+    p.account=p.account || field(/(?:^|\n)\s*(?:buyer account|purchased as|account|username)\s*:\s*([^\n]+)/i) || options.account || '';
+    p.orderNum=p.orderNum || field(/Order\s*(?:number|ID|#)\s*:?\s*([A-Za-z0-9][A-Za-z0-9-]*)/i) || (page?uniqueOrders[0]:'');
+    p.itemUrl=safeSourceUrl(p.itemUrl) || safeSourceUrl(field(/(https?:\/\/(?:www\.)?(?:ebay\.[^\s/]+\/itm\/(?:[^\s/]+\/)?\d+|comc\.com\/item\/\d+)[^\s]*)/i));
+    p.sourceItemId=p.sourceItemId || p.itemId || field(/(?:^|\n)\s*(?:eBay\s+|COMC\s+)?Item\s*(?:ID|number|#)\s*:?\s*(\d+)/i) || (p.itemUrl.match(/(?:\/item\/|\/itm\/(?:[^/?]+\/)?)(\d+)/)||[])[1] || '';
+    p.itemId=p.sourceItemId;
+    p.seller=p.seller&&p.seller!==p.source?p.seller:field(/(?:^|\n)\s*(?:sold by|seller|purchased from)\s*[:\t]\s*([^\n]+)/i);
+    if(!p.seller&&page)p.seller=fieldIn(page,/(?:^|\n)\s*(?:sold by|seller|purchased from)\s*[:\t]\s*([^\n]+)/i);
+    if(!p.quantity){var quantity=field(/(?:^|\n)\s*(?:quantity purchased|purchased quantity|quantity|qty)\s*[:x]\s*(\d+)\b/i);if(quantity)p.quantity=quantity;}
+    p.date=p.date || field(/\b(?:Order date|Purchase date|Date purchased|Date sold|Sale date|End date|Date)\s*:\s*([^\n]+?)(?=Order total|Order number|$)/im);
+    if(!p.date){p.rawEventDate=fieldIn(block,/(?:^|\n)\s*(?:Time placed|Order date|Purchase date)\s*[:\t]\s*([^\n]+)/i)||fieldIn(page,/(?:^|\n)\s*(?:Time placed|Order date|Purchase date)\s*[:\t]\s*([^\n]+)/i);p.date=p.rawEventDate.replace(/\s+at\s+.*$/i,'');}
+    if(!p.orderTotal){var pageTotal=fieldIn(block,/(?:^|\n)\s*Order total\s*[:\t]\s*([^\n]+)/i)||fieldIn(page,/(?:^|\n)\s*Order total\s*[:\t]\s*([^\n]+)/i),totalMoney=money.parseMoney(pageTotal);if(totalMoney){p.orderTotal=totalMoney;p.rawOrderTotal=pageTotal;}}
+    if(p.orderNum&&p.recordType==='listing'&&/Time placed|Order date/i.test(block+'\n'+page))p.recordType='purchase';
+    if(p.recordType==='purchase'&&p.orderTotal&&!p.itemPriceLabelled&&p.price!==''&&Number(p.price)===p.orderTotal.amount)p.priceBasis='order_total';
+    p.eventDate=p.date;
+    p.condition=p.condition || field(/(?:^|\n)\s*Condition\s*:\s*([^\n]+)/i) || field(/\b(NM or Better|Near Mint(?: or Better)?|Mint|Excellent|Ungraded|Pre-Owned|Used)\b/i);
+    var grade=(p.rawSet+'\n'+block).match(/\b(PSA|BGS|SGC|CGC|CSG)\s+(10|[1-9](?:\.5)?)(?:\s+(10|[1-9](?:\.5)?))?\b/i);
+    if(!p.grading&&grade)p.grading={company:grade[1].toUpperCase(),cardGrade:grade[2],...(grade[3]?{autoGrade:grade[3]}:{})};
+    if(p.grading){var cert=field(/(?:cert(?:ification)?(?: number| no\.?| #)?|certificate)\s*[:#]\s*([A-Za-z0-9-]+)/i);if(cert)p.grading={...p.grading,certNumber:cert};}
+    var ship=block.split(/\r?\n/).find(function(line){return /shipping|postage/i.test(line)&&!/(?:ships? to|shipping address|shipping country|ships? from)/i.test(line)&&(/free/i.test(line)||money.parseMoney(line));});
+    if(ship){var paid=money.parseMoney(ship);p.shipping=ship.trim();if(/free\s+(?:shipping|postage)/i.test(ship)){p.shippingNum=0;p.shippingCurrency=p.currency||'UNKNOWN';}else if(paid){p.shippingNum=paid.amount;p.shippingCurrency=paid.currency;}}
+    var financialText=p.orderNum?block+'\n'+page:'';
+    if(financialText&&p.shippingNum==null){var orderShipping=fieldIn(financialText,/(?:^|\n)Shipping\s*[:\t\n]\s*([^\n]+)/i),shippingMoney=money.parseMoney(orderShipping);if(shippingMoney){p.shippingNum=shippingMoney.amount;p.shippingCurrency=shippingMoney.currency;p.shippingScope='order';p.shipping=orderShipping;}}
+    if(financialText){var taxText=fieldIn(financialText,/(?:^|\n)(?:Sales )?Tax\*?\s*[:\t\n]\s*([^\n]+)/i),tax=money.parseMoney(taxText);if(tax)p.orderTax={...tax,raw:taxText};
+      var charged=fieldIn(financialText,/(?:^|\n)(?:Charged|Total paid|Payment(?: info| amount| total)?)\s*[:\t\n]\s*([^\n]+)/i),settlement=money.parseMoney(charged);if(settlement)p.settlement={...settlement,raw:charged,basis:'order_payment'};
+      var rate=financialText.split(/\r?\n/).find(function(line){return /exchange rate/i.test(line)&&line.includes('=');});if(rate){var rates=rate.slice(rate.lastIndexOf(':')+1).split('='),from=money.parseMoney(rates[0]),to=money.parseMoney(rates[1]);p.exchangeRate={raw:rate,...(from&&to?{fromAmount:from.amount,fromCurrency:from.currency,toAmount:to.amount,toCurrency:to.currency}:{})};}}
+    if(p.recordType==='purchase')p.requiresQuantityReview=!/^\d+$/.test(String(p.quantity||''))||Number(p.quantity)<1||Number(p.quantity)>1||/\b(?:lot|bundle|set of)\b/i.test(p.rawSet);
+    p.kind=p.kind || (p.recordType==='purchase'?'purchase':p.recordType==='sold'?'sold':p.listingType==='auction'?'current_bid':'asking');
+    p.priceBasis=p.priceBasis || 'item';p.originalPriceBasis=p.originalPriceBasis || p.priceBasis;p.needsIdentityReview=p.subjectAmbiguous;
+    var applied=money.apply(p,{text:options.fullText||block,fallbackCurrency:options.fallbackCurrency});
+    if(applied.shippingNum===0&&applied.shippingCurrency==='UNKNOWN')applied.shippingCurrency=applied.currency;
+    applied.needsSourceReview=applied.needsSourceReview===true||applied.isReturn===true;
+    applied.needsReview=applied.currencyEvidence.needsReview||applied.needsIdentityReview||applied.needsSourceReview||!applied.price||applied.priceBasis!=='item';
+    return applied;
+  }
+  function delimitedRows(text, delimiter) {
+    var rows=[],row=[],cell='',quoted=false;
+    for(var i=0;i<text.length;i++){var c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){cell+='"';i++;}else quoted=!quoted;}else if(!quoted&&c===delimiter){row.push(cell);cell='';}else if(!quoted&&(c==='\n'||c==='\r')){if(c==='\r'&&text[i+1]==='\n')i++;row.push(cell);if(row.some(Boolean))rows.push(row);row=[];cell='';}else cell+=c;}
+    if(quoted)throw Error('Unclosed quoted CSV field; no rows were imported.');row.push(cell);if(row.some(Boolean))rows.push(row);return rows;
+  }
+  function parseTable(text,options) {
+    var first=text.split(/\r?\n/)[0],delimiter=first.includes('\t')?'\t':',';
+    if(!/(?:Set Name|Item Title|Title|Description)/i.test(first)||!/(?:Purchase Price|Paid Price|Price|Order Number|Item ID)/i.test(first)||!first.includes(delimiter))return null;
+    function headerKey(value){return norm(value).replace(/ /g,'');}
+    var rows=delimitedRows(text.replace(/^\uFEFF/,''),delimiter),header=rows.shift().map(headerKey),out=[];
+    function read(row,names){for(var n of names){var i=header.indexOf(headerKey(n));if(i>=0&&row[i]!=null&&row[i]!=='')return row[i].trim();}return '';}
+    rows.forEach(function(row){if(row.length!==header.length)throw Error('CSV row width differs from its header; no rows were imported.');
+      var set=read(row,['Set Name']),description=read(row,['Description','Player','Subject']),title=read(row,['Item Title','Title'])||[set,read(row,['Card No','Card Number'])?'#'+read(row,['Card No','Card Number']):'',description].filter(Boolean).join(' '),source=options.source||(set?'COMC':'eBay');
+      var p=parseTitle(title,{cards:options.cards,roster:options.roster,source:source}),parts=set.replace(/^(?:19|20)\d{2}\s+/,'').split(' - ');
+      if(set){p.product=parts.shift();p.variant=parts.filter(function(v){return v!=='[Base]';}).join(' ').replace(/\[Base\]\s*/g,'').trim();}
+      p.cardNo=read(row,['Card No','Card Number'])||p.cardNo;p.cardNoClean=p.cardNo.replace(/\.\d+$/,'');p.serial=read(row,['Serial No','Serial Number'])||p.serial;if(p.serial==='0')p.serial='';p.printRun=read(row,['Qty Manufactured','Print Run'])||p.printRun;
+      var salePrice=read(row,['Sale Price']),purchasePrice=read(row,['Purchase Price','Paid Price']);
+      p.rawPrice=salePrice||purchasePrice||read(row,['Item Price','Price']);var price=money.parseMoney(p.rawPrice);p.price=price&&price.amount!=null&&!price.conflict?String(price.amount):'';
+      p.currency=money.code(read(row,['Currency','Item Currency']));p.currencyText=row.join('\n');p.recordType=salePrice?'sold':options.recordType||(purchasePrice?'purchase':'listing');
+      if(salePrice){p.acquisitionPrice=purchasePrice;p.acquisitionDate=read(row,['Acquisition Date']);p.buyer=read(row,['Purchased By','Buyer']);p.lifecycleStatus='sold';}
+      var returned=read(row,['Is Return']);if(returned)p.isReturn=/^(?:true|yes|1)$/i.test(returned);
+      p.priceBasis='item';p.date=read(row,['Date Purchased','Purchase Date','Order Date','Date Sold','Date']);p.seller=read(row,['Purchased From','Seller']);p.orderNum=read(row,['Order Number','Order ID']);p.itemId=read(row,['Item ID','COMC Item ID']);p.itemUrl=read(row,['Item URL','URL']);
+      if(/^COMC$/i.test(source)&&header.includes('itemid')&&header.includes('datesold')&&(header.includes('purchasedfrom')||header.includes('purchasedby'))){p.dateFormat='MM/DD/YYYY';p.rawEventDate=p.date;}
+      p.quantity=read(row,['Quantity Purchased','Quantity','Qty']);p.account=read(row,['Buyer Account','Account','Username']);p.shipTo=read(row,['Ship To','Shipping Country','Shipping Address']);p.condition=read(row,['Condition']);p.unitIndex=read(row,['Unit Index']);
+      var total=read(row,['Order Total']);if(total)p.orderTotal=money.parseMoney(total);out.push(metadata(p,row.join('\n'),{...options,fullText:text}));
+    });return out;
+  }
   function parseListings(text, options) {
     options = options || {};
     // Receipt recommendations are separate offers. Totals may follow them.
     var recommendationBlock=false;
-    text = String(text || "").split(/\r?\n/).filter(function(line){
+    text = String(text || '').split(/\r?\n/).filter(function(line){
       if (/^\s*(?:Inspired by your (?:recent views|activity)|Pick up where you left off|Related Searches|Recommended for you|You may also like|You might also like|Popular in your interests|Sponsored items to complement your purchase)\s*$/i.test(line)){recommendationBlock=true;return false;}
       if (recommendationBlock && /^\s*(?:Order total|Order summary|Payment details)\s*:?\s*$/i.test(line))recommendationBlock=false;
       return !recommendationBlock;
-    }).join("\n");
-    var lines = String(text || "").split(/\r?\n/), results = [];
-    var source = options.source || (/Sold Via:|Current Price:/i.test(text) ? "130point" : /Low Price:|Total Quantity:/i.test(text) ? "SportLots" : /Opens in a new window or tab/.test(text) ? "eBay" : /Whatnot|Ships from|Card image/i.test(text) ? "Whatnot" : /COMC|NM or Better/i.test(text) ? "COMC" : "Scan");
-    if (source === "SportLots" && /Low Price:/i.test(text)) return parseSportLots(text, options);
-    if (source === "130point" && /Sale Price:|Current Price:/i.test(text)) return parse130Point(text, options);
+    }).join('\n');
+    var table=parseTable(text,options);if(table)return table;
+    var lines = text.split(/\r?\n/), results = [];
+    var source = options.source || (/Sold Via:|Current Price:/i.test(text) ? '130point' : /Low Price:|Total Quantity:/i.test(text) ? 'SportLots' : /Opens in a new window or tab|Order number:|ebay\./i.test(text) ? 'eBay' : /Whatnot|Ships from|Card image/i.test(text) ? 'Whatnot' : /COMC|NM or Better/i.test(text) ? 'COMC' : 'Scan');
+    if (source === 'SportLots' && /Low Price:/i.test(text)) return parseSportLots(text, options);
+    if (source === '130point' && /Sale Price:|Current Price:/i.test(text)) return parse130Point(text, options);
     for (var i = 0; i < lines.length; i++) {
-      var line = lines[i].trim();
-      if (!line || !/\b(?:19|20)\d{2}\b/.test(line)) continue;
-      var parts = line.split("|"), isPipe = parts.length >= 3;
-      var title = (isPipe ? parts[0] : line).replace(/Opens in a new window or tab\s*$/, "").trim();
-      if (!isPipe && !subjects(title,options.cards,options.roster).length) {
-        for (var look = 1; look <= 2 && i + look < lines.length; look++) {
-          if (/\b(?:19|20)\d{2}\b/.test(lines[i + look])) break;
-          if (subjects(lines[i + look],options.cards,options.roster).length) { title += " " + lines[i + look].trim(); break; }
-        }
-      }
-      var p = parseTitle(title, {cards:options.cards,roster:options.roster,source:source});
-      if (!p.subject) continue;
-      var rawPrice = isPipe ? parts[1].trim() : "", block = [line];
-      if (!isPipe) {
-        var inline = money.parseMoney(line);
-        if (inline && inline.amount != null) rawPrice = line;
-        for (var j = i + 1; j < Math.min(i + 16, lines.length); j++) {
-          var next = lines[j].trim();
-          if (/Opens in a new window or tab/.test(next) || (/\b(?:19|20)\d{2}\b/.test(next) && subjects(next,options.cards,options.roster).length)) break;
+      var line=lines[i].trim();if(!titleLine(line,options))continue;
+      var parts=line.split('|'),isPipe=parts.length>=3,title=(isPipe?parts[0]:line).replace(/Opens in a new window or tab\s*$/,'').trim(),block=[line];
+      if(!isPipe){for(var header=i-1;header>=0;header--){if(titleLine(lines[header],options))break;if(/^\s*Time placed\s*[:\t]/i.test(lines[header])){block=lines.slice(header,i).concat(line);break;}}}
+      if(!isPipe&&!subjects(title,options.cards,options.roster).length){for(var look=1;look<=2&&i+look<lines.length;look++){if(titleLine(lines[i+look],options))break;if(subjects(lines[i+look],options.cards,options.roster).length){title+=' '+lines[i+look].trim();break;}}}
+      var p=parseTitle(title,{cards:options.cards,roster:options.roster,source:source}),rawPrice=isPipe?parts[1].trim():'',explicitPrice='',orderTotal='';
+      if(!isPipe){
+        var inline=money.parseMoney(line);if(inline&&inline.amount!=null)rawPrice=line;
+        for(var j=i+1;j<lines.length;j++){
+          var next=lines[j].trim();
+          if(/^Time placed\s*[:\t]/i.test(next))break;
+          if(titleLine(next,options)){
+            if(norm(next)===norm(line)&&/Order (?:number|total)/i.test(block.join('\n'))){block.push(next);continue;}
+            break;
+          }
           block.push(next);
-          if (!rawPrice && !/shipping|delivery|postage|bids?|time left/i.test(next)) { var candidate = money.parseMoney(next); if (candidate && candidate.amount != null) rawPrice = next; }
-          if (/^(?:\d+ bids?|Current Number of Bids:)/i.test(next)) { p.listingType = "auction"; p.bids = (next.match(/\d+/) || [""])[0]; }
+          if(/Order total\s*[:\t]/i.test(next))orderTotal=next.split(/Order total\s*[:\t]/i)[1].split(/Order number|\(Auto-paid\)/i)[0];
+          if(/^(?:unit price|item price|purchase price|paid price|sale price|current bid|current price|price)(?:\s*:\s*|\s+(?=[A-Z]{1,3}\s*\$|\$|£|€))/i.test(next))explicitPrice=next.replace(/^(?:unit price|item price|purchase price|paid price|sale price|current bid|current price|price)\s*:?\s*/i,'');
+          if(!rawPrice&&!/shipping|delivery|postage|bids?|time left|order total|subtotal|sales tax|tax:|charged|exchange rate/i.test(next)){var candidate=money.parseMoney(next);if(candidate&&candidate.amount!=null)rawPrice=next;}
+          if(/^(?:\d+ bids?|Current Number of Bids:)|\bcurrent bid\s*:/i.test(next)){p.listingType='auction';p.bids=(next.match(/\d+/)||[''])[0];}
         }
+        i=j-1;
       }
-      var price = money.parseMoney(rawPrice);
-      p.price = price && price.amount != null ? String(price.amount) : ""; p.rawPrice = rawPrice; p.currencyText = block.join("\n");
-      p.currency = isPipe ? money.code(parts[5]) : "UNKNOWN";
-      p.recordType = options.recordType || (isPipe ? "purchase" : "listing");
-      p.date = isPipe ? (parts[2] || "").trim() : ""; p.orderNum = isPipe ? (parts[3] || "").trim() : "";
-      p.itemUrl = isPipe ? (parts[4] || "").trim() : ""; p.quantity = isPipe ? (parts[6] || "").trim() : "";
-      results.push(money.apply(p, {text:text,fallbackCurrency:options.fallbackCurrency}));
+      p.recordType=options.recordType || (isPipe||/Order (?:number|total)\s*:/i.test(block.join('\n'))?'purchase':/\b(?:Sold on|Sale Price:)\b/i.test(block.join('\n'))?'sold':'listing');
+      if(explicitPrice)rawPrice=explicitPrice;p.itemPriceLabelled=!!explicitPrice;
+      var total=money.parseMoney(orderTotal),price=money.parseMoney(rawPrice);p.priceBasis='item';
+      if(p.recordType==='purchase'&&total&&!explicitPrice&&(!price||price.amount===total.amount)){rawPrice=orderTotal;price=total;p.priceBasis='order_total';}
+      p.price=price&&price.amount!=null&&!price.conflict?String(price.amount):'';p.rawPrice=rawPrice;p.currencyText=block.join('\n');p.currency=isPipe?money.code(parts[5]):'UNKNOWN';if(total){p.orderTotal=total;p.rawOrderTotal=orderTotal;}
+      p.date=isPipe?(parts[2]||'').trim():'';p.orderNum=isPipe?(parts[3]||'').trim():'';p.itemUrl=isPipe?(parts[4]||'').trim():'';p.quantity=isPipe?(parts[6]||'').trim():'';p.account=isPipe?(parts[7]||'').trim():'';
+      results.push(metadata(p,block.join('\n'),{...options,fullText:text}));
     }
     return results;
   }
@@ -103,7 +174,7 @@
     var lines = String(text || "").split(/\r?\n/), results = [];
     for (var i = 0; i < lines.length; i++) {
       var cardLine = lines[i].trim();
-      if (!/^#\S+\s+/.test(cardLine) || subjects(cardLine,options.cards,options.roster).length !== 1) continue;
+      if (!/^#\S+\s+/.test(cardLine)) continue;
       var setLine = "";
       for (var j = i - 1; j >= Math.max(0,i - 7); j--) { if (/^(?:19|20)\d{2}(?:-\d{2})?\s+/.test(lines[j].trim())) { setLine = lines[j].trim(); break; } }
       if (!setLine) continue;
@@ -116,7 +187,7 @@
       p.price = price && price.amount != null && !price.conflict ? String(price.amount) : "";
       p.rawPrice = rawPrice; p.currencyText = block.join("\n"); p.recordType = "listing";
       // Total Quantity is seller availability, never the owner's copy count.
-      results.push(money.apply(p, {text:text,fallbackCurrency:options.fallbackCurrency}));
+      results.push(metadata(p,block.join("\n"),{...options,fullText:text}));
     }
     return results;
   }
@@ -124,11 +195,11 @@
     var lines = String(text || "").split(/\r?\n/), results = [];
     for (var i = 0; i < lines.length; i++) {
       var title = lines[i].trim();
-      if (!/\b(?:19|20)\d{2}\b/.test(title) || subjects(title,options.cards,options.roster).length !== 1) continue;
+      if (!titleLine(title,options)) continue;
       var block = [title], sale = "", current = "", listed = "", date = "";
       for (var j = i + 1; j < lines.length; j++) {
         var line = lines[j].trim();
-        if (/^Sold Via:/.test(line) || (/\b(?:19|20)\d{2}\b/.test(line) && subjects(line,options.cards,options.roster).length)) break;
+        if (/^Sold Via:/.test(line) || titleLine(line,options)) break;
         block.push(line);
         if (/^Sale Price:/i.test(line)) sale = line.replace(/^Sale Price:\s*/i, "");
         if (/^Current Price:/i.test(line)) current = line.replace(/^Current Price:\s*/i, "");
@@ -141,9 +212,10 @@
       p.price = price && price.amount != null && !price.conflict ? String(price.amount) : "";
       p.rawPrice = rawPrice; p.currencyText = block.join("\n"); p.recordType = sale ? "sold" : "listing"; p.date = date;
       p.listingType = /Auction|Current Number of Bids:/i.test(block.join("\n")) ? "auction" : "fixed";
+      p.kind=sale?"sold":p.listingType==="auction"?"current_bid":"asking";
       p._130pt = {forSale:!sale,listPrice:listPrice && listPrice.amount,salePrice:price && price.amount,date:date};
       // A public sale result never becomes this owner's paid receipt.
-      results.push(money.apply(p, {text:text,fallbackCurrency:options.fallbackCurrency}));
+      results.push(metadata(p,block.join("\n"),{...options,fullText:text}));
     }
     return results;
   }

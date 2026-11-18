@@ -145,3 +145,56 @@ test('other collections never inherit Tyler jersey 7 without explicit on-card ev
   assert.equal(TM.jerseyMatches(verified,'',null,null).secondary,true);
   assert.equal(TM.jerseyMatches({serial:'7/99'}).primary,true,'Tyler behavior is unchanged');
 });
+
+test('scoped card IDs remain distinct from numeric IDs across exact photos, candidates, and duplicate groups',()=>{
+  assert.equal(TM.canonicalCardId('7'),7);assert.equal(TM.canonicalCardId('007'),7);assert.equal(TM.canonicalCardId('tcdb:7'),'tcdb:7');
+  assert.equal(TM.canonicalCardId('card:2024%7Cracing'),'card:2024%7Cracing');
+  for(const id of [null,{},true,'','__proto__','tcdb:0',-1,1.5,Number.MAX_SAFE_INTEGER+1])assert.equal(TM.canonicalCardId(id),null);
+  assert.equal(TM.sameCardId('7',7),true);assert.equal(TM.sameCardId('tcdb:7',7),false);assert.equal(TM.sameCardId(null,null),false);
+  const media=TM.normalizePublicMedia({cards:{7:{photos:[{...front,kind:'reference'}]},'tcdb:7':{photos:[{...back,kind:'reference'}]}}});
+  assert.equal(TM.exactVariantPhotos('tcdb:7',media)[0].side,'back');assert.equal(TM.exactVariantPhotos('tcdb:7',media)[0].referenceCardId,'tcdb:7');
+  assert.equal(TM.exactVariantPhotos(7,media)[0].side,'front');assert.deepEqual(TM.exactVariantPhotos('tcdb:8',media),[]);
+  const cards={'tcdb:7':{id:'tcdb:7'},'tcdb:8':{id:'tcdb:8'}};
+  const plan=TM.observationPhotoPlan({cardId:'tcdb:7',identityConfirmed:false,candidateCardIds:['tcdb:7','tcdb:8'],photos:[front]},cards,media);
+  assert.deepEqual(plan.candidates.map(row=>row.card.id),['tcdb:7','tcdb:8']);assert.equal(plan.photos[0].kind,'copy_scan');
+  const confirmed=TM.reviewFlags({cardId:'tcdb:7',candidateCardIds:['tcdb:7'],identityConfidence:'exact_catalogue_identity'});
+  assert.equal(confirmed.identityConfirmed,true);
+  const groups=TM.comcDuplicateGroups({observations:{one:{source:'comc',cardId:'tcdb:7',currentInventory:true,duplicateGroupConfirmed:true,comcGroupCount:2}}});
+  assert.equal(groups[0].cardId,'tcdb:7');
+});
+
+test('private scoped references preserve front/back source metadata and update only the selected exact card',()=>{
+  const initial={version:1,cards:{'tcdb:7':{photos:[{...front,kind:'reference',sourceItemId:'source-7',sourceMetadata:{imageSide:'front'}}],provenance:{source:'TCDB'}},'tcdb:8':{photos:[{...back,kind:'reference'}],futureMetadata:'keep'}},futureField:{keep:true}};
+  const before=JSON.stringify(initial),normalized=TM.normalizeScopedMedia(initial);
+  assert.equal(normalized.cards['tcdb:7'].photos[0].sourceItemId,'source-7');
+  const next=TM.setCardReferences(initial,'tcdb:7',{photos:[...initial.cards['tcdb:7'].photos,{...back,kind:'reference',sourceUrl:'https://example.test/item/7'}]}, {primaryJerseyNumber:null});
+  assert.equal(JSON.stringify(initial),before);assert.deepEqual(next.cards['tcdb:8'],initial.cards['tcdb:8']);assert.deepEqual(next.futureField,initial.futureField);
+  assert.equal(next.cards['tcdb:7'].photos.length,2);assert.equal(next.cards['tcdb:7'].photos[0].referenceCardId,'tcdb:7');
+  assert.deepEqual(next.cards['tcdb:7'].photos[0].sourceMetadata,{imageSide:'front'});assert.deepEqual(next.cards['tcdb:7'].provenance,{source:'TCDB'});
+  assert.throws(()=>TM.setCardReferences(initial,'tcdb:7',{photos:[{...front,kind:'reference',referenceCardId:'tcdb:8'}]}),/different catalog card/);
+  assert.throws(()=>TM.setCardReferences(initial,'tcdb:7',{photos:[front]}),/Copies/);
+  assert.throws(()=>TM.normalizeScopedMedia({...initial,cards:{'bad':{photos:[]}}}),/invalid/);
+  assert.throws(()=>TM.normalizeScopedMedia({version:1,cards:{'tcdb:7':{photos:[{...front,kind:'reference',sourceUrl:'javascript:alert(1)'}]}}}),/HTTPS/);
+  assert.throws(()=>TM.normalizeScopedMedia({version:1,cards:{'tcdb:7':{photos:[{...front,kind:'reference'},{...front,kind:'reference'}]}}}),/repeated/);
+});
+
+test('every sport uses small COMC thumbnails while retaining original side URLs and explicit jersey evidence',()=>{
+  for(const sport of ['Racing','Basketball','Football','Hockey','Soccer','MultiSport','Baseball']){
+    const original='https://img.comc.com/i/'+sport+'/2026/front.jpg?size=original&side=back&id=123';
+    assert.equal(TM.thumbnailUrl({url:original}),original.replace('size=original','size=biggerthumb'));
+    assert.equal(TM.primaryJerseyNumber(sport.toLowerCase()),null);
+  }
+  assert.equal(TM.primaryJerseyNumber('tb'),7);assert.equal(TM.primaryJerseyNumber('racing',null),null);
+  const photo={...front,kind:'reference'},value={photos:[photo],secondaryJerseyNumber:'7',secondaryJerseyEvidence:{photoId:'front',confirmed:true}};
+  const scoped=TM.setCardReferences(null,'tcdb:7',value,{primaryJerseyNumber:null});
+  assert.equal(TM.normalizePublicMedia(scoped,{primaryJerseyNumber:null}).cards['tcdb:7'].secondaryJerseyNumber,'7');
+  assert.equal(TM.jerseyMatches({serial:'7/99'},'',scoped.cards['tcdb:7'],null).secondary,true);
+  assert.equal(TM.jerseyMatches({serial:'7/99'},'',scoped.cards['tcdb:7'],null).primary,false);
+});
+
+test('conflicting source updates visibly require purchase, identity, and serial review without rewriting facts',()=>{
+  const observation={cardId:'tcdb:7',identityConfirmed:true,matchedCopyId:'copy-one',serial:'7/99',needsSourceReview:true,conflictingEvidence:[{conflicts:['cardId','serial','paidPrice'],evidence:{cardId:'tcdb:8',serial:'8/99'}}]};
+  const before=JSON.stringify(observation),flags=TM.reviewFlags(observation);
+  assert.equal(flags.identity,true);assert.equal(flags.identityConfirmed,false);assert.equal(flags.serial,true);assert.equal(flags.purchase,true);
+  assert.equal(JSON.stringify(observation),before);
+});

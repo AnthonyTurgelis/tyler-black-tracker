@@ -43,3 +43,12 @@ test('a residual quantity on a wanted or manually unowned card is not an acquire
  assert.deepEqual(A.slots('tcdb:12',{statuses:{'tcdb:12':'not_owned'},details:{'tcdb:12':{qty:2,wantedQty:2}}}),[]);
  assert.deepEqual(A.slots(7,{statuses:{7:'not_owned'},details:{7:{qty:2}},copyInventory:{}}),[]);
 });
+test('managed string-ID physical copies are used without renumbering historical autograph anchors',()=>{
+ const CI=require('../copy-utils'),id='tcdb:12',ctx={statuses:{[id]:'owned'},details:{[id]:{qty:2,ownedQty:2,sourceItemIds:['item12']}}};
+ ctx.cardDetails=ctx.details;
+ const stock=CI.normalizeState(null),managed=CI.editCopy(stock,id,'legacy:tcdb:12:1',{location:'in_hand',serial:'7/25'},ctx);
+ const ownedContext={...ctx,copyInventory:managed};assert.deepEqual(A.slots(id,ownedContext).map(x=>x.id),['legacy:tcdb:12:1','legacy:tcdb:12:2']);
+ const saved=A.saveRecord(A.empty(),signed({cardId:id,copyId:'legacy:tcdb:12:1'}),ownedContext,now);
+ const sold=CI.editCopy(managed,id,'legacy:tcdb:12:1',{saleStatus:'sold'},ctx);
+ assert.deepEqual(A.slots(id,{...ctx,copyInventory:sold}).map(x=>x.id),['legacy:tcdb:12:2']);assert.equal(A.review(saved,{...ctx,copyInventory:sold})[0].needsCopyReview,true);assert.equal(saved.records['ip:test'].copyId,'legacy:tcdb:12:1');
+});

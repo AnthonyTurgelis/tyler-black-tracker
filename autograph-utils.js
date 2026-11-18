@@ -20,8 +20,8 @@
   function slots(cardId,context){
     if(cardId==null||text(cardId)==='')return [];
     cardId=safeId(cardId);context=context||{};var details=context.details||context.cardDetails||{},statuses=context.statuses||{},d=details[cardId]||{},rows=[];
-    if(context.copyInventory&&/^\d+$/.test(cardId)){
-      rows=copies.getCopiesForCard(context.copyInventory,Number(cardId),statuses,details).filter(function(copy){return copies.isCountedCopy(copy)&&(!copy.unallocated||['owned','in_transit','for_sale'].includes(statuses[cardId]||copy.legacyStatus));});
+    if(context.copyInventory&&copies.canonicalCardId(cardId)!==null){
+      rows=copies.getCopiesForCard(context.copyInventory,copies.canonicalCardId(cardId),statuses,details).filter(function(copy){return copies.isCountedCopy(copy)&&(!copy.unallocated||['owned','in_transit','for_sale'].includes(statuses[cardId]||copy.legacyStatus));});
     }else{
       var q=d.qty!=null&&d.qty!==''?quantity(d.qty):null;
       if(q==null&&(d.ownedQty!=null||d.transitQty!=null))q=(quantity(d.ownedQty)||0)+(quantity(d.transitQty)||0);

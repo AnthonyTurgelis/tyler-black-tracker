@@ -370,6 +370,12 @@
     }
   };
 
+  // Side-sport workflows share the copy/media/price models while every scope
+  // remains a separate owner-private, revision-checked record. Creation is lazy.
+  if (window.CollectionAdapters) window.trackerSportStores = window.CollectionAdapters.create(window.trackerPrivateStore, {
+    CopyInventory:window.CopyInventory, TrackerMedia:window.TrackerMedia, PriceHistoryUtils:window.PriceHistoryUtils
+  });
+
   // Public catalogue references have their own read path so Refresh can replace
   // an old local cache. Copy photos are never supplied to this public store.
   window.trackerMediaStore = {

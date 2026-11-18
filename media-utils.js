@@ -4,6 +4,20 @@
   var KINDS = { own_photo: "Own photo", copy_scan: "My copy scan", reference: "Reference" };
   var KIND_ORDER = { own_photo: 0, copy_scan: 1, reference: 2 };
   function text(value) { return value == null ? "" : String(value).trim(); }
+  function canonicalCardId(value) {
+    if (typeof value === "number") return Number.isSafeInteger(value) && value > 0 ? value : null;
+    if (typeof value !== "string") return null;
+    value = value.trim();
+    if (/^\d+$/.test(value)) { var numeric = Number(value); return Number.isSafeInteger(numeric) && numeric > 0 ? numeric : null; }
+    if (/^tcdb:[1-9]\d*$/.test(value) || /^card:[A-Za-z0-9_.!~*'()%:-]+$/.test(value)) return value;
+    return null;
+  }
+  function sameCardId(a,b) { a=canonicalCardId(a);b=canonicalCardId(b);return a != null && b != null && a === b; }
+  function primaryJerseyNumber(mode, explicit) {
+    if (explicit === null) return null;
+    if (explicit !== undefined) return /^\d{1,3}$/.test(String(explicit)) ? Number(explicit) : null;
+    return !mode || mode === "tb" || mode === "tyler" ? 7 : null;
+  }
   function safeImageUrl(value) {
     try {
       var url = new URL(text(value));
@@ -24,7 +38,7 @@
         side: photo.side === "back" ? "back" : "front", kind: kind,
         sourceUrl: safeImageUrl(photo.sourceUrl), caption: text(photo.caption),
         ...(kind === "copy_scan" && photo.context === "purchase_source" ? {context:"purchase_source"} : {}),
-        ...(kind === "reference" && photo.referenceScope === "exact_variant" && Number.isSafeInteger(Number(photo.referenceCardId)) && Number(photo.referenceCardId) > 0 ? {referenceScope:"exact_variant",referenceCardId:Number(photo.referenceCardId)} : {}) });
+        ...(kind === "reference" && photo.referenceScope === "exact_variant" && canonicalCardId(photo.referenceCardId) != null ? {referenceScope:"exact_variant",referenceCardId:canonicalCardId(photo.referenceCardId)} : {}) });
     });
     return output;
   }
@@ -36,7 +50,7 @@
     try {
       var u = new URL(original);
       if (u.hostname.toLowerCase() === "img.comc.com"
-          && u.pathname.indexOf("/i/Baseball/") === 0
+          && /^\/i\/[^/]+\//.test(u.pathname)
           && ["original", "zoom"].indexOf(u.searchParams.get("size")) >= 0) {
         u.searchParams.set("size", "biggerthumb");
         return u.href;
@@ -70,24 +84,64 @@
     });
     return preferredPhotos(photos);
   }
-  function normalizePublicMedia(input) {
+  function normalizePublicMedia(input, options) {
+    options = options || {};
     if (typeof input === "string") { try { input = JSON.parse(input); } catch (_) { input = {}; } }
     var output = { version: 1, cards: {} };
     Object.entries(input && input.cards || {}).forEach(function(entry) {
-      var id = Number(entry[0]);
-      if (!Number.isSafeInteger(id) || id < 1) return;
+      var id = canonicalCardId(entry[0]);
+      if (id == null) return;
       var photos = normalizePhotos(entry[1] && entry[1].photos, { publicOnly: true });
       var record = entry[1] || {}, item = {photos:photos};
       var evidence = record.secondaryJerseyEvidence || {};
       var secondary = {photos:photos,secondaryJerseyNumber:text(record.secondaryJerseyNumber),secondaryJerseyEvidence:{photoId:text(evidence.photoId),sourceUrl:safeImageUrl(evidence.sourceUrl),note:text(evidence.note),confirmed:evidence.confirmed === true}};
-      if (secondaryEvidence(secondary) != null) { item.secondaryJerseyNumber = secondary.secondaryJerseyNumber; item.secondaryJerseyEvidence = secondary.secondaryJerseyEvidence; }
+      if (secondaryEvidence(secondary,options.primaryJerseyNumber) != null) { item.secondaryJerseyNumber = secondary.secondaryJerseyNumber; item.secondaryJerseyEvidence = secondary.secondaryJerseyEvidence; }
       if (photos.length || item.secondaryJerseyNumber) output.cards[id] = item;
     });
     return output;
   }
+  // Scoped references are private. Preserve source metadata and fail closed on
+  // malformed input so a save cannot silently discard another card's records.
+  function normalizeScopedMedia(input) {
+    if (input == null) return {version:1,cards:{}};
+    if (typeof input === "string") { try {input=JSON.parse(input);} catch (_) {throw Error("Private card photos could not be read. Refresh before saving.");} }
+    if (!input || typeof input !== "object" || Array.isArray(input) || input.version !== 1 || !input.cards || typeof input.cards !== "object" || Array.isArray(input.cards)) throw Error("Private card photos need review. Nothing was replaced.");
+    var output=JSON.parse(JSON.stringify(input));
+    Object.entries(output.cards).forEach(function(entry) {
+      var id=canonicalCardId(entry[0]),record=entry[1],seen=new Set();
+      if(id==null || !record || typeof record !== "object" || Array.isArray(record) || !Array.isArray(record.photos)) throw Error("A card photo record is invalid. Nothing was replaced.");
+      record.photos=record.photos.map(function(photo){
+        if(!photo || photo.kind!=="reference" || !safeImageUrl(photo.url) || photo.sourceUrl && !safeImageUrl(photo.sourceUrl) || photo.side && !["front","back"].includes(photo.side)) throw Error("Card references require valid HTTPS image and source links, labelled front or back.");
+        if(seen.has(safeImageUrl(photo.url))) throw Error("The same image URL is repeated. Keep one reference for each image.");
+        seen.add(safeImageUrl(photo.url));
+        if(photo.referenceCardId != null && !sameCardId(photo.referenceCardId,id)) throw Error("A reference image belongs to a different catalog card.");
+        return Object.assign({},photo);
+      });
+    });
+    return output;
+  }
+  function setCardReferences(input, cardId, value, options) {
+    options=options || {};cardId=canonicalCardId(cardId);
+    if(cardId==null) throw Error("Choose an exact catalog card before saving references.");
+    var output=normalizeScopedMedia(input),previous=output.cards[cardId] || {photos:[]};
+    var photos=(value && value.photos || []).filter(function(photo){return text(photo.url);}).map(function(photo){
+      if(photo.kind && photo.kind!=="reference")throw Error("Keep physical-copy photos in Copies; card references must be labelled Reference.");
+      if(photo.referenceCardId != null && !sameCardId(photo.referenceCardId,cardId))throw Error("A reference image belongs to a different catalog card.");
+      return Object.assign({},photo,{kind:"reference",referenceScope:"exact_variant",referenceCardId:cardId});
+    });
+    var next=Object.assign({},previous,{photos:photos});
+    var number=text(value && value.secondaryJerseyNumber),evidence=value && value.secondaryJerseyEvidence || {};
+    if(number) {
+      var candidate={photos:photos,secondaryJerseyNumber:number,secondaryJerseyEvidence:evidence};
+      if(secondaryEvidence(candidate,options.primaryJerseyNumber) == null) throw Error("Confirm the jersey number using a reference photo or an HTTPS evidence link with a note.");
+      next.secondaryJerseyNumber=number;next.secondaryJerseyEvidence=JSON.parse(JSON.stringify(evidence));
+    } else {delete next.secondaryJerseyNumber;delete next.secondaryJerseyEvidence;}
+    output.cards[cardId]=next;
+    return normalizeScopedMedia(output);
+  }
   function exactVariantPhotos(cardId, publicMedia) {
-    cardId = Number(cardId);
-    if (!Number.isSafeInteger(cardId) || cardId < 1) return [];
+    cardId = canonicalCardId(cardId);
+    if (cardId == null) return [];
     var item = publicMedia && publicMedia.cards && publicMedia.cards[cardId];
     return normalizePhotos(item && item.photos,{publicOnly:true}).map(function(photo) {
       return Object.assign({},photo,{referenceScope:"exact_variant",referenceCardId:cardId});
@@ -108,22 +162,23 @@
   function reviewFlags(observation) {
     observation = observation || {};
     var categories = Array.isArray(observation.reviewCategories) ? observation.reviewCategories : [];
-    var candidateIds = Array.from(new Set((observation.candidateCardIds || []).map(Number).filter(function(id){return Number.isSafeInteger(id) && id > 0;})));
+    var sourceConflicts = observation.needsSourceReview ? (observation.conflictingEvidence || []).reduce(function(all,row){return all.concat(row.conflicts || []);},[]) : [];
+    var candidateIds = Array.from(new Set((observation.candidateCardIds || []).map(canonicalCardId).filter(function(id){return id != null;})));
     var exactConfidence = ["exact_normalized_metadata","high_reviewed_alias","high_reviewed_name_match","scan_verified_identity","image_verified","image_reviewed_proof_identity","exact_catalogue_identity","confirmed"].includes(observation.identityConfidence);
-    var identityConfirmed = !!observation.cardId && (!!observation.matchedCopyId || observation.identityConfirmed === true || observation.identityStatus === "confirmed" || observation.identityConfirmed !== false && !observation.identityStatus && !categories.includes("identity") && candidateIds.every(function(id){return id === Number(observation.cardId);}) && exactConfidence);
+    var identityConfirmed = sourceConflicts.indexOf("cardId") < 0 && canonicalCardId(observation.cardId) != null && (!!observation.matchedCopyId || observation.identityConfirmed === true || observation.identityStatus === "confirmed" || observation.identityConfirmed !== false && !observation.identityStatus && !categories.includes("identity") && candidateIds.every(function(id){return sameCardId(id,observation.cardId);}) && exactConfidence);
     var decision = text(observation.reconciliationDecision);
     var copyMatch = !observation.matchedCopyId && !["ignored","split"].includes(observation.disposition);
     return {identity:!identityConfirmed,identityConfirmed:identityConfirmed,copy_match:copyMatch,
       duplicate:categories.includes("duplicate") || observation.duplicateGroupConfirmed === true || ["no_exact_serial_or_comc_date_and_price_match","manual_owned_preserved","legacy_baseline_slot_already_linked","different_serial_requires_copy_review"].includes(decision),
-      serial:categories.includes("serial") || observation.serialConflict === true || decision === "different_serial_requires_copy_review" || !!(observation.reportedSerial || observation.tentativeSerial) && !(observation.serial && credibleSerial(observation)),
+      serial:sourceConflicts.indexOf("serial") >= 0 || categories.includes("serial") || observation.serialConflict === true || decision === "different_serial_requires_copy_review" || !!(observation.reportedSerial || observation.tentativeSerial) && !(observation.serial && credibleSerial(observation)),
       location:categories.includes("location") || !observation.location || observation.location === "unknown",
-      purchase:categories.includes("purchase") || categories.includes("retention") || observation.refundOrCancellationReview === true || observation.retainedCopyStatus === "unresolved"};
+      purchase:observation.needsSourceReview === true || categories.includes("purchase") || categories.includes("retention") || observation.refundOrCancellationReview === true || observation.retainedCopyStatus === "unresolved"};
   }
   function observationPhotoPlan(observation, cardById, publicMedia) {
     observation = observation || {}; cardById = cardById || {};
     var flags = reviewFlags(observation), card = cardById[observation.cardId];
     var confirmed = !!card && flags.identityConfirmed;
-    var ids = confirmed ? [] : Array.from(new Set((observation.candidateCardIds || []).concat(observation.cardId || []).map(Number)));
+    var ids = confirmed ? [] : Array.from(new Set((observation.candidateCardIds || []).concat(observation.cardId || []).map(canonicalCardId).filter(function(id){return id != null;})));
     var sourcePhotos = preferredPhotos(observation.photos).map(function(photo){return photo.kind === "copy_scan" && !observation.matchedCopyId ? Object.assign({},photo,{context:"purchase_source"}) : photo;});
     return {identityConfirmed:confirmed,card:confirmed ? card : null,
       photos:confirmed ? mergePhotos(sourcePhotos,exactVariantPhotos(card.id,publicMedia)) : sourcePhotos,
@@ -178,18 +233,18 @@
     var groups = {};
     Object.values(input && input.observations || {}).forEach(function(observation) {
       if (!observation || String(observation.source).toLowerCase() !== "comc" || observation.currentInventory !== true || observation.duplicateGroupConfirmed !== true) return;
-      var cardId = Number(observation.cardId), count = Number(observation.comcGroupCount);
-      if (!Number.isSafeInteger(cardId) || cardId < 1 || !Number.isSafeInteger(count) || count < 2) return;
+      var cardId = canonicalCardId(observation.cardId), count = Number(observation.comcGroupCount);
+      if (cardId == null || !Number.isSafeInteger(count) || count < 2) return;
       if (!groups[cardId]) groups[cardId] = { cardId: cardId, count: count, minimumExtras: count - 1, observations: [] };
       var group = groups[cardId];
       group.count = Math.max(group.count, count);
       group.minimumExtras = group.count - 1;
       group.observations.push(observation);
     });
-    return Object.values(groups).sort(function(a, b) { return b.minimumExtras - a.minimumExtras || a.cardId - b.cardId; });
+    return Object.values(groups).sort(function(a, b) { return b.minimumExtras - a.minimumExtras || String(a.cardId).localeCompare(String(b.cardId),undefined,{numeric:true}); });
   }
   var api = { KINDS: KINDS, safeImageUrl: safeImageUrl, thumbnailUrl: thumbnailUrl, normalizePhotos: normalizePhotos, preferredPhotos: preferredPhotos,
-    mergePhotos: mergePhotos, normalizePublicMedia: normalizePublicMedia, serialNumbers: serialNumbers,
+    mergePhotos: mergePhotos, normalizePublicMedia: normalizePublicMedia, normalizeScopedMedia:normalizeScopedMedia,setCardReferences:setCardReferences,canonicalCardId:canonicalCardId,sameCardId:sameCardId,primaryJerseyNumber:primaryJerseyNumber,serialNumbers: serialNumbers,
     exactVariantPhotos:exactVariantPhotos,photosForCopy:photosForCopy,photoSourceLabel:photoSourceLabel,isExternalSourceScan:isExternalSourceScan,REVIEW_LABELS:REVIEW_LABELS,reviewFlags:reviewFlags,observationPhotoPlan:observationPhotoPlan,observationFacts:observationFacts,observationMatchesScope:observationMatchesScope,
     credibleSerial: credibleSerial, secondaryEvidence: secondaryEvidence, jerseyMatches: jerseyMatches, comcDuplicateGroups: comcDuplicateGroups };
   if (root) root.TrackerMedia = api;

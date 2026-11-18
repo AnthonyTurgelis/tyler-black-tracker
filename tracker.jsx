@@ -183,6 +183,8 @@ function Sparkline({ card, width, height }) {
 // cardYear: prefer explicit numeric `card.year` (WNBA cards), fall back to product
 // regex (TB cards encode year as "2024 Topps Update" prefix). Returns string for
 // consistency with existing call sites that expect string output.
+function cardPlayers(card) { return Array.from(new Set((Array.isArray(card?.players) && card.players.length ? card.players : [card?.player]).filter(Boolean))); }
+function cardHasPlayer(card, player) { return cardPlayers(card).includes(player); }
 function cardYear(card) {
   if (!card) return "";
   if (card.year != null && card.year !== "") return String(card.year);
@@ -430,7 +432,7 @@ function CatalogScopeSelect({value, onChange}) {
   if (window.MODE === "wnba") return null;
   return <label className="inline-flex items-center gap-1 text-[11px] text-gray-400">Show <select aria-label="Card category" value={value} onChange={function(e){onChange(e.target.value);}} className="bg-gray-900 border border-gray-700 text-gray-200 rounded px-1 py-1"><option value="checklist">Checklist</option><option value="proofs">All proofs & prototypes</option><option value="preproduction">Pre-production proofs</option><option value="manufacturer_proofs">Other manufacturer proofs</option><option value="proofs_signed">Proofs · signed</option><option value="proofs_unsigned">Proofs · unsigned</option><option value="proofs_unknown">Proofs · signature unconfirmed</option><option value="custom">Custom / fantasy</option><option value="review">Needs review</option><option value="all">All cards</option></select></label>;
 }
-function privatePanelHasEdits() { return !!(window.AutographPanel?.hasPending() || window.PurchaseReceiptsPanel?.hasPending()); }
+function privatePanelHasEdits() { return !!(window.CopyInventoryPanel?.hasPending() || window.SportCollectionWorkspace?.hasPending() || window.CollectionMarketScanner?.hasPending() || window.CollectionPricesPanel?.hasPending() || window.CollectionMediaEditor?.hasPending() || window.AutographPanel?.hasPending() || window.PurchaseReceiptsPanel?.hasPending()); }
 function TempoFocusSelect({value, onChange, counts, wants, wantsError}) {
   if (!counts) return null;
   var options = [["primary", "Primary"], ["all", "All"], ["uniform", "Tempo jersey"], ["rookies", "Rookies"]];
@@ -675,7 +677,7 @@ function TylerBlackTracker() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [copyCardId, setCopyCardId] = useState(null);
   const [catalogScope, setCatalogScope] = useState("checklist");
-  const [tempoFocus, setTempoFocus] = useState("primary");
+  const [tempoFocus, setTempoFocus] = useState("all");
   const [tempoWants, setTempoWants] = useState(null), [tempoWantsError, setTempoWantsError] = useState("");
   useEffect(function() {
     var generation=0,disposed=false;
@@ -699,7 +701,11 @@ function TylerBlackTracker() {
   const [saving, setSaving] = useState(false);
   const [expandedCard, setExpandedCard] = useState(null);
   const [showDupes, setShowDupes] = useState(false);
-  const [activeTab, setActiveTab] = useState("summary");
+  const [activeTab, setActiveTabState] = useState("summary");
+  const setActiveTab = useCallback(function(next) {
+    if (window.CopyInventoryPanel?.hasPending() && next !== "copies") { setSaveToast("Save or cancel the open copy edit before changing tabs."); return false; }
+    setActiveTabState(next); return true;
+  }, []);
   const [detailedSnFilter, setDetailedSnFilter] = useState(null);
   const [detailedStatusFilter, setDetailedStatusFilter] = useState(null);
   const [detailedCardId, setDetailedCardId] = useState(null);
@@ -1559,14 +1565,14 @@ function TylerBlackTracker() {
   // years respects player+product (so picking a player narrows the year dropdown to that player's cards)
   const years = useMemo(() => {
     var cards = collectionFocusCards;
-    if (filterPlayer) cards = cards.filter(c => c.player === filterPlayer);
+    if (filterPlayer) cards = cards.filter(c => cardHasPlayer(c,filterPlayer));
     if (filterProduct !== "all") cards = cards.filter(c => c.product === filterProduct);
     return [...new Set(cards.map(c => cardYear(c) || c.product.match(/^\d{4}/)?.[0]).filter(Boolean))].sort();
   }, [filterPlayer, filterProduct, collectionFocusCards, customEditVer]);
   // cardNumbers respects player+year+product
   const cardNumbers = useMemo(() => {
     var cards = collectionFocusCards;
-    if (filterPlayer) cards = cards.filter(c => c.player === filterPlayer);
+    if (filterPlayer) cards = cards.filter(c => cardHasPlayer(c,filterPlayer));
     if (filterYear !== "all") cards = cards.filter(c => cardYear(c) === filterYear);
     if (filterProduct !== "all") cards = cards.filter(c => c.product === filterProduct);
     var nums = [...new Set(cards.map(c => c.cardNumber))];
@@ -1577,7 +1583,7 @@ function TylerBlackTracker() {
     let cards = collectionFocusCards;
     // Use cardYear() so WNBA cards (numeric `year` field) work, not just TB prefix-style
     if (filterYear !== "all") cards = cards.filter(c => cardYear(c) === filterYear);
-    if (filterPlayer) cards = cards.filter(c => c.player === filterPlayer);
+    if (filterPlayer) cards = cards.filter(c => cardHasPlayer(c,filterPlayer));
     return [...new Set(cards.map(c => c.product))].sort();
   }, [filterYear, filterPlayer, collectionFocusCards, customEditVer]);
   const filtered = useMemo(() => {
@@ -1589,7 +1595,7 @@ function TylerBlackTracker() {
       const cardStatus = statuses[card.id] || "not_owned";
       const view = collectionCardState(card.id, statuses, cardDetails, copySummaries);
       if (filterYear !== "all" && cardYear(card) !== filterYear) return false;
-      if (filterPlayer && card.player !== filterPlayer) return false;
+      if (filterPlayer && !cardHasPlayer(card,filterPlayer)) return false;
       if (filterColor && !extractColors(card.cardSet).includes(filterColor)) return false;
       if (filterProduct !== "all" && card.product !== filterProduct) return false;
       if (cn && card.cardNumber !== cn) return false;
@@ -1620,13 +1626,14 @@ function TylerBlackTracker() {
   const collectionPlayerList = useMemo(function() {
     if (trackerMode !== "wnba") return [];
     var roster = (typeof window !== "undefined" && window.TEMPO_ROSTER) ? window.TEMPO_ROSTER : {};
-    var keysSeen = {};
-    collectionFocusCards.forEach(function(card) {
-      if (card.player && !keysSeen[card.player]) keysSeen[card.player] = true;
+    var keysSeen = {}, focusCounts = {};
+    ALL_CARDS.forEach(function(card) {
+      cardPlayers(card).forEach(function(player){keysSeen[player]=(keysSeen[player] || 0)+1;});
     });
+    collectionFocusCards.forEach(function(card) {cardPlayers(card).forEach(function(player){focusCounts[player]=(focusCounts[player] || 0)+1;});});
     return Object.keys(keysSeen).map(function(k) {
       var name = (roster[k] && roster[k].name) ? roster[k].name : (k.charAt(0).toUpperCase() + k.slice(1));
-      return { key: k, name: name, last: name.split(" ").pop() };
+      return { key: k, name: name, last: name.split(" ").pop(), total:keysSeen[k], shown:focusCounts[k] || 0 };
     }).sort(function(a, b) { return a.last.localeCompare(b.last); });
   }, [trackerMode, collectionFocusCards]);
   useEffect(function() { if (trackerMode === "wnba" && filterPlayer && !collectionPlayerList.some(function(player) { return player.key === filterPlayer; })) setFilterPlayer(null); }, [trackerMode, filterPlayer, collectionPlayerList]);
@@ -1642,7 +1649,7 @@ function TylerBlackTracker() {
   const colorFrequencies = useMemo(function() {
     var ctx = collectionFocusCards.filter(function(c) {
       if (HIDDEN_DUPES.has(c.id)) return false;
-      if (filterPlayer && c.player !== filterPlayer) return false;
+      if (filterPlayer && !cardHasPlayer(c,filterPlayer)) return false;
       if (filterYear !== "all" && cardYear(c) !== filterYear) return false;
       if (filterProduct !== "all" && c.product !== filterProduct) return false;
       return true;
@@ -1741,7 +1748,7 @@ function TylerBlackTracker() {
       <div className="flex-shrink-0 backdrop-blur-sm border-b z-30" style={{background:"rgba(10,22,40,0.97)",borderColor:"#1a2d4a",padding:"clamp(2px,0.3vw,4px) clamp(4px,0.6vw,12px)"}}>
         <div className="flex items-center gap-1.5">
           <span className="font-black tracking-tight whitespace-nowrap" style={{color: trackerMode === "wnba" ? "#a855f7" : "#FFC52F", fontSize:"clamp(13px,1.8vw,18px)"}}>{trackerMode === "wnba" ? "TORONTO TEMPO" : "TYLER BLACK"}</span>
-          {trackerMode === "wnba" && window.Tempo2026 && <details className="relative text-[10px] text-purple-300"><summary className="cursor-pointer whitespace-nowrap" title="2026 checklist coverage">2026 coverage</summary><div className="absolute left-0 top-5 w-72 max-w-[85vw] p-2 rounded border border-purple-800 bg-slate-950 text-slate-300 z-50">{window.Tempo2026.coverageNote}</div></details>}
+          {trackerMode === "wnba" && window.Tempo2026 && <details className="relative text-[10px] text-purple-300"><summary className="cursor-pointer whitespace-nowrap" title="Checklist source coverage">Coverage</summary><div className="absolute left-0 top-5 w-72 max-w-[85vw] p-2 rounded border border-purple-800 bg-slate-950 text-slate-300 z-50">{window.TEMPO_CATALOG_COVERAGE_NOTE || window.Tempo2026.coverageNote}</div></details>}
           {trackerMode === "wnba" && <span className="text-gray-500 text-[9px]" title="Totals across the full Tempo collection">Overall</span>}
           <div className="flex-1 rounded-full h-1.5 overflow-hidden min-w-8 max-w-24" style={{background:"#1a2d4a"}}>
             <div className="h-full flex">
@@ -1864,7 +1871,7 @@ function TylerBlackTracker() {
           {TABS.map(function(t) {
             var active = activeTab === t.id;
             return (
-              <button key={t.id} onClick={function(){ if (t.id === "copies") setCopyCardId(null); setActiveTab(t.id); }} className={"whitespace-nowrap border-b-2 font-medium transition-colors " + (active ? (tabColorMap[t.color] || "") : "border-transparent text-gray-400 hover:text-yellow-200")} style={{padding:"clamp(1px,0.2vw,3px) clamp(4px,0.7vw,10px)",fontSize:"clamp(9px,1.2vw,12px)"}}>
+              <button key={t.id} onClick={function(){ if (setActiveTab(t.id) && t.id === "copies" && !window.CopyInventoryPanel?.hasPending()) setCopyCardId(null); }} className={"whitespace-nowrap border-b-2 font-medium transition-colors " + (active ? (tabColorMap[t.color] || "") : "border-transparent text-gray-400 hover:text-yellow-200")} style={{padding:"clamp(1px,0.2vw,3px) clamp(4px,0.7vw,10px)",fontSize:"clamp(9px,1.2vw,12px)"}}>
                 {t.label}{t.badge > 0 ? <span className={"ml-1 px-1 rounded-full " + (active ? (badgeActiveMap[t.color] || "bg-gray-400 text-gray-900") : (badgeInactiveMap[t.color] || "bg-gray-700 text-gray-300"))} style={{fontSize:"clamp(8px,0.9vw,10px)"}}>{t.badge}</span> : null}
               </button>
             );
@@ -1939,7 +1946,7 @@ function TylerBlackTracker() {
                 className={"px-1.5 py-0.5 rounded font-semibold transition-colors "+
                   (filterPlayer===p.key ? "bg-purple-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700")}
                 style={{fontSize:"clamp(9px,1vw,11px)"}}
-                title={p.name}>{p.last}</button>);
+                title={p.name+" · "+p.shown+" in this focus / "+p.total+" catalogued"}>{p.last} <span className="font-normal opacity-60">{tempoFocus === "all" ? p.total : p.shown+"/"+p.total}</span></button>);
             })}
           </div>
         )}
@@ -2003,7 +2010,7 @@ function TylerBlackTracker() {
         </div>
         {/* Results toolbar */}
         <div className="flex items-center justify-between mb-0.5" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
-          <span className="text-gray-500">{filtered.length} shown{tempoProfileEnabled && <span className="text-purple-300 ml-1">· {tempoFocusLabel}</span>} {saving && <span className="text-yellow-400 ml-1">saving...</span>}</span>
+          <span className="text-gray-500">{filtered.length}{tempoProfileEnabled ? " / "+tempoFocusCounts.all+" catalogued" : " shown"}{tempoProfileEnabled && <span className="text-purple-300 ml-1">· {tempoFocusLabel}</span>} {saving && <span className="text-yellow-400 ml-1">saving...</span>}</span>
           <div className="flex gap-1">
             <button onClick={function(){ var urls = []; var seen = {}; filtered.slice(0, 30).forEach(function(c){ var u = tcdbUrl(c); if (u !== TCDB_PLAYER && !seen[u]) { seen[u] = true; urls.push(u); }}); urls.forEach(function(u){window.open(u, "_blank");}); }} className="px-1.5 py-0 bg-cyan-950/60 border border-cyan-800 text-cyan-400 rounded hover:bg-cyan-900/60">TCDB</button>
             <button onClick={function(){ if (superSearchMode) { filtered.slice(0, 30).forEach(function(c){ ebayUrlsSuper(c).forEach(function(url){ window.open(url, "_blank"); }); }); } else { filtered.slice(0, 30).forEach(function(c){window.open(ebayUrl(c), "_blank");}); } }} className="px-1.5 py-0 bg-yellow-950/60 border border-yellow-800 text-yellow-400 rounded hover:bg-yellow-900/60">eBay</button>
@@ -2037,7 +2044,7 @@ function TylerBlackTracker() {
                   {trackerMode === "wnba" && card.player && playerNameByKey[card.player] && (
                     <span className="font-bold px-1 py-0 rounded bg-purple-900/50 border border-purple-700 text-purple-200 whitespace-nowrap flex-shrink-0"
                       style={{fontSize:"clamp(8px,0.9vw,10px)"}}
-                      title={playerNameByKey[card.player]}>{playerNameByKey[card.player].split(" ").pop()}</span>
+                      title={cardPlayers(card).map(player=>playerNameByKey[player] || player).join(" / ")}>{cardPlayers(card).map(player=>(playerNameByKey[player] || player).split(" ").pop()).join(" / ")}</span>
                   )}
                   <div className="flex-1 min-w-0 flex items-baseline gap-1 truncate" style={{fontSize:"clamp(9px,1.2vw,12px)"}}>
                     <span className="font-semibold text-white whitespace-nowrap">#{card.cardNumber}</span>
@@ -2362,7 +2369,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
     var roster = (typeof window !== "undefined" && window.TEMPO_ROSTER) ? window.TEMPO_ROSTER : {};
     var keysSeen = {};
     ALL_CARDS.forEach(function(card) {
-      if (card.player && !keysSeen[card.player]) keysSeen[card.player] = true;
+      cardPlayers(card).forEach(function(player){keysSeen[player]=true;});
     });
     return Object.keys(keysSeen).map(function(k) {
       var name = (roster[k] && roster[k].name) ? roster[k].name : (k.charAt(0).toUpperCase() + k.slice(1));
@@ -2403,7 +2410,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
     var byYear={},byBrand={},byProduct={},byPlayer={},cardsByProduct={};
     cards.forEach(function(card) {
       // WNBA player filter — only include cards for the selected player when one is chosen
-      if (selectedPlayer && card.player !== selectedPlayer) return;
+      if (selectedPlayer && !cardHasPlayer(card,selectedPlayer)) return;
       if (!passesFilter(card, minSN, inclBlank, ex1of1, unnumOnly, spOnly)) return;
       var s = sts[card.id] || "not_owned";
       var acq = s==="owned"||s==="in_transit" ? 1 : 0;
@@ -2423,7 +2430,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
         if (s==="in_transit") map[key].transit++;
       }
       add(byYear, year); add(byBrand, brand); add(byProduct, prod);
-      if (card.player) add(byPlayer, card.player);
+      cardPlayers(card).forEach(function(player){add(byPlayer,player);});
       if (!cardsByProduct[prod]) cardsByProduct[prod] = [];
       cardsByProduct[prod].push(card);
     });
@@ -3080,7 +3087,7 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
                           {/* Player name pill — WNBA only */}
                           {trackerMode === "wnba" && card.player && playerNameByKey[card.player] && (
                             <span className="font-bold px-1 py-0 rounded bg-purple-900/50 border border-purple-700 text-purple-200 whitespace-nowrap flex-shrink-0 text-[9px]"
-                              title={playerNameByKey[card.player]}>{playerNameByKey[card.player].split(" ").pop()}</span>
+                              title={cardPlayers(card).map(player=>playerNameByKey[player] || player).join(" / ")}>{cardPlayers(card).map(player=>(playerNameByKey[player] || player).split(" ").pop()).join(" / ")}</span>
                           )}
                           <div className="flex-1 min-w-0 flex items-baseline gap-1 truncate">
                             {pv.prefix && <span className="text-gray-500 text-[9px] truncate flex-shrink">{pv.prefix}</span>}
