@@ -375,9 +375,12 @@
   // Now queries BOTH tables. Tempo table only queried if owner is logged in     // + TEMPO
   // (anon SELECT is denied on tempo_collection_kv anyway).                       // + TEMPO
   const collectionKey = "tb-alldata-v1";
-  async function readCollection() {
-    const row = await supabase.from("collection_kv").select("value, updated_at").eq("key",collectionKey).single();
+  async function readCollection(editKeys) {
+    const query = editKeys ? supabase.rpc("tb_read_collection_for_edit",{edit_keys:editKeys})
+      : supabase.from("collection_kv").select("value, updated_at").eq("key",collectionKey);
+    const row = await query.single();
     if(row.error || !row.data || !row.data.updated_at) throw Error(row.error && row.error.message || "Could not read the saved collection.");
+    if(editKeys && !Array.isArray(row.data.applied_keys)) throw Error("Could not verify previously saved edits. Your changes are pending.");
     return row.data;
   }
   const collection = window.CollectionSync.create({
@@ -677,6 +680,7 @@
     },
 
     async delete(key) {
+      if(key===collectionKey) return {key,deleted:false,error:"Change collection entries individually."};
       try { localStorage.removeItem(key); } catch (e) {}
       if (isCloudKey(key)) deleteFromCloud(key);
       return { key: key, deleted: true, shared: false };

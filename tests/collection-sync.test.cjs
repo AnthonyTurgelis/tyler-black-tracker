@@ -8,13 +8,22 @@ function harness() {
   const storage = {get length(){return rows.size;},key:i=>[...rows.keys()][i],getItem:k=>rows.get(k) || null,
     setItem:(k,v)=>rows.set(k,v),removeItem:k=>rows.delete(k)};
   const db={value:copy(initial),version:1,writes:0,offline:false};
-  const read=async()=>{if(db.offline) throw Error("offline");return {value:copy(db.value),updated_at:db.version};};
+  const seen=new Set();
+  const read=async(keys=[])=>{
+    if(db.offline) throw Error("offline");
+    return {value:copy(db.value),updated_at:db.version,applied_keys:keys.filter(k=>seen.has(k))};
+  };
   const tab=id=>{
     const t=create({storage,owner:()=>"owner",read,id,issue:()=>{},write:async (value,version)=>{
       if(db.version!==version) return null;
       assert.equal(value._expectedCollectionVersion,version);
+      if(value._collectionEditKeys.some(k=>seen.has(k)))return null;
+      value._collectionEditKeys.forEach(k=>seen.add(k));
+      delete value._collectionEditKeys;
       delete value._expectedCollectionVersion;
-      db.value=copy(value);db.version++;db.writes++;return read();
+      db.value=copy(value);db.version++;db.writes++;
+      if(db.loseReply){db.loseReply=false;throw Error("connection closed after commit");}
+      return read();
     }});
     t.begin(db.value);
     return t;
@@ -78,4 +87,20 @@ test("a local-only legacy edit is reviewed once, and a whole stale cache is neve
   a.resolve(conflict.journal,conflict.conflicts[0],false);await a.flush();
   a.recoverLegacy(legacy,db.value);await a.resume();
   assert.equal(db.value.statuses[777],undefined);assert.equal(db.value.statuses[889],"in_transit");
+});
+test("a lost acknowledgement never replays a receipt over a later intentional reversal",async()=>{
+  const {tab,db,storage}=harness(), original=tab("first");
+  original.stage({...initial,statuses:{889:"owned"}});
+  db.loseReply=true;await assert.rejects(original.flush(),/after commit/);
+  const other=tab("second");other.stage(initial);await other.flush();
+  assert.equal(db.value.statuses[889],"in_transit");
+  await tab("reopened").resume();
+  assert.equal(db.value.statuses[889],"in_transit");assert.equal(db.writes,2);assert.equal(storage.length,0);
+});
+test("a retry acknowledges the saved portion and still applies later offline edits",async()=>{
+  const {tab,db}=harness(), a=tab("a");
+  const first={...initial,statuses:{889:"owned"}};
+  a.stage(first);db.loseReply=true;await assert.rejects(a.flush(),/after commit/);
+  a.stage({...first,statuses:{889:"owned",2004:"in_transit"}});
+  await a.flush();assert.deepEqual(db.value.statuses,{889:"owned",2004:"in_transit"});assert.equal(db.writes,2);
 });

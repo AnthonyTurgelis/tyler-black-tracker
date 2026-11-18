@@ -83,7 +83,7 @@
       const ops=changes(view,value);
       if (!ops.length) return;
       const key=prefix()+id+":"+(++seq);
-      remember(key,{created:Date.now(),writer:id,seq,ops});
+      remember(key,{created:Date.now(),writer:id,seq,version:2,ops});
       const reviewIndex=queue.findIndex(k=>readDraft(k)?.review);
       if(reviewIndex<0) queue.push(key); else queue.splice(reviewIndex,0,key);
       view=clone(value);
@@ -108,22 +108,42 @@
         // Persist that group together. Journal records remain immutable during a request.
         for (const k of queue.slice(1)) {
           const next=readDraft(k);
-          if(!next || next.writer!==entry.writer || next.review || entry.review) break;
+          if(!next || keys.length===128 || next.writer!==entry.writer || next.review || entry.review) break;
           keys.push(k);entries.push(next);
         }
-        const ops=combine(entries);
-        if(!ops.length) {for(const k of keys){drop(k);const index=queue.indexOf(k);if(index>=0)queue.splice(index,1);}continue;}
+        const editKeys=keys.map(k=>k.slice(prefix().length));
         let done=false;
         for(let attempt=0;attempt<4;attempt++) {
-          const row=await read();
-          const {result,conflicts}=apply(row.value,ops,entry.choices);
+          const row=await read(editKeys);
+          const acknowledged=new Set(row.applied_keys);
+          const remaining=editKeys.filter(k=>!acknowledged.has(k));
+          if(!remaining.length) { last=row.value;done=true;break; }
+
+          // Another tab may already have finished part of this batch. Older
+          // pending operations on a field superseded by a saved one stay ignored.
+          const outstanding=[], superseded=new Set();
+          for(let i=entries.length-1;i>=0;i--) {
+            const item=entries[i];
+            if(acknowledged.has(editKeys[i])) {
+              for(const op of item.ops) superseded.add(JSON.stringify(op.path));
+              continue;
+            }
+            const ops=item.ops.filter(op=>!superseded.has(JSON.stringify(op.path))).map(op=>{
+              // Pre-receipt journals cannot prove an earlier request failed.
+              return !item.version && ["statuses","details","forsale"].includes(op.path[0])
+                ? {...op,review:true} : op;
+            });
+            outstanding.unshift({ops});
+          }
+          const {result,conflicts}=apply(row.value,combine(outstanding),entry.choices);
           if(conflicts.length) {
             const err=Error("A saved value changed on another device. Review the pending edit.");
             err.conflicts=conflicts; err.journal=key; throw err;
           }
           if(!owner() || !key.startsWith(prefix())) throw Error("Sign in again to sync your collection edits.");
-          if(equal(row.value,result)) {last=row.value;done=true;break;}
-          const saved=await write({...result,_saveTimestamp:Date.now(),_expectedCollectionVersion:row.updated_at},row.updated_at);
+          // Record the acknowledgement even if the visible value already matches.
+          const saved=await write({...result,_saveTimestamp:Date.now(),_expectedCollectionVersion:row.updated_at,
+            _collectionEditKeys:remaining},row.updated_at);
           if(saved) {last=saved.value;done=true;break;}
         }
         if(!done) throw Error("The collection is busy. Your edits are pending.");
