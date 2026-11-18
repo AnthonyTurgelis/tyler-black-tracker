@@ -34,6 +34,7 @@ async function boot({ local = {}, cloud = {}, owner = true } = {}) {
       const query = {
         selectedKey: null,
         select() { return this; },
+        in() { return this; },
         eq(column, value) { assert.equal(column, 'key'); this.selectedKey = value; return this; },
         then(resolve, reject) {
           return Promise.resolve({ data: Object.entries(database[table]).map(([key, value]) => ({ key, value: clone(value) })), error: null }).then(resolve, reject);
@@ -68,7 +69,8 @@ async function boot({ local = {}, cloud = {}, owner = true } = {}) {
     window, localStorage,
     CustomEvent: function(type, options) { this.type = type; this.detail = options.detail; },
     console: { log() {}, warn() {}, error() {} },
-    setTimeout: (...args) => calls.timers.push(args)
+    setTimeout: (...args) => { const timer={args}; calls.timers.push(timer); return timer; },
+    clearTimeout: timer => { const index=calls.timers.indexOf(timer); if(index>=0) calls.timers.splice(index,1); }
   });
   vm.runInContext(source, context);
   await window.storageReady;

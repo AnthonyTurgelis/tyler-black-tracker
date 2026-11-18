@@ -6,21 +6,36 @@
   <title>Tyler Black Card Collection Tracker</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚾</text></svg>" />
 
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = { darkMode: 'class', theme: { extend: {} } };
+  <script id="tracker-bootstrap">
+    // Show the loading shell before waiting for third-party scripts. This never
+    // resolves storageReady or enables edits when the cloud has not loaded.
+    window.trackerBootstrap = (function () {
+      var timer, observer, finished = false;
+      function show(message) {
+        if (finished) return;
+        var notice = document.getElementById("bootstrap-notice");
+        var detail = document.getElementById("bootstrap-detail");
+        if (notice && detail) { detail.textContent = message; notice.hidden = false; }
+      }
+      function check() {
+        if (!document.querySelector("[data-tracker-ready='true']")) return;
+        finished = true; clearTimeout(timer);
+        if (observer) observer.disconnect();
+        var notice = document.getElementById("bootstrap-notice");
+        if (notice) notice.hidden = true;
+      }
+      function observe() {
+        var root = document.getElementById("root");
+        if (root && window.MutationObserver) { observer = new MutationObserver(check); observer.observe(root,{childList:true,subtree:true,attributes:true,attributeFilter:["data-tracker-ready"]}); }
+        check();
+      }
+      function failed(message) { show(typeof message === "string" ? message : "A required page file could not load. Reload to try again."); }
+      window.addEventListener("error",function(event){if(event.target && event.target.tagName === "SCRIPT")failed();},true);
+      window.addEventListener("unhandledrejection",function(){show("The collection could not finish loading. Reload to retry.");});
+      timer = setTimeout(function(){check();show("The collection is taking longer to load. Reload to retry.");},25000);
+      return {observe:observe,failed:failed};
+    })();
   </script>
-
-  <!-- React 18 -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-
-  <!-- Babel (transpiles JSX in browser) -->
-  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
-
-  <!-- Supabase JS Client (official CDN) -->
-  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
   <!-- ══════════════════════════════════════════════════════════
        SUPABASE CONFIG — Replace these with YOUR project values
@@ -106,6 +121,11 @@
     </div>
   </div>
 
+  <div id="bootstrap-notice" role="alert" hidden style="padding:10px 16px;background:#422006;color:#fde68a;font:13px system-ui;">
+    <span id="bootstrap-detail"></span>
+    <button type="button" onclick="location.reload()" style="margin-left:10px;padding:4px 10px;border:1px solid #a16207;border-radius:4px;background:#713f12;color:#fff;cursor:pointer;">Reload tracker</button>
+  </div>
+
   <!-- Tracker mounts here -->
   <div id="root">
     <div id="loading">
@@ -114,9 +134,30 @@
     </div>
   </div>
 
+  <script>window.trackerBootstrap.observe();</script>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    if (window.tailwind) tailwind.config = { darkMode: 'class', theme: { extend: {} } };
+  </script>
+
+  <!-- React 18 -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel (transpiles JSX in browser) -->
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+
+  <!-- Supabase JS Client (official CDN) -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
   <!-- Storage shim (Supabase + localStorage) — must be before tracker -->
   <script src="catalog-utils.js"></script>
   <script src="market-utils.js"></script>
+  <script src="scan-currency.js"></script>
+  <script src="scanner-utils.js"></script>
+  <script src="collections-utils.js"></script>
   <script src="price-history-utils.js"></script>
   <script src="media-utils.js"></script>
   <script src="copy-utils.js"></script>
@@ -207,6 +248,9 @@
     if (window.storageReady) {
       window.storageReady.then(function () {
         updateAuthUI();
+      }).catch(function () {
+        document.getElementById("auth-status").textContent = "Connection unavailable";
+        window.trackerBootstrap.failed("Your saved collection could not load. Reload to retry.");
       });
     } else {
       // storage-shim didn't load — hide auth bar
@@ -216,11 +260,13 @@
 
   <!-- The tracker (Babel transpiles JSX at runtime) -->
   <script src="tempo_data.js"></script>
+  <script src="tempo-2026.js"></script>
   <script src="catalog-2026.js"></script>
   <script src="catalog-corrections.js"></script>
   <script type="text/babel" data-presets="react" src="catalog-panel.jsx"></script>
   <script type="text/babel" data-presets="react" src="media-panel.jsx"></script>
   <script type="text/babel" data-presets="react" src="inventory-panel.jsx"></script>
+  <script type="text/babel" data-presets="react" src="collections-panel.jsx"></script>
   <script type="text/babel" data-presets="react" src="tracker.jsx"></script>
 
 </body>

@@ -160,6 +160,9 @@
     });
     // Order totals never become per-card purchase prices. An unverified title never becomes an exact serial.
     if (purchase.photos) observation.photos = media.mergePhotos(previous.photos, purchase.photos);
+    if (purchase.rawPrice != null) observation.rawPrice = text(purchase.rawPrice);
+    if (purchase.currencyEvidence && typeof purchase.currencyEvidence === "object" && !Array.isArray(purchase.currencyEvidence))
+      observation.currencyEvidence = clone(purchase.currencyEvidence);
     if (purchase.orderTotal != null) observation.orderTotal = text(purchase.orderTotal);
     if (options.priceVerified === true && observation.reportedQuantity === 1 && !observation.requiresQuantityReview && purchase.paidPrice != null && purchase.paidPrice !== "") {
       if (!Number.isFinite(Number(purchase.paidPrice)) || Number(purchase.paidPrice) < 0) throw new Error("Enter a non-negative item price.");

@@ -104,3 +104,51 @@ test("a retry acknowledges the saved portion and still applies later offline edi
   a.stage({...first,statuses:{889:"owned",2004:"in_transit"}});
   await a.flush();assert.deepEqual(db.value.statuses,{889:"owned",2004:"in_transit"});assert.equal(db.writes,2);
 });
+
+test("catalogue changes merge by field without overwriting another tab's ownership",async()=>{
+  const {tab,db}=harness(),a=tab("a"),b=tab("b");
+  a.stage({...initial,statuses:{889:"owned"},details:{889:{qty:"2"}},cards:{c1:{name:"Driver",variant:"Gold"}}});await a.flush();
+  b.stage({...initial,cards:{c2:{name:"Second driver",variant:"Base"}},imports:{batch:{source:"TCDB",count:1}}});await b.flush();
+  assert.equal(db.value.statuses[889],"owned");assert.equal(db.value.details[889].qty,"2");
+  assert.deepEqual(Object.keys(db.value.cards),["c1","c2"]);assert.equal(db.value.imports.batch.count,1);
+});
+test("stale catalogue corrections conflict instead of replacing newer verified identity",async()=>{
+  const {tab,db}=harness();db.value.cards={c1:{name:"Driver",variant:"Base",tcdbId:"123"}};
+  const a=tab("a"),b=tab("b"),base=copy(db.value);
+  a.stage({...base,cards:{c1:{...base.cards.c1,variant:"Gold /10"}}});await a.flush();
+  b.stage({...base,cards:{c1:{...base.cards.c1,variant:"Gold /25"}}});
+  await assert.rejects(b.flush(),err=>err.conflicts[0].path.join("/")==="cards/c1/variant");
+  assert.equal(db.value.cards.c1.variant,"Gold /10");assert.equal(db.value.cards.c1.tcdbId,"123");
+});
+test("sport namespaces isolate overlapping IDs and receipt keys on a shared device",async()=>{
+  const {storage}=harness(), saved=new Map(), receipts=new Set();
+  function side(namespace) {
+    const row={value:copy(initial),version:1};saved.set(namespace,row);
+    const read=async(keys=[])=>({value:copy(row.value),updated_at:row.version,applied_keys:keys.filter(k=>receipts.has(k))});
+    const instance=create({storage,namespace,owner:()=>"owner",id:"same-writer",read,issue:()=>{},write:async(value,version)=>{
+      assert.equal(version,row.version);value._collectionEditKeys.forEach(k=>{assert.equal(receipts.has(k),false);receipts.add(k);});
+      row.value=copy(value);row.version++;return read();
+    }});instance.begin(initial);return instance;
+  }
+  const racing=side("collect-racing"),baseball=side("collect-baseball");
+  racing.stage({...initial,statuses:{889:"owned"}});baseball.stage({...initial,details:{889:{qty:"3"}}});
+  assert.equal(storage.length,2);await Promise.all([racing.flush(),baseball.flush()]);
+  assert.equal(saved.get("collect-racing").value.statuses[889],"owned");
+  assert.equal(saved.get("collect-baseball").value.statuses[889],"in_transit");
+  assert.equal(saved.get("collect-racing").value.details[889],undefined);assert.equal(receipts.size,2);
+});
+test("quantity zero and deliberate reductions survive independent stale status changes",async()=>{
+  const {tab,db}=harness();db.value.details={889:{qty:"2",serial:"7/35"}};
+  const a=tab("a"),b=tab("b"),base=copy(db.value);
+  a.stage({...base,details:{889:{qty:"0",serial:"7/35"}}});await a.flush();
+  b.stage({...base,statuses:{889:"owned"}});await b.flush();
+  assert.equal(db.value.details[889].qty,"0");assert.equal(db.value.details[889].serial,"7/35");assert.equal(db.value.statuses[889],"owned");
+});
+test("an account switch cannot replay another owner's pending journal",async()=>{
+  const {storage}=harness();let owner="first",writes=0;
+  const sync=create({storage,owner:()=>owner,id:"tab",issue:()=>{},read:async()=>({value:copy(initial),updated_at:1,applied_keys:[]}),write:async(value)=>{writes++;return {value};}});
+  sync.begin(initial);sync.stage({...initial,statuses:{889:"owned"}});
+  owner="second";sync.begin(initial);await sync.resume();
+  assert.equal(writes,0);assert.equal(storage.length,1);
+  owner="first";sync.begin(initial);await sync.resume();assert.equal(writes,1);assert.equal(storage.length,0);
+});

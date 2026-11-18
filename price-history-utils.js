@@ -86,7 +86,37 @@
     if (Object.keys(meta.events).length) result[META] = meta;
     return merge(result,null);
   }
-  var api = {META:META,identity:identity,normalizeIdentity:normalizeIdentity,merge:merge,visible:visible,applyChanges:applyChanges};
+  function cardSubject(card) {
+    return String(card && (card.player || card.subject || card.playerName) || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  }
+  function legacyCardKey(card) {
+    if (!card) return null;
+    if (card.priceKey) return String(card.priceKey).replace(/\|subject:[^|]*$/, "");
+    var product = String(card.product || "");
+    return product.slice(0,4) + "|" + product + "|" + card.cardNumber + "|" + (card.cardSet || "Base");
+  }
+  function cardKey(card) {
+    var base = legacyCardKey(card), who = cardSubject(card);
+    return base == null ? null : base + (who ? "|subject:" + encodeURIComponent(who) : "");
+  }
+  function cardKeys(card, cards) {
+    var key = cardKey(card), legacy = legacyCardKey(card);
+    if (!key) return [];
+    if (key === legacy) return [key];
+    var who = cardSubject(card), possible = new Set((cards || []).filter(function(c) { return legacyCardKey(c) === legacy; }).map(cardSubject));
+    // Legacy evidence has no subject identity. Show it only when the entire
+    // catalogue has exactly one subject for that key; never relabel or delete.
+    return possible.size === 1 && possible.has(who) ? [key,legacy] : [key];
+  }
+  function entriesForCard(history, card, cards) {
+    var entries = new Map();
+    cardKeys(card,cards).forEach(function(key) {
+      var value = history && history[key], rows = Array.isArray(value) ? value : value && value.entries || [];
+      rows.forEach(function(row) { var id = identity(row); if (!entries.has(id)) entries.set(id,row); });
+    });
+    return Array.from(entries.values());
+  }
+  var api = {META:META,identity:identity,normalizeIdentity:normalizeIdentity,merge:merge,visible:visible,applyChanges:applyChanges,cardSubject:cardSubject,legacyCardKey:legacyCardKey,cardKey:cardKey,cardKeys:cardKeys,entriesForCard:entriesForCard};
   if (root) root.PriceHistoryUtils = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : null);

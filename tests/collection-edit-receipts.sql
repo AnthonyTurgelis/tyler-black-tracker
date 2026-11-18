@@ -18,7 +18,7 @@ begin
     insert into public.collection_kv(key,value) values ('tb-alldata-v1',current_row.value)
     on conflict(key) do update set value=excluded.value;
     raise exception 'Unversioned full-collection upsert succeeded';
-  exception when serialization_failure then null; end;
+  exception when sqlstate 'PT409' then null; end;
 
   begin
     update public.collection_kv set value=value || jsonb_build_object('_expectedCollectionVersion',original_version)
@@ -34,7 +34,7 @@ begin
     update public.collection_kv set value=value || jsonb_build_object('_expectedCollectionVersion',original_version,
       '_collectionEditKeys',array[rejected_id]) where key='tb-alldata-v1';
     raise exception 'Stale write succeeded';
-  exception when serialization_failure then null; end;
+  exception when sqlstate 'PT409' then null; end;
 
   update public.collection_kv set value=value || jsonb_build_object('_expectedCollectionVersion',first_version,
     '_collectionEditKeys',array[second_id],'_guardTestValue','later') where key='tb-alldata-v1';
@@ -49,7 +49,7 @@ begin
     update public.collection_kv set value=value || jsonb_build_object('_expectedCollectionVersion',current_row.updated_at,
       '_collectionEditKeys',array[first_id,rejected_id],'_guardTestValue','first') where key='tb-alldata-v1';
     raise exception 'Already committed edit was replayed';
-  exception when serialization_failure then null; end;
+  exception when sqlstate 'PT409' then null; end;
   select * into strict current_row from public.tb_read_collection_for_edit(array[rejected_id]);
   if current_row.value->>'_guardTestValue' is distinct from 'later' or cardinality(current_row.applied_keys)<>0 then
     raise exception 'Mixed retry was partly applied';

@@ -157,22 +157,22 @@
     var evidence = text(record && record.serialEvidence).toLowerCase();
     return !/(?:title|reported|unverified|tentative|uncertain)/.test(evidence);
   }
-  function secondaryEvidence(record) {
+  function secondaryEvidence(record, primaryJerseyNumber) {
     record = record || {};
     var evidence = record.secondaryJerseyEvidence || {};
     var numberText = text(record.secondaryJerseyNumber);
     var number = /^\d{1,3}$/.test(numberText) ? Number(numberText) : null;
-    if (number == null || number === 7 || evidence.confirmed !== true) return null;
+    if (number == null || number === (primaryJerseyNumber === undefined ? 7 : primaryJerseyNumber) || evidence.confirmed !== true) return null;
     var photoExists = !!evidence.photoId && normalizePhotos(record.photos).some(function(photo) { return photo.id === evidence.photoId; });
     if (!photoExists && !(safeImageUrl(evidence.sourceUrl) && text(evidence.note))) return null;
     return number;
   }
-  function jerseyMatches(record, legacySerial, cardMedia) {
+  function jerseyMatches(record, legacySerial, cardMedia, primaryJerseyNumber) {
     record = record || {};
     var numbers = credibleSerial(record) ? serialNumbers(record.serial) : [];
     serialNumbers(legacySerial).forEach(function(number) { if (numbers.indexOf(number) < 0) numbers.push(number); });
-    var secondaryNumber = secondaryEvidence(text(record.secondaryJerseyNumber) ? record : cardMedia);
-    return { primary: numbers.indexOf(7) >= 0, secondary: secondaryNumber != null && numbers.indexOf(secondaryNumber) >= 0, secondaryNumber: secondaryNumber, serialNumbers: numbers };
+    var secondaryNumber = secondaryEvidence(text(record.secondaryJerseyNumber) ? record : cardMedia,primaryJerseyNumber);
+    return { primary: primaryJerseyNumber !== null && numbers.indexOf(primaryJerseyNumber === undefined ? 7 : Number(primaryJerseyNumber)) >= 0, secondary: secondaryNumber != null && numbers.indexOf(secondaryNumber) >= 0, secondaryNumber: secondaryNumber, serialNumbers: numbers };
   }
   function comcDuplicateGroups(input) {
     var groups = {};

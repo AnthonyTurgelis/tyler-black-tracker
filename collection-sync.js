@@ -27,13 +27,15 @@
     fields(["statuses"],base.statuses,next.statuses,1);
     fields(["details"],base.details,next.details,2);
     fields(["forsale"],base.forsale,next.forsale,1);
+    // Catalogue/import evidence belongs to its sport; only changed record fields travel.
+    for (const key of ["cards","imports"]) fields([key],base[key],next[key],2);
     for (const key of ["dirty","synced"]) fields([key],mapOf(base[key],String),mapOf(next[key],String),1);
     const prevLog=mapOf(base.changelog,logKey), nextLog=mapOf(next.changelog,logKey);
     fields(["changelog"],prevLog,nextLog,1);
     compare(["checkpoint"],base.checkpoint || null,next.checkpoint || null);
     return ops;
   }
-  function apply(current, ops, choices) {
+  function apply(current, ops, choices, options) {
     const result=clone(current), conflicts=[];
     const maps={};
     for (const key of ["dirty","synced"]) maps[key]=mapOf(current[key],String);
@@ -63,30 +65,38 @@
       const kept=(current[key] || []).filter(item=>own(maps[key],String(item)));
       result[key]=[...new Set([...kept,...Object.values(maps[key])])];
     }
-    if (ops.some(op=>op.path[0]==="changelog"))
-      result.changelog=Object.values(maps.changelog).sort((a,b)=>b.ts.localeCompare(a.ts)).slice(0,500);
+    if (ops.some(op=>op.path[0]==="changelog")) {
+      const log=Object.values(maps.changelog).sort((a,b)=>b.ts.localeCompare(a.ts));
+      result.changelog=options && options.keepFullHistory ? log : log.slice(0,500);
+    }
     return {result,conflicts};
   }
-  function create({storage,owner,read,write,issue,id}) {
-    let view, tail=Promise.resolve(), seq=0;
+  function create({storage,owner,read,write,issue,id,namespace="tb"}) {
+    if (!/^[a-z][a-z0-9-]*$/.test(namespace)) throw Error("Invalid collection namespace");
+    let view, tail=Promise.resolve(), seq=0, activeOwner=owner();
     const queue=[], pending=new Map();
-    const prefix=()=> "tb-edit-journal-v1:"+owner()+":";
+    const prefix=()=> namespace+"-edit-journal-v1:"+owner()+":";
     const has=(key)=>pending.has(key) || storage.getItem(key)!==null;
     function readDraft(key) {return pending.get(key) || JSON.parse(storage.getItem(key));}
     function remember(key, entry) {
       try { storage.setItem(key,JSON.stringify(entry));pending.delete(key); } catch { pending.set(key,entry);issue("Device storage is full. Keep this tab open until the cloud save finishes."); }
     }
     function drop(key) {storage.removeItem(key);pending.delete(key);}
-    function begin(value) {view=clone(value);}
+    function syncOwner() {
+      if(activeOwner!==owner()) {activeOwner=owner();view=undefined;queue.length=0;}
+    }
+    function begin(value) {syncOwner();view=clone(value);}
     function stage(value) {
-      if (!view || !owner()) return;
+      syncOwner();
+      if (!view || !owner()) return false;
       const ops=changes(view,value);
-      if (!ops.length) return;
+      if (!ops.length) return true;
       const key=prefix()+id+":"+(++seq);
       remember(key,{created:Date.now(),writer:id,seq,version:2,ops});
       const reviewIndex=queue.findIndex(k=>readDraft(k)?.review);
       if(reviewIndex<0) queue.push(key); else queue.splice(reviewIndex,0,key);
       view=clone(value);
+      return true;
     }
     function combine(entries) {
       const merged=new Map();
@@ -111,7 +121,7 @@
           if(!next || keys.length===128 || next.writer!==entry.writer || next.review || entry.review) break;
           keys.push(k);entries.push(next);
         }
-        const editKeys=keys.map(k=>k.slice(prefix().length));
+        const editKeys=keys.map(k=>(namespace === "tb" ? "" : namespace+":")+k.slice(prefix().length));
         let done=false;
         for(let attempt=0;attempt<4;attempt++) {
           const row=await read(editKeys);
@@ -135,7 +145,7 @@
             });
             outstanding.unshift({ops});
           }
-          const {result,conflicts}=apply(row.value,combine(outstanding),entry.choices);
+          const {result,conflicts}=apply(row.value,combine(outstanding),entry.choices,{keepFullHistory:namespace!=="tb"});
           if(conflicts.length) {
             const err=Error("A saved value changed on another device. Review the pending edit.");
             err.conflicts=conflicts; err.journal=key; throw err;
@@ -153,16 +163,18 @@
       return last;
     }
     function flush() {
+      syncOwner();
       const task=tail.then(drain);
       tail=task.catch(()=>{});
       return task;
     }
     function resume() {
+      syncOwner();
       if(owner()) {
-        const keys=[];
+        const keys=[...pending.keys()].filter(k=>k.startsWith(prefix()) && !queue.includes(k));
         for(let i=0;i<storage.length;i++) {
           const k=storage.key(i);
-          if(k && k.startsWith(prefix()) && !k.endsWith(":resolved") && !queue.includes(k)) keys.push(k);
+          if(k && k.startsWith(prefix()) && !k.endsWith(":resolved") && !queue.includes(k) && !keys.includes(k)) keys.push(k);
         }
         keys.sort((a,b)=>Number(!!readDraft(a).review)-Number(!!readDraft(b).review) || readDraft(a).created-readDraft(b).created || a.localeCompare(b,undefined,{numeric:true}));
         queue.push(...keys);

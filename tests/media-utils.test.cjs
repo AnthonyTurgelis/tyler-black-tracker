@@ -136,3 +136,12 @@ test('unsigned Top100 source facts filter as pre-production proofs while catalog
   assert.equal(TM.reviewFlags(observation).identity,true);
   assert.equal(observation.serial,undefined,'a visible source marking never becomes a physical-copy serial');
 });
+
+test('other collections never inherit Tyler jersey 7 without explicit on-card evidence',()=>{
+  const TM=require('../media-utils');
+  assert.equal(TM.jerseyMatches({serial:'7/99'},'',null,null).primary,false);
+  assert.equal(TM.jerseyMatches({serial:'7/99'},'',null,null).secondary,false);
+  const verified={serial:'7/99',secondaryJerseyNumber:'7',secondaryJerseyEvidence:{confirmed:true,sourceUrl:'https://example.test/card.jpg',note:'7 visible on this card'}};
+  assert.equal(TM.jerseyMatches(verified,'',null,null).secondary,true);
+  assert.equal(TM.jerseyMatches({serial:'7/99'}).primary,true,'Tyler behavior is unchanged');
+});

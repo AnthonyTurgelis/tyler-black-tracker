@@ -3,13 +3,13 @@ const PH=require('../price-history-utils.js'),KEY='tb-price-history-v1',source=f
 const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
 const observation=(id,extra={})=>({observationKey:id,date:'2026-11-16',observedAt:'2026-11-16T10:00:00Z',source:'eBay',currency:'USD',kind:'asking',price:10,titles:['Card'],...extra});
 
-async function boot(initial) {
+async function boot(initial, key=KEY) {
  const cache=new Map(),db={row:initial===undefined?null:{value:clone(initial),updated_at:'v1'},version:1},calls={reads:0,writes:[],beforeWrite:null,failRead:false,conflictAlways:false};
  const client={auth:{getSession:async()=>({data:{session:{user:{id:'owner'}}}})},from(table){
   let operation='read',payload,filters={};
-  const query={select(){return this;},eq(key,value){filters[key]=value;return this;},insert(row){operation='insert';payload=row;return this;},update(row){operation='update';payload=row;return this;},
+  const query={select(){return this;},in(){return this;},eq(key,value){filters[key]=value;return this;},insert(row){operation='insert';payload=row;return this;},update(row){operation='update';payload=row;return this;},
    then(resolve,reject){return Promise.resolve({data:[],error:null}).then(resolve,reject);},
-   async maybeSingle(){assert.equal(table,'collection_kv');
+   async maybeSingle(){assert.equal(table,key.startsWith('tempo-')?'tempo_collection_kv':'collection_kv');assert.equal(operation==='insert'?payload.key:filters.key,key);
     if(operation==='read'){calls.reads++;return {data:clone(db.row),error:calls.failRead?{message:'Read failed'}:null};}
     calls.writes.push({operation,filters:clone(filters),value:clone(payload.value)});if(calls.beforeWrite)await calls.beforeWrite({operation,payload,filters,db});
     if(operation==='insert'&&db.row)return{data:null,error:{code:'23505',message:'Duplicate key'}};
@@ -106,4 +106,13 @@ test('partial duplicate evidence preserves older fields and unions notes/titles 
  assert.deepEqual(row.notes,['Reviewed front','Cached title']);assert.deepEqual(row.titles,['Original title','Revised title']);
  const equal=PH.merge({card:[existing]},{card:[{...incoming,observedAt:existing.observedAt}]}).card[0];
  assert.equal(equal.price,12);assert.equal(equal.currency,'USD');assert.equal(equal.seller,'Verified seller');
+});
+
+for(const key of ['tb-price-history-v1','tempo-price-history-v1']) test(key+' preserves concurrent observations and explicit removal in its own table',async()=>{
+ const a=observation('a'),b=observation('b'),h=await boot({card:[a,b]},key);
+ const deleted=PH.applyChanges({card:[a,b]},[{cardKey:'card',entries:[a]}],[],'2026-11-18T19:00:00Z');
+ assert.equal((await h.window.storage.set(key,deleted)).cloudSaved,true);
+ assert.equal((await h.window.storage.set(key,{card:[a,b,observation('new')]})).cloudSaved,true);
+ assert.deepEqual(h.db.row.value.card.map(PH.identity).sort(),['b','new']);
+ assert.equal(h.calls.writes.length,2);assert.equal(h.calls.writes[1].filters.updated_at,'v2');
 });

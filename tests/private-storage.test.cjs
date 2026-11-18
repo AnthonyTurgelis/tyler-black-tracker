@@ -21,6 +21,7 @@ async function boot() {
       let operation = 'read', payload, filters = {};
       const query = {
         select() { return this; },
+        in() { return this; },
         eq(key,value) { filters[key] = value; return this; },
         insert(value) { operation = 'insert'; payload = value; return this; },
         update(value) { operation = 'update'; payload = value; return this; },
@@ -51,7 +52,7 @@ async function boot() {
   };
   const window = {CollectionSync:require("../collection-sync.js"),SUPABASE_URL:'https://example.invalid',SUPABASE_ANON_KEY:'public-test-key',supabase:{createClient:()=>client},dispatchEvent(event){auth.events.push(event);}};
   const localStorage = {get length(){return cache.size;},key:i=>[...cache.keys()][i],getItem:k=>cache.get(k)||null,setItem:(k,v)=>cache.set(k,v),removeItem:k=>cache.delete(k)};
-  vm.runInNewContext(source,{window,localStorage,console:{log(){},warn(){},error(){}},CustomEvent:function(type,options){this.type=type;this.detail=options.detail;},setTimeout(){}});
+  vm.runInNewContext(source,{window,localStorage,console:{log(){},warn(){},error(){}},CustomEvent:function(type,options){this.type=type;this.detail=options.detail;},setTimeout(fn,ms){if(ms===0)queueMicrotask(fn);}});
   await window.storageReady;
   auth.switchUser = user => { auth.user=user; auth.callback(user ? 'SIGNED_IN' : 'SIGNED_OUT',user ? {user} : null); };
   return {window,auth,cache,rows,calls};
@@ -154,4 +155,17 @@ test('saving without the identity captured by the load is rejected', async () =>
   const h=await boot();
   const result=await h.window.trackerPrivateStore.save(KEY,{private:'A order'},null);
   assert.equal(result.ok,false); assert.match(result.error,/refresh/i); assert.equal(h.calls.length,0);
+});
+
+test('Tyler and Tempo private copy inventories isolate identical card and receipt IDs',async()=>{
+  const h=await boot(),tempoKey='tempo-copy-inventory-v1';
+  const tyler={copies:{same:{cardId:7,serial:'3/25'}},observations:{receipt:{title:'Tyler Black',currency:'USD'}}};
+  const tempo={copies:{same:{cardId:7,serial:'8/25'}},observations:{receipt:{title:'Tempo player',currency:'CAD'}}};
+  assert.equal((await h.window.trackerPrivateStore.save(KEY,tyler,null,'owner-a')).ok,true);
+  assert.equal((await h.window.trackerPrivateStore.save(tempoKey,tempo,null,'owner-a')).ok,true);
+  const loaded=await h.window.trackerPrivateStore.load(tempoKey);
+  assert.deepEqual(loaded.value,tempo);assert.deepEqual(h.rows.get('owner-a:'+KEY).value,tyler);
+  const update={...tempo,copies:{same:{cardId:7,serial:'9/25'}}};
+  assert.equal((await h.window.trackerPrivateStore.save(tempoKey,update,loaded.revision,loaded.ownerId)).ok,true);
+  assert.deepEqual(h.rows.get('owner-a:'+KEY).value,tyler);assert.equal(h.cache.size,0);
 });

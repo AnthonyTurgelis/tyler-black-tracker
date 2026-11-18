@@ -93,8 +93,8 @@ function getLowestTargetPrice(cardId, targetByCardId) {
 // Get lowest scanner price for a card from PRICE_HISTORY
 function getLowestScannerPrice(card) {
   var pk = globalPriceKey(card);
-  if (!pk || !PRICE_HISTORY[pk]) return null;
-  var entries = Array.isArray(PRICE_HISTORY[pk]) ? PRICE_HISTORY[pk] : (PRICE_HISTORY[pk].entries || []);
+  var entries = window.PriceHistoryUtils.entriesForCard(PRICE_HISTORY, card, ALL_CARDS);
+  if (!pk || !entries.length) return null;
   if (!entries.length) return null;
   var lowest = Infinity;
   for (var i = 0; i < entries.length; i++) {
@@ -137,16 +137,16 @@ function useIsOwner() {
 }
 // ──────────────────────────────────────────────────────────────────────────
 
-function loadPriceHistory() { try { var k=tbk("price-history-v1"), raw=JSON.parse(localStorage.getItem(k) || "{}"); return k === "tb-price-history-v1" ? window.PriceHistoryUtils.visible(raw) : raw; } catch(e) { return {}; } }
+function loadPriceHistory() { try { var k=tbk("price-history-v1"), raw=JSON.parse(localStorage.getItem(k) || "{}"); return /^(tb|tempo)-price-history-v1$/.test(k) ? window.PriceHistoryUtils.visible(raw) : raw; } catch(e) { return {}; } }
 function savePriceHistory(obj, changes) {
   var k = tbk("price-history-v1"), value=obj;
-  if (k === "tb-price-history-v1") {
+  if (/^(tb|tempo)-price-history-v1$/.test(k)) {
     value=window.PriceHistoryUtils.merge(localStorage.getItem(k),obj);
     if (changes) value=window.PriceHistoryUtils.applyChanges(value,changes.removals,changes.restores);
   }
   localStorage.setItem(k,JSON.stringify(value));
   try { var pending=window.storage.set(k,JSON.stringify(value)); if(pending && pending.catch) pending.catch(function(error){window.dispatchEvent(new CustomEvent("storage-sync-issue",{detail:{key:k,error:error.message || "Price history could not be saved."}}));}); } catch(e) {}
-  PRICE_HISTORY = k === "tb-price-history-v1" ? window.PriceHistoryUtils.visible(value) : value;
+  PRICE_HISTORY = /^(tb|tempo)-price-history-v1$/.test(k) ? window.PriceHistoryUtils.visible(value) : value;
 }
 var TCDB_FLAGS = {}; // Populated from localStorage -- flagged bad links
 var EBAY_BLOCKED = {}; // Populated from localStorage -- blocked eBay listings
@@ -157,15 +157,16 @@ function saveEbayBids(obj) { var k = tbk("ebay-bids-v1"); localStorage.setItem(k
 function loadTargets() { try { return JSON.parse(localStorage.getItem(tbk("targets-v1")) || "{}"); } catch(e) { return {}; } }
 function saveTargets(obj) { var k = tbk("targets-v1"); localStorage.setItem(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} }
 function globalPriceKey(card) {
-  if (!card) return null;
-  if (card.priceKey) return card.priceKey;
-  return card.product.slice(0,4) + "|" + card.product + "|" + card.cardNumber + "|" + (card.cardSet || "Base");
+  return window.PriceHistoryUtils.cardKey(card);
 }
 function Sparkline({ card, width, height }) {
   var pk = globalPriceKey(card);
-  if (!pk || !PRICE_HISTORY[pk]) return null;
-  var entries = Array.isArray(PRICE_HISTORY[pk]) ? PRICE_HISTORY[pk] : (PRICE_HISTORY[pk].entries || []);
+  var entries = window.PriceHistoryUtils.entriesForCard(PRICE_HISTORY, card, ALL_CARDS);
+  if (!pk || !entries.length) return null;
   if (entries.length < 2) return null;
+  var series = window.TrackerMarket.groupSeries(entries);
+  if (series.length !== 1 || series[0].currency === "UNKNOWN" || series[0].kind === "unknown") return null;
+  entries = series[0].entries.slice().sort(function(a,b){return String(a.observedAt || a.date || "").localeCompare(String(b.observedAt || b.date || ""));});
   var prices = entries.map(function(e) { return e.price; }).filter(function(p) { return p > 0; });
   if (prices.length < 2) return null;
   var w = width || 40, h = height || 14;
@@ -337,18 +338,24 @@ function ebayUrlsSuper(card) {
 }
 var COMC_PLAYER = "https://www.comc.com/Players/Baseball/Tyler_Black/c389004";
 function comcUrl(card) {
+  if (!card || card.player || card.subject || card.playerName) return null;
   var terms = card.product.replace(/'/g, "").replace(/\s*\([^)]*\)/g, "") + " " + card.cardNumber + " " + card.cardSet;
   return COMC_PLAYER + ",+" + terms.replace(/[&\/]/g, " ").replace(/\s+/g, " ").trim().replace(/ /g, "+");
 }
 var SPORTLOTS_PLAYER = "https://sportlots.com/Baseball/cards/Tyler-Black.tpl";
 function sportLotsUrl() { return SPORTLOTS_PLAYER; }
 var WHATNOT_SEARCH = "https://www.whatnot.com/search?q=tyler+black&category=sports-cards&subcategory=baseball-cards";
-function whatnotUrl() { return WHATNOT_SEARCH; }
+function whatnotUrl(card) {
+  if (!card) return window.MODE === "wnba" ? "https://www.whatnot.com/search?q=Toronto%20Tempo&category=sports-cards" : WHATNOT_SEARCH;
+  var name = window.CollectionScanner.subject(card, window.TEMPO_ROSTER || {}) || "Tyler Black";
+  return "https://www.whatnot.com/search?q=" + encodeURIComponent(name + " " + cardYear(card) + " " + card.cardNumber + " " + String(card.product || "").replace(/^\d{4}\s*/, "")) + "&category=sports-cards";
+}
 function pt130Url(card) {
-  if (!card) return "https://130point.com/sales/?search=tyler+black";
-  var yr = (card.product.match(/^\d{4}/) || [""])[0];
+  if (!card) return "https://130point.com/sales/?search=" + encodeURIComponent(window.MODE === "wnba" ? "Toronto Tempo" : "Tyler Black");
+  var yr = cardYear(card);
   var prodNoYear = card.product.replace(/^\d{4}\s*/, "").replace(/\s*\(NOT_ON_TCDB\)/, "");
-  var q = "tyler black " + yr + " " + card.cardNumber + " " + prodNoYear;
+  var name = window.CollectionScanner.subject(card, window.TEMPO_ROSTER || {}) || "Tyler Black";
+  var q = name + " " + yr + " " + card.cardNumber + " " + prodNoYear;
   return "https://130point.com/sales/?search=" + encodeURIComponent(q.trim());
 }
 let TB_ALL_CARDS = expandData(RAW_DATA).filter(function(c) { return c.id !== 1; }).concat(window.TB_CATALOG_UPDATES || []);
@@ -468,7 +475,7 @@ ALL_CARDS.forEach(function(c) {
   var words = v.split(/\s+/).filter(function(w) { return w.length >= 2; });
   if (words.length > 0 && words.every(function(w) { return EBAY_AMBIGUOUS_WORDS[w]; })) {
     AMBIGUOUS_CARD_IDS.add(c.id);
-    AMBIGUOUS_PRICE_KEYS.add(c.product.slice(0,4) + "|" + c.product + "|" + c.cardNumber + "|" + (c.cardSet || "Base"));
+    AMBIGUOUS_PRICE_KEYS.add(globalPriceKey(c));
   }
 });
 // Fast card lookup by ID - used by recordPrice instead of ALL_CARDS.find()
@@ -489,21 +496,33 @@ if (typeof window !== "undefined") {
     if (e.detail.mode === "wnba") {
       DUPES = [];
       HIDDEN_DUPES = new Set();
+      EXTRA_DUPES = HIDDEN_DUPES;
+      NOT_SYNCED = new Set(); NOT_ON_TCDB = new Set(); MISSING_FROM_TCDB = new Set();
+      EBAY_IDS = new Set(); MULTI_EBAY = new Set(); EBAY_ORDERS = {};
     } else {
       DUPES = TB_DUPES;
       HIDDEN_DUPES = TB_HIDDEN_DUPES;
+      EXTRA_DUPES = TB_HIDDEN_DUPES;
+      NOT_SYNCED = TB_NOT_SYNCED; NOT_ON_TCDB = TB_NOT_ON_TCDB; MISSING_FROM_TCDB = TB_MISSING_FROM_TCDB;
+      EBAY_IDS = TB_EBAY_IDS; MULTI_EBAY = TB_MULTI_EBAY; EBAY_ORDERS = TB_EBAY_ORDERS;
     }
   });
 }
 const DUPE_QTY_INIT = {33:1,294:1,875:1,878:1}; // primary cards with extra statused copies
-const NOT_SYNCED = new Set(RAW_DATA.not_synced || []);
-const NOT_ON_TCDB = new Set([1472,1473,1474,1475,1476,1477,1478,1479]);
-const MISSING_FROM_TCDB = new Set([968,969,970,971,972,973,974,975,976,977,978,979,980,981]);
-const EXTRA_DUPES = HIDDEN_DUPES; // backward compat alias
-const EBAY_IDS = new Set([3,8,12,32,57,91,92,106,112,113,121,145,158,199,202,204,227,232,253,255,258,272,273,276,277,293,302,307,308,314,319,331,334,349,361,373,388,437,451,454,459,483,500,512,514,534,549,573,616,626,643,650,652,653,657,658,660,664,666,673,675,683,684,685,687,691,693,699,711,736,758,760,775,780,808,841,849,855,856,862,863,871,879,881,887,888,899,906,924,934,940,945,952,953,954,958,964,965,971,975,977,978,980,981,983,985,988,989,1000,1002,1005,1012,1018,1023,1025,1029,1041,1056,1068,1069,1094,1098,1104,1107,1109,1116,1137,1139,1151,1209,1212,1218,1221,1232,1241,1250,1257,1276,1286,1288,1304,1308,1311,1313,1316,1317,1330,1357,1371,1383,1388,1390,1396,1398,1401,1417,1420]);
-const MULTI_EBAY = new Set([57,112,307,314,349,437,643,653,660,666,693,736,871,879,954,971,975,1000,1012,1069,1104,1276,1388]);
-const EBAY_ORDERS={"3":"01-10569-82556","8":"19-10579-25938","12":"05-13269-40771","32":"14-13863-41516","57":"07-14016-02005","91":"10-13989-82166","92":"07-13996-14051","106":"23-13802-33304","112":"23-13802-33304","113":"09-14061-68316","121":"04-14163-75237","145":"25-14081-12262","158":"16-14152-79872","199":"08-13992-50613","202":"20-13660-42140","204":"19-13809-83289","227":"16-13813-95195","232":"23-13802-33304","253":"15-13505-52573","255":"05-14106-79011","258":"25-13241-99537","272":"08-13188-68193","273":"05-13541-82282","276":"19-14000-28543","277":"21-13999-14291","293":"13-13941-50267","302":"09-10667-00902","307":"07-14045-70384","308":"24-13317-71730","314":"09-14061-68317","319":"09-14061-68317","331":"09-14061-68315","334":"14-13188-86252","349":"04-13329-51743","361":"12-13815-42719","373":"22-13970-20992","388":"23-13802-33304","437":"09-14120-70554","451":"01-13830-87479","454":"17-14109-43575","459":"22-14043-40803","483":"22-13173-03861","500":"19-14075-98262","512":"01-14073-62987","514":"03-14074-39244","534":"20-13973-58268","549":"15-13180-05837","573":"02-13621-05141","616":"20-13804-06916","626":"09-13207-17087","643":"27-13988-02244","650":"12-13838-36620","652":"22-12653-78553","653":"20-13931-61616","657":"07-12663-64721","658":"26-12644-44368","660":"25-13797-11931","664":"10-14118-70535","666":"24-13817-48959","673":"12-13838-36620","675":"15-12654-01101","683":"11-13471-09535","684":"14-12655-26561","685":"10-12665-41096","687":"08-12667-63770","691":"21-12652-40109","693":"05-12667-66600","699":"07-12787-09777","711":"15-13638-67907","736":"23-13800-09954","758":"23-13251-64587","760":"15-13855-78087","775":"09-14032-83495","780":"26-13840-52249","808":"23-14077-11619","841":"07-12534-67938","849":"24-14114-37037","855":"14-13188-86252","856":"13-13614-54271","862":"10-14119-26694","863":"20-13612-97452","871":"14-13782-17023","879":"05-14095-95800","881":"21-13315-97580","887":"09-13749-35221","888":"04-14069-26885","899":"06-13827-98668","906":"22-13622-24600","924":"01-13490-79609","934":"20-13804-11045","940":"24-13185-19070","945":"05-13193-65487","952":"25-13452-47031","953":"18-13093-66593","954":"27-14036-69268","958":"10-13475-38186","964":"12-13469-96808","965":"25-13453-85178","971":"27-13804-88657","975":"19-13814-37357","977":"04-14139-74277","978":"17-13817-08536","980":"07-13854-71671","981":"18-12650-80902","983":"13-13826-86488","985":"25-14094-11278","988":"06-13836-55786","989":"20-13979-31887","1000":"10-12665-43528","1002":"20-12649-63500","1005":"20-13794-54378","1012":"11-14153-43763","1018":"12-12657-91135","1023":"03-12669-49550","1025":"13-12658-12767","1029":"02-12669-81516","1041":"10-13286-26132","1056":"15-13947-06800","1068":"12-12663-27978","1069":"27-12645-79442","1094":"11-13644-16209","1098":"07-14045-70385","1104":"24-13991-56188","1107":"22-13933-67704","1109":"07-13989-68962","1116":"06-13832-65499","1137":"24-12659-72975","1139":"02-12670-90573","1151":"27-13966-28254","1209":"25-14032-36475","1212":"01-14046-06072","1218":"07-13935-14571","1221":"27-13907-21909","1232":"26-13795-88577","1241":"24-13285-91373","1250":"22-14004-49033","1257":"15-13619-68949","1276":"09-14089-64729","1286":"24-13925-99770","1288":"04-13939-23947","1304":"07-13822-27916","1308":"27-13595-87051","1311":"25-13909-96233","1313":"20-13175-58858","1316":"18-13310-99826","1317":"22-12653-78553","1330":"16-13637-37471","1357":"16-14000-46274","1371":"11-13929-44435","1383":"01-13943-96198","1388":"15-14134-48316","1390":"20-13917-17991","1396":"07-13569-92315","1398":"19-13174-33264","1401":"22-13593-67618","1417":"10-14115-17049","1420":"19-14102-65835"};
-function orderUrl(card) { var oid = EBAY_ORDERS[String(card.id)]; return oid ? "https://order.ebay.ca/ord/show?orderId=" + oid : null; }
+const TB_NOT_SYNCED = new Set(RAW_DATA.not_synced || []);
+let NOT_SYNCED = TB_NOT_SYNCED;
+const TB_NOT_ON_TCDB = new Set([1472,1473,1474,1475,1476,1477,1478,1479]);
+let NOT_ON_TCDB = TB_NOT_ON_TCDB;
+const TB_MISSING_FROM_TCDB = new Set([968,969,970,971,972,973,974,975,976,977,978,979,980,981]);
+let MISSING_FROM_TCDB = TB_MISSING_FROM_TCDB;
+let EXTRA_DUPES = HIDDEN_DUPES; // backward compat alias
+const TB_EBAY_IDS = new Set([3,8,12,32,57,91,92,106,112,113,121,145,158,199,202,204,227,232,253,255,258,272,273,276,277,293,302,307,308,314,319,331,334,349,361,373,388,437,451,454,459,483,500,512,514,534,549,573,616,626,643,650,652,653,657,658,660,664,666,673,675,683,684,685,687,691,693,699,711,736,758,760,775,780,808,841,849,855,856,862,863,871,879,881,887,888,899,906,924,934,940,945,952,953,954,958,964,965,971,975,977,978,980,981,983,985,988,989,1000,1002,1005,1012,1018,1023,1025,1029,1041,1056,1068,1069,1094,1098,1104,1107,1109,1116,1137,1139,1151,1209,1212,1218,1221,1232,1241,1250,1257,1276,1286,1288,1304,1308,1311,1313,1316,1317,1330,1357,1371,1383,1388,1390,1396,1398,1401,1417,1420]);
+let EBAY_IDS = TB_EBAY_IDS;
+const TB_MULTI_EBAY = new Set([57,112,307,314,349,437,643,653,660,666,693,736,871,879,954,971,975,1000,1012,1069,1104,1276,1388]);
+let MULTI_EBAY = TB_MULTI_EBAY;
+const TB_EBAY_ORDERS={"3":"01-10569-82556","8":"19-10579-25938","12":"05-13269-40771","32":"14-13863-41516","57":"07-14016-02005","91":"10-13989-82166","92":"07-13996-14051","106":"23-13802-33304","112":"23-13802-33304","113":"09-14061-68316","121":"04-14163-75237","145":"25-14081-12262","158":"16-14152-79872","199":"08-13992-50613","202":"20-13660-42140","204":"19-13809-83289","227":"16-13813-95195","232":"23-13802-33304","253":"15-13505-52573","255":"05-14106-79011","258":"25-13241-99537","272":"08-13188-68193","273":"05-13541-82282","276":"19-14000-28543","277":"21-13999-14291","293":"13-13941-50267","302":"09-10667-00902","307":"07-14045-70384","308":"24-13317-71730","314":"09-14061-68317","319":"09-14061-68317","331":"09-14061-68315","334":"14-13188-86252","349":"04-13329-51743","361":"12-13815-42719","373":"22-13970-20992","388":"23-13802-33304","437":"09-14120-70554","451":"01-13830-87479","454":"17-14109-43575","459":"22-14043-40803","483":"22-13173-03861","500":"19-14075-98262","512":"01-14073-62987","514":"03-14074-39244","534":"20-13973-58268","549":"15-13180-05837","573":"02-13621-05141","616":"20-13804-06916","626":"09-13207-17087","643":"27-13988-02244","650":"12-13838-36620","652":"22-12653-78553","653":"20-13931-61616","657":"07-12663-64721","658":"26-12644-44368","660":"25-13797-11931","664":"10-14118-70535","666":"24-13817-48959","673":"12-13838-36620","675":"15-12654-01101","683":"11-13471-09535","684":"14-12655-26561","685":"10-12665-41096","687":"08-12667-63770","691":"21-12652-40109","693":"05-12667-66600","699":"07-12787-09777","711":"15-13638-67907","736":"23-13800-09954","758":"23-13251-64587","760":"15-13855-78087","775":"09-14032-83495","780":"26-13840-52249","808":"23-14077-11619","841":"07-12534-67938","849":"24-14114-37037","855":"14-13188-86252","856":"13-13614-54271","862":"10-14119-26694","863":"20-13612-97452","871":"14-13782-17023","879":"05-14095-95800","881":"21-13315-97580","887":"09-13749-35221","888":"04-14069-26885","899":"06-13827-98668","906":"22-13622-24600","924":"01-13490-79609","934":"20-13804-11045","940":"24-13185-19070","945":"05-13193-65487","952":"25-13452-47031","953":"18-13093-66593","954":"27-14036-69268","958":"10-13475-38186","964":"12-13469-96808","965":"25-13453-85178","971":"27-13804-88657","975":"19-13814-37357","977":"04-14139-74277","978":"17-13817-08536","980":"07-13854-71671","981":"18-12650-80902","983":"13-13826-86488","985":"25-14094-11278","988":"06-13836-55786","989":"20-13979-31887","1000":"10-12665-43528","1002":"20-12649-63500","1005":"20-13794-54378","1012":"11-14153-43763","1018":"12-12657-91135","1023":"03-12669-49550","1025":"13-12658-12767","1029":"02-12669-81516","1041":"10-13286-26132","1056":"15-13947-06800","1068":"12-12663-27978","1069":"27-12645-79442","1094":"11-13644-16209","1098":"07-14045-70385","1104":"24-13991-56188","1107":"22-13933-67704","1109":"07-13989-68962","1116":"06-13832-65499","1137":"24-12659-72975","1139":"02-12670-90573","1151":"27-13966-28254","1209":"25-14032-36475","1212":"01-14046-06072","1218":"07-13935-14571","1221":"27-13907-21909","1232":"26-13795-88577","1241":"24-13285-91373","1250":"22-14004-49033","1257":"15-13619-68949","1276":"09-14089-64729","1286":"24-13925-99770","1288":"04-13939-23947","1304":"07-13822-27916","1308":"27-13595-87051","1311":"25-13909-96233","1313":"20-13175-58858","1316":"18-13310-99826","1317":"22-12653-78553","1330":"16-13637-37471","1357":"16-14000-46274","1371":"11-13929-44435","1383":"01-13943-96198","1388":"15-14134-48316","1390":"20-13917-17991","1396":"07-13569-92315","1398":"19-13174-33264","1401":"22-13593-67618","1417":"10-14115-17049","1420":"19-14102-65835"};
+let EBAY_ORDERS = TB_EBAY_ORDERS;
+function orderUrl(card) { if(window.MODE === "wnba") return null; var oid = EBAY_ORDERS[String(card.id)]; return oid ? "https://order.ebay.ca/ord/show?orderId=" + oid : null; }
 const STATUS_CONFIG = {
   owned: { label: "Owned", dot: "bg-green-500", bg: "bg-green-900/30", border: "border-green-500", emoji: "v" },
   in_transit: { label: "In Transit", dot: "bg-emerald-400", bg: "bg-emerald-900/30", border: "border-emerald-400", emoji: ">" },
@@ -519,6 +538,7 @@ function TylerBlackTracker() {
   const [isOwner, setIsOwner] = useState(false);
   // WNBA Tempo mode subscription — fires re-render on modechange events from storage-shim
   var trackerMode = useTrackerMode();
+  const copyStorageKey=trackerMode === "wnba" ? "tempo-copy-inventory-v1" : "tb-copy-inventory-v1";
   useEffect(function() {
     function onAuth(event) { setIsOwner(!!event.detail.isOwner); }
     window.addEventListener("authchange", onAuth);
@@ -536,14 +556,16 @@ function TylerBlackTracker() {
   const [publicMedia, setPublicMedia] = useState(function() { return window.TrackerMedia.normalizePublicMedia(null); });
   const [mediaStorage, setMediaStorage] = useState({loading:false,error:""});
   const refreshPublicMedia = useCallback(async function() {
+    if(trackerMode !== "tb") {setPublicMedia(window.TrackerMedia.normalizePublicMedia(null));setMediaStorage({loading:false,error:""});return {ok:true};}
     setMediaStorage({loading:true,error:""});
     try {
       var result = window.trackerMediaStore ? await window.trackerMediaStore.load() : {ok:true,value:window.TrackerMedia.normalizePublicMedia(localStorage.getItem("tb-card-media-v1"))};
+      if((window.MODE || "tb")!==trackerMode) return {ok:false,error:"Collection changed."};
       if (result.value) setPublicMedia(window.TrackerMedia.normalizePublicMedia(result.value));
       setMediaStorage({loading:false,error:result.error || ""});
       return result;
     } catch (error) { setMediaStorage({loading:false,error:error.message}); return {ok:false,error:error.message}; }
-  }, []);
+  }, [trackerMode]);
   useEffect(function() { refreshPublicMedia(); }, [refreshPublicMedia]);
   const [copyStorage, setCopyStorage] = useState({ ready: false, loading: false, error: "" });
   const copyStateRef = useRef({ inventory: window.CopyInventory.normalizeState(null), revision: null, ownerId: null, ready: false, epoch: 0 });
@@ -551,16 +573,16 @@ function TylerBlackTracker() {
     var epoch = ++copyStateRef.current.epoch;
     copyStateRef.current.ready = false;
     setCopyStorage({ ready: false, loading: true, error: "" });
-    var result = window.trackerPrivateStore ? await window.trackerPrivateStore.load("tb-copy-inventory-v1") : { ok: false, error: "Private storage is unavailable." };
-    if (epoch !== copyStateRef.current.epoch) return;
+    var result = window.trackerPrivateStore ? await window.trackerPrivateStore.load(copyStorageKey) : { ok: false, error: "Private storage is unavailable." };
+    if (epoch !== copyStateRef.current.epoch || (window.MODE || "tb")!==trackerMode) return;
     if (!result.ok || !result.ownerId) { setCopyStorage({ ready: false, loading: false, error: result.error || "Your account could not be verified. Refresh your private inventory." }); return result; }
     if (window.trackerAuth.userId && window.trackerAuth.userId() !== result.ownerId) return { ok: false, error: "Your session changed. Refresh your private inventory." };
     var value = window.CopyInventory.normalizeState(result.value);
-    copyStateRef.current = { inventory: value, revision: result.revision, ownerId: result.ownerId, ready: true, epoch: epoch };
+    copyStateRef.current = { inventory: value, revision: result.revision, ownerId: result.ownerId, ready: true, epoch: epoch, key:copyStorageKey };
     setCopyInventory(value);
     setCopyStorage({ ready: true, loading: false, error: "" });
     return { ok: true };
-  }, []);
+  }, [copyStorageKey,trackerMode]);
   useEffect(function() {
     function clearPrivateInventory() {
       copyStateRef.current = { inventory: window.CopyInventory.normalizeState(null), revision: null, ownerId: null, ready: false, epoch: copyStateRef.current.epoch + 1 };
@@ -571,17 +593,17 @@ function TylerBlackTracker() {
       clearPrivateInventory();
       scannerStateRef.current = null;
       setActiveTab(function(tab) { return ["copies", "comc_scanner", "collection"].includes(tab) ? "summary" : tab; });
-      if (event.detail.isOwner && trackerMode === "tb") refreshCopyInventory();
+      if (event.detail.isOwner) refreshCopyInventory();
     }
     window.addEventListener("authchange", authChanged);
-    if (isOwner && trackerMode === "tb") refreshCopyInventory(); else clearPrivateInventory();
+    if (isOwner) refreshCopyInventory(); else clearPrivateInventory();
     return function() { window.removeEventListener("authchange", authChanged); };
   }, [isOwner, trackerMode, refreshCopyInventory]);
   const saveCopyInventory = useCallback(async function(next) {
     var current = copyStateRef.current, epoch = current.epoch;
-    if (!current.ready || !current.ownerId) return { ok: false, error: "Load your private copy inventory before saving." };
-    var result = await window.trackerPrivateStore.save("tb-copy-inventory-v1", next, current.revision, current.ownerId);
-    if (epoch !== copyStateRef.current.epoch) return { ok: false, error: "Your session changed. Sign in again." };
+    if (!current.ready || !current.ownerId || current.key!==copyStorageKey || (window.MODE || "tb")!==trackerMode) return { ok: false, error: "Load this collection’s private copy inventory before saving." };
+    var result = await window.trackerPrivateStore.save(copyStorageKey, next, current.revision, current.ownerId);
+    if (epoch !== copyStateRef.current.epoch || (window.MODE || "tb")!==trackerMode) return { ok: false, error: "Your collection or session changed. Refresh before saving." };
     if (!result.ok) {
       if (result.conflict || result.signedOut) copyStateRef.current.ready = false;
       if (result.signedOut) {
@@ -594,13 +616,13 @@ function TylerBlackTracker() {
     }
     if (result.ownerId !== current.ownerId) return { ok: false, error: "Your session changed. Refresh your private inventory." };
     var value = window.CopyInventory.normalizeState(result.value);
-    copyStateRef.current = { inventory: value, revision: result.revision, ownerId: result.ownerId, ready: true, epoch: epoch };
+    copyStateRef.current = { inventory: value, revision: result.revision, ownerId: result.ownerId, ready: true, epoch: epoch, key:copyStorageKey };
     setCopyInventory(value);
     setCopyStorage({ ready: true, loading: false, error: "" });
     return { ok: true };
-  }, []);
+  }, [copyStorageKey,trackerMode]);
   const importPurchaseCopy = useCallback(async function(card, parsed) {
-    if (!copyStateRef.current.ready) return { ok: false, error: "Open Copies and sign in or refresh the private inventory before importing purchases." };
+    if (!copyStateRef.current.ready || copyStateRef.current.key!==copyStorageKey || (window.MODE || "tb")!==trackerMode) return { ok: false, error: "Open Copies and refresh this collection’s inventory before importing purchases." };
     var code = window.TrackerMarket.currency(parsed.currency);
     var result = window.CopyInventory.upsertPurchase(copyStateRef.current.inventory, {
       cardId: card.id, source: String(parsed.source || parsed.seller || "manual").toLowerCase(),
@@ -609,11 +631,11 @@ function TylerBlackTracker() {
       observationId: parsed.source === "Manual" ? parsed.observationId : "",
       sourceUrl: window.TrackerMarket.safeUrl(parsed.itemUrl || parsed.url || parsed.sourceUrl), title: parsed.rawSet || "",
       seller: parsed.seller || "", purchaseDate: parsed.date || "", paidPrice: window.TrackerMarket.amount(parsed.price),
-      currency: code === "UNKNOWN" ? "" : code, serial: parsed.serial || "", printRun: parsed.printRun || ""
+      currency: code === "UNKNOWN" ? "" : code, currencyEvidence:parsed.currencyEvidence, rawPrice:parsed.rawPrice, serial: parsed.serial || "", printRun: parsed.printRun || ""
     }, { statuses: statuses, cardDetails: cardDetails, priceVerified: code !== "UNKNOWN", imageVerified: false });
     if (!result.observationId) return { ok: false, error: result.reviewReason };
     return result.changed ? saveCopyInventory(result.inventory) : { ok: true };
-  }, [statuses, cardDetails, saveCopyInventory]);
+  }, [statuses, cardDetails, saveCopyInventory,copyStorageKey,trackerMode]);
   const [filterYear, setFilterYear] = useState("all");
   const [filterProduct, setFilterProduct] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -817,56 +839,8 @@ function TylerBlackTracker() {
     var result = await saveCustomCards(customs);
     return {ok:!!(result && (result.localSaved || result.cloudSaved)),cloudSaved:!!(result && result.cloudSaved),error:result && result.error};
   }
-  useEffect(() => {
-    function handleBeforeUnload() {
-      if (window.MODE !== "wnba") return; // Tyler Black edits are journaled at the point of change.
-      if (window._skipBeforeUnloadSave) return;
-      // GUARD: abort if mode toggled mid-flight (data is for old mode, would contaminate new mode's storage)
-      if (loadedModeRef.current && loadedModeRef.current !== window.MODE) return;
-      if (loadComplete.current && allDataRef.current._migrationComplete) {
-        allDataRef.current._saveTimestamp = Date.now();
-        var payload = JSON.stringify(allDataRef.current);
-        // localStorage is SYNC - guaranteed to complete before unload
-        try { localStorage.setItem(tbk("alldata-backup-v1"), payload); } catch (e) {}
-        // window.storage is ASYNC - may not complete, but try anyway
-        try { window.storage.set(tbk("alldata-v1"), payload); } catch (e) {}
-      }
-    }
-    function handleVisibilityChange() {
-      if (window.MODE !== "wnba") return;
-      if (window._skipBeforeUnloadSave) return;
-      // GUARD: abort if mode toggled mid-flight
-      if (loadedModeRef.current && loadedModeRef.current !== window.MODE) return;
-      if (document.hidden && loadComplete.current && allDataRef.current._migrationComplete) {
-        allDataRef.current._saveTimestamp = Date.now();
-        var payload = JSON.stringify(allDataRef.current);
-        try { localStorage.setItem(tbk("alldata-backup-v1"), payload); } catch (e) {}
-        try { window.storage.set(tbk("alldata-v1"), payload); } catch (e) {}
-      }
-    }
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => { window.removeEventListener("beforeunload", handleBeforeUnload); document.removeEventListener("visibilitychange", handleVisibilityChange); };
-  }, []);
-  // Periodic backup -- just force-flush allDataRef
-  useEffect(() => {
-    if (loading) return;
-    if (window.MODE !== "wnba") return;
-    function doBackup() {
-      if (!loadComplete.current) return;
-      // GUARD: abort if mode toggled mid-flight (timer captured stale closure)
-      if (loadedModeRef.current && loadedModeRef.current !== window.MODE) return;
-      allDataRef.current._saveTimestamp = Date.now();
-      var payload = JSON.stringify(allDataRef.current);
-      try {
-        window.storage.set(tbk("alldata-v1"), payload);
-      } catch (e) { console.error("Backup flush failed:", e); }
-      try { localStorage.setItem(tbk("alldata-backup-v1"), payload); } catch(e) {}
-    }
-    var initialTimer = setTimeout(doBackup, 30000);
-    var interval = setInterval(doBackup, 5 * 60 * 1000);
-    return () => { clearTimeout(initialTimer); clearInterval(interval); };
-  }, [loading]);
+  // Every mode journals the exact edit synchronously, before the save debounce.
+  // Idle timers and unload handlers must never replay a whole collection snapshot.
 
   // Show a brief save notification
   const flashSave = useCallback((msg) => {
@@ -904,9 +878,11 @@ function TylerBlackTracker() {
     allDataRef.current._saveTimestamp = Date.now();
     setSaving(true);
     var ok = false;
+    const saveMode=window.MODE || "tb", saveKey=tbk("alldata-v1");
     for (var attempt = 0; attempt < 3 && !ok; attempt++) {
+      if((window.MODE || "tb")!==saveMode || loadedModeRef.current!==saveMode) break;
       try {
-        var result = await window.storage.set(tbk("alldata-v1"), JSON.stringify(allDataRef.current));
+        var result = await window.storage.set(saveKey, JSON.stringify(allDataRef.current));
         if (result && result.cloudSaved) ok = true; else await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
       } catch (e) {
         await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
@@ -917,12 +893,12 @@ function TylerBlackTracker() {
       flashSave("OK Saved");
       setStorageDiag("Saved at " + new Date().toLocaleTimeString());
       // BACKUP: Also write to localStorage in case window.storage fails on next load
-      try { localStorage.setItem(tbk("alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
+      try { localStorage.setItem(saveKey.replace("alldata-v1","alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
     } else {
       flashSave("WARN Save FAILED");
       setStorageDiag("SAVE FAILED at " + new Date().toLocaleTimeString());
       // Even if window.storage fails, try localStorage as emergency backup
-      try { localStorage.setItem(tbk("alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
+      try { localStorage.setItem(saveKey.replace("alldata-v1","alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
     }
   }, [flashSave]);
 
@@ -934,8 +910,9 @@ function TylerBlackTracker() {
 
   // Update a field in allDataRef and schedule save
   const persistField = useCallback((field, value) => {
+    if (!loadComplete.current || loadedModeRef.current !== (window.MODE || "tb")) return;
     allDataRef.current[field] = value;
-    if (window.MODE !== "wnba") window.trackerCollection.stage(allDataRef.current);
+    window.trackerCollections.forMode(window.MODE || "tb").stage(allDataRef.current);
     allDataRef.current._saveTimestamp = Date.now();
     // IMMEDIATE sync backup to localStorage on every change (sync = guaranteed)
     try { localStorage.setItem(tbk("alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
@@ -966,7 +943,7 @@ function TylerBlackTracker() {
 
   useEffect(() => {
     async function load() {
-      if (window.storageReady) { try { await window.storageReady; } catch(e) {} }
+      if (window.storageReady) { try { await window.storageReady; } catch(e) { console.error("Collection loading stopped:",e); return; } }
       let diagParts = [];
       let allData = null;
       // Try consolidated key first (single read)
@@ -983,7 +960,7 @@ function TylerBlackTracker() {
       // just be an idle tab. Only use it as a fallback if no saved copy is available.
       try {
         const backup = JSON.parse(localStorage.getItem(tbk("alldata-backup-v1")) || "null");
-        if (backup && (!allData || (window.MODE==="wnba" && backup._saveTimestamp>allData._saveTimestamp))) allData=backup;
+        if (backup && !allData) allData=backup;
       } catch (_) {}
       // If no consolidated data, or consolidated data is missing the migration flag
       // (meaning a broken build may have written partial data), try legacy keys.
@@ -1067,9 +1044,9 @@ function TylerBlackTracker() {
         mergedDetails[id] = { ...(mergedDetails[id] || {}), ...d };
       });
       // Initialize qty from duplicate copy data
-      Object.entries(DUPE_QTY_INIT).forEach(function([id, extraQty]) {
+      Object.entries(window.MODE === "wnba" ? {} : DUPE_QTY_INIT).forEach(function([id, extraQty]) {
         if (!mergedDetails[id]) mergedDetails[id] = {};
-        if (!mergedDetails[id].qty) mergedDetails[id].qty = String(1 + extraQty);
+        if (mergedDetails[id].qty == null || mergedDetails[id].qty === "") mergedDetails[id].qty = String(1 + extraQty);
       });
       setCardDetails(mergedDetails);
       setSyncedIds(new Set(syncedArr));
@@ -1098,7 +1075,7 @@ function TylerBlackTracker() {
         changelog: changelogArr,
         _migrationComplete: true
       };
-      if (window.MODE !== "wnba") window.trackerCollection.begin(allDataRef.current);
+      window.trackerCollections.forMode(window.MODE || "tb").begin(allDataRef.current);
       loadComplete.current = true; // Now safe to save
       // Capture which mode this data was loaded for. Saves that fire from
       // stale closures after a mode toggle will see a mismatch and abort.
@@ -1111,28 +1088,31 @@ function TylerBlackTracker() {
     load();
   }, []);
   useEffect(function() {
-    if (trackerMode !== "tb") return;
+    const collectionApi=window.trackerCollections.forMode(trackerMode);
+    const isTyler=trackerMode==="tb";
     let active=true, refreshRequest=0;
     function applySaved(data) {
-      if (!active || !data || !loadComplete.current || window.MODE==="wnba" || window.trackerCollection.hasPending()) return;
+      if (!active || !data || !loadComplete.current || (window.MODE || "tb")!==trackerMode || collectionApi.hasPending()) return;
       const marked={...data.statuses}, sale={...data.forsale}, detail={};
-      PRESET_OWNED.forEach(id=>{if(!marked[id]) marked[id]="owned";});
-      PRESET_INTRANSIT.forEach(id=>{if(!marked[id]) marked[id]="in_transit";});
+      if(isTyler) {
+        PRESET_OWNED.forEach(id=>{if(!marked[id]) marked[id]="owned";});
+        PRESET_INTRANSIT.forEach(id=>{if(!marked[id]) marked[id]="in_transit";});
+      }
       for(const [id,st] of Object.entries(marked)) if(st==="for_sale"){ marked[id]="owned";sale[id]=true; }
       const projected={...data,statuses:marked,forsale:sale};
       if(!window.CollectionSync.changes(allDataRef.current,projected).length) return;
-      for(const [id,d] of Object.entries(PRESET_DETAILS)) {
+      for(const [id,d] of Object.entries(isTyler ? PRESET_DETAILS : {})) {
         detail[id]={};
         for(const [field,short] of Object.entries({serial:"s",price:"p",date:"d",notes:"n",printRun:"pr"}))
           if(d[short]) detail[id][field]=d[short];
       }
       for(const [id,d] of Object.entries(data.details || {})) detail[id]={...detail[id],...d};
-      for(const [id,extra] of Object.entries(DUPE_QTY_INIT)){
+      for(const [id,extra] of Object.entries(isTyler ? DUPE_QTY_INIT : {})){
         if(!detail[id]) detail[id]={};
-        if(!detail[id].qty) detail[id].qty=String(1+extra);
+        if(detail[id].qty == null || detail[id].qty === "") detail[id].qty=String(1+extra);
       }
       allDataRef.current=projected;
-      window.trackerCollection.begin(projected);
+      collectionApi.begin(projected);
       setStatuses(marked);setCardDetails(detail);setForSaleFlags(sale);
       setSyncedIds(new Set(data.synced));setDirtyIds(new Set(data.dirty));
       setChangelog(data.changelog || []);setLastCheckpoint(data.checkpoint || null);
@@ -1144,19 +1124,19 @@ function TylerBlackTracker() {
       if(document.hidden || !loadComplete.current) return;
       const request=++refreshRequest, stamp=allDataRef.current._saveTimestamp;
       try {
-        if(window.trackerCollection.hasPending()) {await window.trackerCollection.sync();return;}
-        const current=await window.trackerCollection.read();
+        if(collectionApi.hasPending()) {await collectionApi.sync();return;}
+        const current=await collectionApi.read();
         if(request===refreshRequest && stamp===allDataRef.current._saveTimestamp) applySaved(current);
       } catch (_) {}
     }
-    function saved(e){++refreshRequest;setCollectionIssue(null);applySaved(e.detail);}
-    function issue(e){if(e.detail.key==="tb-alldata-v1") setCollectionIssue(e.detail);}
-    setCollectionIssue(window.storageSyncIssues["tb-alldata-v1"] || null);
+    function saved(e){if(e.detail.mode!==trackerMode)return;++refreshRequest;setCollectionIssue(null);applySaved(e.detail.value);}
+    function issue(e){if(e.detail.key===collectionApi.key) setCollectionIssue(e.detail);}
+    setCollectionIssue(window.storageSyncIssues[collectionApi.key] || null);
     document.addEventListener("visibilitychange",refresh);
     window.addEventListener("online",refresh);
-    window.addEventListener("collection-synced",saved);
+    window.addEventListener("scoped-collection-synced",saved);
     window.addEventListener("storage-sync-issue",issue);
-    return ()=>{active=false;document.removeEventListener("visibilitychange",refresh);window.removeEventListener("online",refresh);window.removeEventListener("collection-synced",saved);window.removeEventListener("storage-sync-issue",issue);};
+    return ()=>{active=false;document.removeEventListener("visibilitychange",refresh);window.removeEventListener("online",refresh);window.removeEventListener("scoped-collection-synced",saved);window.removeEventListener("storage-sync-issue",issue);};
   },[trackerMode,loading]);
   const saveStatuses = useCallback(async (newStatuses) => {
     persistField("statuses", newStatuses);
@@ -1164,7 +1144,7 @@ function TylerBlackTracker() {
   const saveDetails = useCallback(async (newDetails) => {
     // Keep provenance and future detail fields, including explicit cleared
     // preset values. The old whitelist silently discarded purchase metadata.
-    var userEdits = window.TrackerMarket.detailOverrides(newDetails, PRESET_DETAILS);
+    var userEdits = window.TrackerMarket.detailOverrides(newDetails, window.MODE === "wnba" ? {} : PRESET_DETAILS);
     persistField("details", userEdits);
     flashSave("");
   }, [persistField, flashSave]);
@@ -1359,7 +1339,7 @@ function TylerBlackTracker() {
   }, [statuses,cardDetails,saveCopyInventory]);
   const setCardStatus = useCallback((cardId, status) => {
     if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
-    if (trackerMode === "tb") {
+    if (trackerMode === "tb" || trackerMode === "wnba") {
       if (!copyStateRef.current.ready) { window.alert("Copy inventory is still loading. Try the status edit again once it is ready."); return false; }
       var quick = window.CopyInventory.quickStatusPresence(copyStateRef.current.inventory,cardId,status,{statuses:statuses,cardDetails:cardDetails});
       if (quick.handled) {
@@ -1374,7 +1354,7 @@ function TylerBlackTracker() {
         if (qty > 0) { window.alert("Reduce Qty to 0 to mark a card Needed. Your counted copies have not changed."); return false; }
       }
     }
-    if (trackerMode === "tb" && window.CopyInventory.hasStoredCopies(copyStateRef.current.inventory, cardId)) {
+    if (window.CopyInventory.hasStoredCopies(copyStateRef.current.inventory, cardId)) {
       var rows = window.CopyInventory.getCopiesForCard(copyStateRef.current.inventory,cardId,statuses,cardDetails).filter(window.CopyInventory.isCountedCopy);
       var legacy = rows.filter(function(c){return c.origin === "legacy";});
       var explicitHand = rows.filter(function(c){return c.origin !== "legacy" && c.location === "in_hand";}).length;
@@ -1405,11 +1385,11 @@ function TylerBlackTracker() {
     });
   }, [saveStatuses, pushUndo, logChange, persistField, trackerMode, statuses, cardDetails, quickSaveHand, saveCopyInventory]);
   const copySummaries = useMemo(function() {
-    if (!isOwner || trackerMode !== "tb") return null;
+    if (!isOwner || !copyStorage.ready || copyStateRef.current.key!==copyStorageKey) return null;
     var result = {};
     ALL_CARDS.forEach(function(card) { result[card.id] = window.CopyInventory.summarizeCard(copyInventory, card.id, statuses, cardDetails); });
     return result;
-  }, [copyInventory, statuses, cardDetails, isOwner, trackerMode, customEditVer]);
+  }, [copyInventory, statuses, cardDetails, isOwner, trackerMode, customEditVer,copyStorage.ready,copyStorageKey]);
   // Summary charts use one slice per variant; a mixed variant belongs to Owned.
   // The Collection/Detailed views retain both independent flags for filtering.
   const summaryStatuses = useMemo(function() {
@@ -1674,8 +1654,8 @@ function TylerBlackTracker() {
   const TABS = [
     {id:"collection",label:"Collection",color:"yellow",ownerOnly:true},
     {id:"catalog",label:"Catalogue",color:"purple",tbOnly:true},
-    {id:"gallery",label:"Gallery",color:"amber",tbOnly:true},
-    {id:"copies",label:"Copies",color:"cyan",tbOnly:true,ownerOnly:true},
+    {id:"gallery",label:"Gallery",color:"amber"},
+    {id:"copies",label:"Copies",color:"cyan",ownerOnly:true},
     {id:"lookup",label:"Lookup",color:"purple"},
     {id:"detailed",label:"Detailed",color:"emerald"},
     {id:"summary",label:"Summary",color:"cyan"},
@@ -1694,11 +1674,12 @@ function TylerBlackTracker() {
   const badgeActiveMap = {orange:"bg-orange-400 text-gray-900",amber:"bg-amber-400 text-gray-900",emerald:"bg-emerald-400 text-gray-900",indigo:"bg-indigo-400 text-gray-900"};
   const badgeInactiveMap = {orange:"bg-orange-900 text-orange-300",amber:"bg-amber-900 text-amber-300",emerald:"bg-emerald-900 text-emerald-300",indigo:"bg-indigo-900 text-indigo-300"};
   return (
-    <div className="h-screen text-white flex flex-col overflow-hidden" style={{background:"#0a1628",fontSize:"clamp(10px,1.4vw,13px)",letterSpacing:"-0.01em"}}>
+    <div data-tracker-ready="true" className="h-screen text-white flex flex-col overflow-hidden" style={{background:"#0a1628",fontSize:"clamp(10px,1.4vw,13px)",letterSpacing:"-0.01em"}}>
       {/* STICKY HEADER */}
       <div className="flex-shrink-0 backdrop-blur-sm border-b z-30" style={{background:"rgba(10,22,40,0.97)",borderColor:"#1a2d4a",padding:"clamp(2px,0.3vw,4px) clamp(4px,0.6vw,12px)"}}>
         <div className="flex items-center gap-1.5">
           <span className="font-black tracking-tight whitespace-nowrap" style={{color: trackerMode === "wnba" ? "#a855f7" : "#FFC52F", fontSize:"clamp(13px,1.8vw,18px)"}}>{trackerMode === "wnba" ? "TORONTO TEMPO" : "TYLER BLACK"}</span>
+          {trackerMode === "wnba" && window.Tempo2026 && <details className="relative text-[10px] text-purple-300"><summary className="cursor-pointer whitespace-nowrap" title="2026 checklist coverage">2026 coverage</summary><div className="absolute left-0 top-5 w-72 max-w-[85vw] p-2 rounded border border-purple-800 bg-slate-950 text-slate-300 z-50">{window.Tempo2026.coverageNote}</div></details>}
           <div className="flex-1 rounded-full h-1.5 overflow-hidden min-w-8 max-w-24" style={{background:"#1a2d4a"}}>
             <div className="h-full flex">
               <button 
@@ -1777,6 +1758,7 @@ function TylerBlackTracker() {
               {superSearchMode ? "* SUPER" : "E"}
             </button>
             {/* WNBA Tempo mode toggle — owner only */}
+            {isOwner && <button onClick={function() { window.dispatchEvent(new CustomEvent("open-collections")); }} className="px-2 py-0.5 rounded font-bold border border-orange-700 text-orange-300" style={{fontSize:"clamp(8px,0.9vw,10px)"}} title="Racing and other sport collections">Collections</button>}
             {isOwner && (
               <button
                 onClick={function() {
@@ -1958,7 +1940,7 @@ function TylerBlackTracker() {
           <div className="flex gap-1">
             <button onClick={function(){ var urls = []; var seen = {}; filtered.slice(0, 30).forEach(function(c){ var u = tcdbUrl(c); if (u !== TCDB_PLAYER && !seen[u]) { seen[u] = true; urls.push(u); }}); urls.forEach(function(u){window.open(u, "_blank");}); }} className="px-1.5 py-0 bg-cyan-950/60 border border-cyan-800 text-cyan-400 rounded hover:bg-cyan-900/60">TCDB</button>
             <button onClick={function(){ if (superSearchMode) { filtered.slice(0, 30).forEach(function(c){ ebayUrlsSuper(c).forEach(function(url){ window.open(url, "_blank"); }); }); } else { filtered.slice(0, 30).forEach(function(c){window.open(ebayUrl(c), "_blank");}); } }} className="px-1.5 py-0 bg-yellow-950/60 border border-yellow-800 text-yellow-400 rounded hover:bg-yellow-900/60">eBay</button>
-            <button onClick={function(){ var urls = []; var seen = {}; filtered.forEach(function(c){ var u = comcUrl(c); if (!seen[u]) { seen[u] = true; urls.push(u); }}); urls.slice(0, 30).forEach(function(u){window.open(u, "_blank");}); }} className="px-1.5 py-0 bg-orange-950/60 border border-orange-800 text-orange-400 rounded hover:bg-orange-900/60">COMC</button>
+            {trackerMode !== "wnba" && <button onClick={function(){ var urls = []; var seen = {}; filtered.forEach(function(c){ var u = comcUrl(c); if (!seen[u]) { seen[u] = true; urls.push(u); }}); urls.slice(0, 30).forEach(function(u){window.open(u, "_blank");}); }} className="px-1.5 py-0 bg-orange-950/60 border border-orange-800 text-orange-400 rounded hover:bg-orange-900/60">COMC</button>}
           </div>
         </div>
         {/* Card list - ultra dense */}
@@ -2034,7 +2016,7 @@ function TylerBlackTracker() {
                     <a href={tcdbUrl(card)} target="_blank" rel="noopener noreferrer" className={"font-bold hover:text-cyan-300 " + (tcdbFlags[card.id] ? "text-red-400" : tcdbFixes[card.id] ? "text-green-400" : "text-cyan-500")} title={tcdbFlags[card.id] ? "TCDB link flagged as bad" : tcdbFixes[card.id] ? "TCDB link user-corrected" : "TCDB"}>T</a>
                     <button onClick={function(){tcdbFlags[card.id] ? unflagTcdbLink(card.id) : flagTcdbLink(card.id);}} title={tcdbFlags[card.id] ? "Unflag TCDB link" : "Flag bad TCDB link"} className={"hover:text-red-300 " + (tcdbFlags[card.id] ? "text-red-500" : "text-gray-700 hover:text-red-400")} style={{fontSize:"clamp(7px,0.9vw,10px)"}}>⚑</button>
                     <a href="#" onClick={function(e) { handleEbayClick(card, e); }} className="font-bold text-yellow-500 hover:text-yellow-300">E</a>
-                    <a href={comcUrl(card)} target="_blank" rel="noopener noreferrer" className="font-bold text-orange-500 hover:text-orange-300">C</a>
+                    {comcUrl(card) && <a href={comcUrl(card)} target="_blank" rel="noopener noreferrer" className="font-bold text-orange-500 hover:text-orange-300">C</a>}
                     <a href={pt130Url(card)} target="_blank" rel="noopener noreferrer" className="font-bold text-teal-500 hover:text-teal-300" title="130point sold prices">P</a>
                   </div>
                   {(function() { var isFS = forSaleFlags[card.id] || (parseInt((cardDetails[card.id] || {}).qty) || 1) > 1; var s = statuses[card.id] || "not_owned"; var isAcq = s === "owned" || s === "in_transit"; return <button onClick={function(e){ e.stopPropagation(); var prodShort = card.product.replace(/^\d{4}\s*/, ""); setPricesSearchFilter(prodShort + " " + card.cardNumber); setActiveTab("prices"); }} title="View prices" className={"flex-shrink-0 rounded border font-bold flex items-center justify-center transition-all " + (isFS && isAcq ? "border-pink-600 bg-pink-950/40 text-pink-400" : "border-gray-800 text-gray-700 hover:border-gray-600 hover:text-gray-500")} style={{width:"clamp(14px,1.8vw,20px)",height:"clamp(14px,1.8vw,20px)",fontSize:"clamp(7px,0.9vw,10px)"}}>$</button>; })()}
@@ -2074,7 +2056,7 @@ function TylerBlackTracker() {
                         <a href={tcdbUrl(card)} target="_blank" rel="noopener noreferrer" className={"hover:text-cyan-300 underline " + (tcdbFlags[card.id] ? "text-red-400" : tcdbFixes[card.id] ? "text-green-400" : "text-cyan-500")}>{tcdbFlags[card.id] ? "TCDB ⚠" : tcdbFixes[card.id] ? "TCDB ✓" : "TCDB"}</a>
                         <a href={tcdbSearchUrl(card)} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-cyan-300 underline">Search</a>
                         <a href="#" onClick={function(e) { handleEbayClick(card, e); }} className="text-yellow-500 hover:text-yellow-300 underline">eBay</a>
-                        <a href={comcUrl(card)} target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:text-orange-300 underline">COMC</a>
+                        {comcUrl(card) && <a href={comcUrl(card)} target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:text-orange-300 underline">COMC</a>}
                         <a href={pt130Url(card)} target="_blank" rel="noopener noreferrer" className="text-teal-500 hover:text-teal-300 underline">130pt</a>
                         {orderUrl(card) ? <a href={orderUrl(card)} target="_blank" rel="noopener noreferrer" className="text-lime-500 hover:text-lime-300 underline">Order</a> : null}
                         <span className="mx-1 text-gray-700">|</span>
@@ -2151,10 +2133,10 @@ function TylerBlackTracker() {
           <CleanupPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} hidePrices={hidePrices} />
         ) : activeTab === "detailed" ? (
           <DetailedPanel statuses={statuses} copySummaries={copySummaries} openCardCopies={openCardCopies} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} needsSync={needsSync} initialSnFilter={detailedSnFilter} initialStatusFilter={detailedStatusFilter} initialCardId={detailedCardId} setDetailedCardId={setDetailedCardId} initialProductFilter={detailedProductFilter} setDetailedProductFilter={setDetailedProductFilter} initialCardNumFilter={detailedCardNumFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} editCustomCardById={editCustomCardById} customEditVer={customEditVer} targetByCardId={targetByCardId} setActiveTab={setActiveTab} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
-        ) : activeTab === "copies" && isOwner && trackerMode === "tb" ? (
-          <window.CopyInventoryPanel key={copyStateRef.current.ownerId || "signed-out"} initialCardId={copyCardId} cards={ALL_CARDS.filter(function(card) { return !HIDDEN_DUPES.has(card.id); })} statuses={statuses} cardDetails={cardDetails} inventory={copyInventory} publicMedia={publicMedia} onInventoryChange={saveCopyInventory} onRefresh={refreshCopyInventory} isOwner={isOwner} storageReady={copyStorage.ready} loading={copyStorage.loading} readOnlyReason={copyStorage.error} />
-        ) : activeTab === "gallery" && trackerMode === "tb" ? (
-          <window.CardGalleryPanel key={copyStateRef.current.ownerId || "public"} cards={ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id);})} statuses={statuses} cardDetails={cardDetails} inventory={isOwner ? copyInventory : null} publicMedia={publicMedia} isOwner={isOwner} onOpenCopies={isOwner ? openCardCopies : null} loading={mediaStorage.loading || isOwner && copyStorage.loading} loadError={mediaStorage.error} onRefresh={async function(){var results=await Promise.all([refreshPublicMedia(),isOwner ? refreshCopyInventory() : Promise.resolve({ok:true})]);return results.find(function(result){return result && result.ok === false;}) || {ok:true};}} />
+        ) : activeTab === "copies" && isOwner ? (
+          <window.CopyInventoryPanel key={copyStorageKey+":"+(copyStateRef.current.ownerId || "signed-out")} initialCardId={copyCardId} cards={ALL_CARDS.filter(function(card) { return trackerMode === "wnba" || !HIDDEN_DUPES.has(card.id); })} statuses={statuses} cardDetails={cardDetails} inventory={copyInventory} publicMedia={publicMedia} onInventoryChange={saveCopyInventory} onRefresh={refreshCopyInventory} isOwner={isOwner} storageReady={copyStorage.ready} loading={copyStorage.loading} readOnlyReason={copyStorage.error} />
+        ) : activeTab === "gallery" ? (
+          <window.CardGalleryPanel key={copyStorageKey+":"+(copyStateRef.current.ownerId || "public")} cards={ALL_CARDS.filter(function(card){return trackerMode === "wnba" || !HIDDEN_DUPES.has(card.id);})} statuses={statuses} cardDetails={cardDetails} inventory={isOwner ? copyInventory : null} publicMedia={publicMedia} isOwner={isOwner} onOpenCopies={isOwner ? openCardCopies : null} loading={mediaStorage.loading || isOwner && copyStorage.loading} loadError={mediaStorage.error} onRefresh={async function(){var results=await Promise.all([refreshPublicMedia(),isOwner ? refreshCopyInventory() : Promise.resolve({ok:true})]);return results.find(function(result){return result && result.ok === false;}) || {ok:true};}} />
         ) : activeTab === "catalog" && trackerMode === "tb" ? (
           <window.CardCatalogPanel cards={ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id);}).concat(isOwner ? loadCustomCards().filter(function(card){return card.archived;}) : [])} statuses={statuses} isOwner={isOwner} initialEditId={catalogEditId} onClearEdit={function(){setCatalogEditId(null);}} onSave={saveCatalogCard} onArchive={archiveCatalogCard} onRestore={restoreCatalogCard} onOpen={function(card){setDetailedCardId(card.id);setActiveTab("detailed");}} onStatusChange={setCardStatus} revision={customEditVer}/>
         ) : activeTab === "summary" ? (
@@ -2198,7 +2180,7 @@ function TylerBlackTracker() {
           </div>
         </div>
       )}
-      {trackerMode==="tb" && collectionIssue && <div role="alert" className="fixed bottom-12 right-3 left-3 sm:left-auto max-w-lg bg-gray-950 text-amber-200 border border-amber-600 rounded p-3 text-xs z-50">
+      {collectionIssue && <div role="alert" className="fixed bottom-12 right-3 left-3 sm:left-auto max-w-lg bg-gray-950 text-amber-200 border border-amber-600 rounded p-3 text-xs z-50">
         <strong>Collection edits pending</strong> · {collectionIssue.error}
         {(collectionIssue.conflicts || []).slice(0,1).map(c=>{
           const card=CARD_BY_ID[c.path[1]];
@@ -2206,11 +2188,11 @@ function TylerBlackTracker() {
           const show=v=>v==null ? "blank" : typeof v==="object" ? JSON.stringify(v).slice(0,100) : String(v);
           return <div key={JSON.stringify(c.path)} className="mt-2">{label} · {c.path[2] || c.path[0]}
             <div className="flex gap-3 mt-1">
-              <button className="underline" onClick={()=>window.trackerCollection.resolve(collectionIssue.journal,c,false)}>Keep saved {show(c.actual)}</button>
-              <button className="underline" onClick={()=>window.trackerCollection.resolve(collectionIssue.journal,c,true)}>Apply my {show(c.desired)}</button>
+              <button className="underline" onClick={()=>window.trackerCollections.forMode(window.MODE || "tb").resolve(collectionIssue.journal,c,false)}>Keep saved {show(c.actual)}</button>
+              <button className="underline" onClick={()=>window.trackerCollections.forMode(window.MODE || "tb").resolve(collectionIssue.journal,c,true)}>Apply my {show(c.desired)}</button>
             </div></div>;
         })}
-        {!(collectionIssue.conflicts || []).length && <button className="underline ml-2" onClick={()=>window.trackerCollection.sync()}>Retry</button>}
+        {!(collectionIssue.conflicts || []).length && <button className="underline ml-2" onClick={()=>window.trackerCollections.forMode(window.MODE || "tb").sync()}>Retry</button>}
       </div>}
       {/* Floating save toast */}
       {saveToast && (
@@ -3134,7 +3116,7 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
                 <input type="number" min="0" value={curQty} onChange={function(e){ setCardQty(selectedCard.id, e.target.value); }} className="w-10 text-center bg-gray-950 border border-gray-700 rounded px-1 py-0 text-white outline-none" />
                 <button onClick={function(){ adjustCardQty(selectedCard.id, 1); }} className="bg-gray-800 border border-gray-700 rounded w-5 h-5 text-gray-400 hover:text-white hover:bg-gray-700 font-bold text-[10px] flex items-center justify-center" title={curQty === 0 ? "Add 1 copy (sets status to in-transit)" : "Increment quantity"}>+</button>
                 {curQty > 1 && <span className="text-green-400 font-black text-[10px] bg-green-950/40 border border-green-800 rounded px-1">{"+" + (curQty - 1) + " extra"}</span>}
-                {trackerMode === "tb" && curQty > 1 && (function(){
+                {copyStorage.ready && curQty > 1 && (function(){
                   var rows = window.CopyInventory.getCopiesForCard(copyInventory, selectedCard.id, statuses, cardDetails).filter(window.CopyInventory.isCountedCopy);
                   var legacy = rows.filter(function(c){return c.origin === "legacy";});
                   var confirmedHand = rows.filter(function(c){return c.origin !== "legacy" && c.location === "in_hand";}).length;
@@ -3153,7 +3135,7 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
               <a href={ebayUrl(selectedCard)} target="_blank" rel="noopener noreferrer" className="py-0.5 px-1.5 rounded bg-yellow-950/40 border border-yellow-800 text-yellow-400 hover:bg-yellow-900/40 font-bold" title="eBay: search for this exact variant">eBay Card</a>
               <a href={"https://www.ebay.com/sch/i.html?_nkw=" + encodeURIComponent("Tyler Black " + ((selectedCard.product.match(/^(\d{4})\s/) || ["",""])[1]) + " " + selectedCard.cardNumber + " " + stripBrand(selectedCard.product.replace(/^\d{4}\s*/, "").replace(/\s*\([^)]*\)/g, ""))) + "&_sacat=212"} target="_blank" rel="noopener noreferrer" className="py-0.5 px-1.5 rounded bg-yellow-950/30 border border-yellow-900 text-yellow-500 hover:bg-yellow-900/40 font-bold" title="eBay: search for all variants of this card # in this set">eBay Set</a>
               {superSearchMode && <button onClick={function(e) { e.preventDefault(); var urls = ebayUrlsSuper(selectedCard); urls.forEach(function(url) { window.open(url, "_blank"); }); }} className="py-0.5 px-1.5 rounded bg-yellow-800/50 border border-yellow-600 text-yellow-200 hover:bg-yellow-700/50 font-bold" title="Open multiple eBay search variations">eBay Super</button>}
-              <a href={comcUrl(selectedCard)} target="_blank" rel="noopener noreferrer" className="py-0.5 px-1.5 rounded bg-orange-950/40 border border-orange-800 text-orange-400 hover:bg-orange-900/40 font-bold" title="COMC: search for this specific card">COMC Card</a>
+              {comcUrl(selectedCard) && <a href={comcUrl(selectedCard)} target="_blank" rel="noopener noreferrer" className="py-0.5 px-1.5 rounded bg-orange-950/40 border border-orange-800 text-orange-400 hover:bg-orange-900/40 font-bold" title="COMC: search for this specific card">COMC Card</a>}
               <a href={"https://www.comc.com/Players/Baseball/Tyler_Black/c389004,+" + (selectedCard.product.replace(/'/g, "").replace(/\s*\([^)]*\)/g, "") + " " + selectedCard.cardNumber).replace(/[&\/]/g, " ").replace(/\s+/g, " ").trim().replace(/ /g, "+")} target="_blank" rel="noopener noreferrer" className="py-0.5 px-1.5 rounded bg-orange-950/30 border border-orange-900 text-orange-500 hover:bg-orange-900/40 font-bold" title="COMC: search for all variants of this card # in this set">COMC Set</a>
             </div>
           </div>
@@ -3500,7 +3482,7 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
                   <td className="dt-date px-0.5 py-0.5"><input type="date" value={d.date || ""} onChange={function(e) { updateCardDetail(card.id, "date", e.target.value); }} className="bg-transparent border-b border-gray-700 focus:border-gray-400 w-24 text-gray-400 outline-none" style={{fontSize: "9px"}} /></td>
                   <td className="dt-notes px-0.5 py-0.5"><input type="text" value={d.notes || ""} onChange={function(e) { updateCardDetail(card.id, "notes", e.target.value); }} placeholder="-" className="bg-transparent border-b border-gray-700 focus:border-gray-400 text-gray-500 outline-none" style={{fontSize: "9px", width:"clamp(40px,8vw,120px)"}} /></td>
                   {!hidePrices && <td className="dt-trend px-0 py-0.5"><Sparkline card={card} width={30} height={12} /></td>}
-                  <td className="px-0.5 py-0.5 whitespace-nowrap">{needsSync.has(card.id) && <span className="text-pink-400 mr-0.5" title="Needs TCDB sync">!</span>}<a href={tcdbUrl(card)} target="_blank" rel="noopener noreferrer" className={"font-bold hover:text-cyan-200 " + (TCDB_FLAGS[card.id] ? "text-red-400" : TCDB_USER_FIXES[card.id] ? "text-green-400" : "text-cyan-400")}>T</a>{" "}<a href="#" onClick={function(e) { handleEbayClick(card, e); }} className="font-bold text-yellow-400 hover:text-yellow-200">E</a>{" "}<a href={comcUrl(card)} target="_blank" rel="noopener noreferrer" className="font-bold text-orange-400 hover:text-orange-200">C</a>{card.id >= 10000 && editCustomCardById ? <span>{" "}<button onClick={function(){editCustomCardById(card.id);}} className="text-yellow-500 hover:text-yellow-300" title="Edit custom card">✏</button></span> : null}</td>
+                  <td className="px-0.5 py-0.5 whitespace-nowrap">{needsSync.has(card.id) && <span className="text-pink-400 mr-0.5" title="Needs TCDB sync">!</span>}<a href={tcdbUrl(card)} target="_blank" rel="noopener noreferrer" className={"font-bold hover:text-cyan-200 " + (TCDB_FLAGS[card.id] ? "text-red-400" : TCDB_USER_FIXES[card.id] ? "text-green-400" : "text-cyan-400")}>T</a>{" "}<a href="#" onClick={function(e) { handleEbayClick(card, e); }} className="font-bold text-yellow-400 hover:text-yellow-200">E</a>{" "}{comcUrl(card) && <a href={comcUrl(card)} target="_blank" rel="noopener noreferrer" className="font-bold text-orange-400 hover:text-orange-200">C</a>}{card.id >= 10000 && editCustomCardById ? <span>{" "}<button onClick={function(){editCustomCardById(card.id);}} className="text-yellow-500 hover:text-yellow-300" title="Edit custom card">✏</button></span> : null}</td>
                 </tr>
               );
             })}
@@ -3741,7 +3723,7 @@ function CleanupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, 
                     <a href={tcdbUrl(card)} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-0.5 bg-cyan-900/40 border border-cyan-700 text-cyan-300 rounded hover:bg-cyan-800/40">TCDB</a>
                     <a href="#" onClick={function(e) { handleEbayClick(card, e); }} className="text-xs px-2 py-0.5 bg-yellow-900/40 border border-yellow-700 text-yellow-300 rounded hover:bg-yellow-800/40">eBay</a>
                     {orderUrl(card) && <a href={orderUrl(card)} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-0.5 bg-yellow-900/40 border border-yellow-600 text-yellow-200 rounded hover:bg-yellow-800/40">Order</a>}
-                    <a href={comcUrl(card)} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-0.5 bg-orange-900/40 border border-orange-700 text-orange-300 rounded hover:bg-orange-800/40">COMC</a>
+                    {comcUrl(card) && <a href={comcUrl(card)} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-0.5 bg-orange-900/40 border border-orange-700 text-orange-300 rounded hover:bg-orange-800/40">COMC</a>}
                     <a href={googleImgUrl(card)} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-0.5 bg-blue-900/40 border border-blue-700 text-blue-300 rounded hover:bg-blue-800/40">Images</a>
                     <a href={variantOnlyUrl(card)} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-0.5 bg-purple-900/40 border border-purple-700 text-purple-300 rounded hover:bg-purple-800/40" title="Search this variant without player name">Variant</a>
                     <a href={pt130Url(card)} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-0.5 bg-teal-900/40 border border-teal-700 text-teal-300 rounded hover:bg-teal-800/40">130pt</a>
@@ -4021,7 +4003,7 @@ function SyncPanel({ cards, touchupCards, cardDetails, syncIndex, setSyncIndex, 
               <div className="flex gap-3">
                 <a href={tcdbUrl(card)} target="_blank" rel="noopener noreferrer" className="text-xs text-cyan-400 hover:text-cyan-300 underline">Find on TCDB</a>
                 <a href="#" onClick={function(e) { handleEbayClick(card, e); }} className="text-xs text-yellow-400 hover:text-yellow-300 underline">Search eBay</a>
-                <a href={comcUrl(card)} target="_blank" rel="noopener noreferrer" className="text-xs text-orange-400 hover:text-orange-300 underline">Browse COMC</a>
+                {comcUrl(card) && <a href={comcUrl(card)} target="_blank" rel="noopener noreferrer" className="text-xs text-orange-400 hover:text-orange-300 underline">Browse COMC</a>}
                 <a href={pt130Url(card)} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-400 hover:text-teal-300 underline">130pt Sold</a>
               </div>
             </div>
@@ -4062,7 +4044,7 @@ function SyncPanel({ cards, touchupCards, cardDetails, syncIndex, setSyncIndex, 
                     <span className="flex gap-1.5 flex-shrink-0">
                       <a href={tcdbUrl(c)} target="_blank" rel="noopener noreferrer" onClick={function(e) { e.stopPropagation(); }} className="font-bold text-cyan-400 hover:text-cyan-200">T</a>
                       <a href="#" onClick={function(e) { e.stopPropagation(); handleEbayClick(c, e); }} className="font-bold text-yellow-400 hover:text-yellow-200">E</a>
-                      <a href={comcUrl(c)} target="_blank" rel="noopener noreferrer" onClick={function(e) { e.stopPropagation(); }} className="font-bold text-orange-400 hover:text-orange-200">C</a>
+                      {comcUrl(c) && <a href={comcUrl(c)} target="_blank" rel="noopener noreferrer" onClick={function(e) { e.stopPropagation(); }} className="font-bold text-orange-400 hover:text-orange-200">C</a>}
                       <a href={pt130Url(c)} target="_blank" rel="noopener noreferrer" onClick={function(e) { e.stopPropagation(); }} className="font-bold text-teal-400 hover:text-teal-200">P</a>
                     </span>
                   </div>
@@ -4079,6 +4061,12 @@ function SyncPanel({ cards, touchupCards, cardDetails, syncIndex, setSyncIndex, 
 
 function COMCScannerPanel(props) {
   var cards = props.cards, statuses = props.statuses, cardDetails = props.cardDetails;
+  var multiSubject = cards.some(function(c) { return !!(c.player || c.subject || c.playerName); });
+  var scanRoster = multiSubject ? (window.TEMPO_ROSTER || {}) : {};
+  function subjectNames(text) { return multiSubject ? window.CollectionScanner.subjects(text, cards, scanRoster) : (/\btyler\s+black\b/i.test(text) ? ["Tyler Black"] : []); }
+  function acceptsSubject(text) { return subjectNames(text).length === 1; }
+  function scanEvidence(p) { return window.ScanCurrency.infer(p, {text:rawInput, fallbackCurrency:scanCurrency}); }
+  function genericListings(text, source) { return window.CollectionScanner.parseListings(text, {source:source,cards:cards,roster:scanRoster,fallbackCurrency:scanCurrency}); }
   var updateCardDetail = props.updateCardDetail, setCardStatus = props.setCardStatus;
   var setDetailedCardId = props.setDetailedCardId, setActiveTab = props.setActiveTab;
   var persistedState = props.persistedState, onStateChange = props.onStateChange;
@@ -4098,6 +4086,7 @@ function COMCScannerPanel(props) {
   var _ss = useState(_ps.shopSort || {col:"price",dir:"asc"}), shopSort = _ss[0], setShopSort = _ss[1];
   var _ex = useState(_ps.expanded || {}), expanded = _ex[0], setExpanded = _ex[1];
   var _aa = useState(false), autoAddEnabled = _aa[0], setAutoAddEnabled = _aa[1];
+  var _mn = useState(""), manualSubject = _mn[0], setManualSubject = _mn[1];
   var _my = useState(""), manualYear = _my[0], setManualYear = _my[1];
   var _mp = useState(""), manualProduct = _mp[0], setManualProduct = _mp[1];
   var _mc = useState(""), manualCardNo = _mc[0], setManualCardNo = _mc[1];
@@ -4128,8 +4117,7 @@ function COMCScannerPanel(props) {
   // cardKey: canonical grouping key for price history across duplicate card IDs
   // Cards with same (year, product, cardNumber, variant) share price data
   function priceKey(card) {
-    if (!card) return null;
-    return card.product.slice(0,4) + "|" + card.product + "|" + card.cardNumber + "|" + (card.cardSet || "Base");
+    return globalPriceKey(card);
   }
   // Build lookup: priceKey -> [cardId, cardId, ...]
   var PRICE_KEY_MAP = useMemo(function() {
@@ -4143,9 +4131,7 @@ function COMCScannerPanel(props) {
   }, []);
 
   function parsedCurrency(p) {
-    var code = window.TrackerMarket.currency(p.currency);
-    if (code === "UNKNOWN") code = window.TrackerMarket.detectCurrency(p.price);
-    return code === "UNKNOWN" ? scanCurrency : code;
+    return scanEvidence(p).currency;
   }
   function parsedPriceKind(p) {
     if (p.recordType === "purchase") return "purchase";
@@ -4169,7 +4155,9 @@ function COMCScannerPanel(props) {
       if (AMBIGUOUS_PRICE_KEYS.has(pk) || AMBIGUOUS_CARD_IDS.has(cardId)) return;
       if (card && String(card.copies) === "1" && /\bblack\b/i.test(card.cardSet || "")) return;
     }
-    var code = parsedCurrency(p);
+    var currencyEvidence = scanEvidence(p);
+    if (currencyEvidence.needsReview) return;
+    var code = currencyEvidence.currency;
     var priceKind = parsedPriceKind(p);
     var ph = batchPH || loadPriceHistory();
     window.TrackerMarket.record(ph, pk, {
@@ -4178,6 +4166,7 @@ function COMCScannerPanel(props) {
       marketplace: p.marketplace, eventDate: priceKind === "sold" ? p.date : "",
       serial: p.serial, printRun: p.printRun,
       shipping: p.shipping ? (p.shippingNum != null ? p.shippingNum : p.shipping) : null,
+      shippingCurrency: p.shippingCurrency || (p.shippingNum === 0 ? code : "UNKNOWN"),
       priceBasis: "item"
     });
     if (!batchPH) savePriceHistory(ph);
@@ -4242,6 +4231,7 @@ function COMCScannerPanel(props) {
   // pinKey: unique per-listing key for overrides. eBay/Whatnot use rawSet+price+shipping
   // (each listing is unique by this combo). COMC uses comcKey (same card shares override).
   function pinKey(p) {
+    if (multiSubject) return "subject|" + encodeURIComponent(subjectNames((p.rawSet || "") + " " + (p.description || "")).join(" / ")) + "|" + (p.source || "") + "|" + (p.rawSet || comcKey(p)) + "|" + parsedCurrency(p);
     if ((p.source === "eBay" || p.source === "Whatnot" || p.source === "130point") && p.rawSet) {
       return "ebay|" + p.rawSet.trim() + "|" + (p.totalPrice || p.price || "") + "|" + (p.shipping || "");
     }
@@ -4321,6 +4311,7 @@ function COMCScannerPanel(props) {
       cardNoFilter = p.cardNoClean || p.cardNo || "";
     }
     // Deduplicate candidates by (cardNumber + cardSet + copies) to remove exact DB dupes
+    if (multiSubject) candidates = candidates.filter(function(c) { return subjectNames((p.rawSet || "") + " " + (p.description || "")).indexOf(window.CollectionScanner.subject(c,scanRoster)) >= 0; });
     var candSeen = {};
     var candDeduped = [];
     for (var cdi = 0; cdi < candidates.length; cdi++) {
@@ -4349,6 +4340,7 @@ function COMCScannerPanel(props) {
   function assignCandidate(origIdx, candidateCard) {
     // Save persistent override so this match survives repaste
     var item = parsed[origIdx];
+    if (multiSubject && item && subjectNames((item.parsed.rawSet || "") + " " + (item.parsed.description || "")).indexOf(window.CollectionScanner.subject(candidateCard,scanRoster)) < 0) { setImportMessage("The selected card belongs to a different player."); return; }
     if (item && item.parsed && item.parsed.recordType !== "purchase") {
       var ck = pinKey(item.parsed);
       var overrides = loadComcOverrides();
@@ -4366,9 +4358,11 @@ function COMCScannerPanel(props) {
           if (ph[oldPK]) {
             if (!ph[newPK]) ph[newPK] = [];
             // Move today's entries from old to new (these are from THIS scan)
-            var keep = [];
+            var keep = [], moved = [];
             ph[oldPK].forEach(function(e) {
-              if (e.date === today) {
+              var identityMatches = window.CollectionScanner.sameListingEvidence(e, item.parsed, parsedCurrency(item.parsed), parsedPriceKind(item.parsed));
+              if (e.date === today && identityMatches) {
+                moved.push(e);
                 var exists = ph[newPK].some(function(x) { return x.date === e.date && x.source === e.source; });
                 if (!exists) ph[newPK].push(e);
                 // Don't keep in old key
@@ -4378,7 +4372,7 @@ function COMCScannerPanel(props) {
             });
             if (keep.length === 0) { delete ph[oldPK]; }
             else { ph[oldPK] = keep; }
-            savePriceHistory(ph);
+            savePriceHistory(ph, {removals:[{cardKey:oldPK,entries:moved}],restores:[{cardKey:newPK,entries:moved}]});
           }
         }
       }
@@ -4401,7 +4395,7 @@ function COMCScannerPanel(props) {
       var deduped = [];
       for (var di = 0; di < updatedParsed.length; di++) {
         var uItem = updatedParsed[di];
-        var matchId = uItem.match && uItem.match.score >= 90 ? uItem.match.card.id : null;
+        var matchId = uItem.match && uItem.match.score >= 90 ? comparableListingKey(uItem.parsed, uItem.match.card.id) : null;
         if (!matchId) { deduped.push(uItem); continue; }
         if (seen[matchId] === undefined) { seen[matchId] = deduped.length; deduped.push(uItem); }
         else {
@@ -4454,13 +4448,17 @@ function COMCScannerPanel(props) {
     var dbVariant = f.variant || "Base";
     var dbCardNo = f.cardNo || "";
     var dbPrintRun = f.printRun ? parseInt(f.printRun) : null;
+    var parsedSubjects = subjectNames((item.parsed.rawSet || "") + " " + (item.parsed.description || ""));
+    if (multiSubject && parsedSubjects.length !== 1) { setImportMessage("Choose one identified player before adding a card."); return; }
+    var dbSubject = multiSubject ? parsedSubjects[0] : "";
+    var dbPlayer = Object.keys(scanRoster).find(function(key){return scanRoster[key].name === dbSubject;}) || "";
     // Save custom card
     var custom = loadCustomCards();
     // Check for duplicates
     var isDupe = custom.some(function(cc) {
-      return cc.product === dbProduct && cc.cardNumber === dbCardNo && cc.cardSet === dbVariant;
+      return cc.product === dbProduct && cc.cardNumber === dbCardNo && cc.cardSet === dbVariant && (!multiSubject || window.CollectionScanner.subject(cc,scanRoster) === dbSubject);
     }) || ALL_CARDS.some(function(c) {
-      return c.product === dbProduct && c.cardNumber === dbCardNo && c.cardSet === dbVariant;
+      return c.product === dbProduct && c.cardNumber === dbCardNo && c.cardSet === dbVariant && (!multiSubject || window.CollectionScanner.subject(c,scanRoster) === dbSubject);
     });
     if (isDupe) {
       alert("This card already exists in the database!");
@@ -4469,6 +4467,7 @@ function COMCScannerPanel(props) {
     custom.push({
       id: window.CardCatalog.nextCustomId(custom),
       product: dbProduct,
+      subject: dbSubject, player: dbPlayer,
       cardNumber: dbCardNo,
       cardSet: dbVariant,
       copies: dbPrintRun,
@@ -4494,7 +4493,7 @@ function COMCScannerPanel(props) {
       var deduped = [];
       for (var di = 0; di < updatedParsed.length; di++) {
         var uItem = updatedParsed[di];
-        var matchId = uItem.match && uItem.match.score >= 90 ? uItem.match.card.id : null;
+        var matchId = uItem.match && uItem.match.score >= 90 ? comparableListingKey(uItem.parsed, uItem.match.card.id) : null;
         if (!matchId) { deduped.push(uItem); continue; }
         if (seen[matchId] === undefined) { seen[matchId] = deduped.length; deduped.push(uItem); }
         else {
@@ -4590,7 +4589,8 @@ function COMCScannerPanel(props) {
       year: year, product: product, variant: variant,
       cardNo: cardNo, cardNoClean: cardNoClean,
       serial: serial, printRun: (row["Qty Manufactured"] || "").trim(),
-      price: (row["Purchase Price"] || "").trim(),
+      price: (row["Purchase Price"] || "").trim(), rawPrice: (row["Purchase Price"] || "").trim(),
+      shipTo: row["Ship To"] || row["Shipping Country"] || row["Shipping Address"] || "",
       date: (row["Date Sold"] || "").trim().slice(0, 10),
       seller: (row["Purchased From"] || "").trim(),
       rawSet: setName, description: (row["Description"] || "").trim(),
@@ -4712,6 +4712,7 @@ function COMCScannerPanel(props) {
   ];
 
   function parseEbayTitle(title) {
+    if (multiSubject) return window.CollectionScanner.parseTitle(title, {cards:cards,roster:scanRoster,source:"eBay"});
     var tl = title.toLowerCase();
     var ym = title.match(/\b(20[12]\d)\b/);
     var year = ym ? ym[1] : "";
@@ -4787,17 +4788,17 @@ function COMCScannerPanel(props) {
       if (/^Shop on eBay/i.test(title)) continue;
       if (/complete your set|set builder|you pick/i.test(title)) continue;
       var titleLow = title.toLowerCase();
-      if (titleLow.indexOf("tyler black") === -1) continue;
+      if (!acceptsSubject(title)) continue;
       var excluded = false;
-      for (var ei = 0; ei < EBAY_NOT_TB.length; ei++) {
+      for (var ei = 0; !multiSubject && ei < EBAY_NOT_TB.length; ei++) {
         if (titleLow.indexOf(EBAY_NOT_TB[ei]) !== -1) { excluded = true; break; }
       }
       if (excluded) continue;
-      for (var si = 0; si < EBAY_SPORT_EXCLUDE.length; si++) {
+      for (var si = 0; !multiSubject && si < EBAY_SPORT_EXCLUDE.length; si++) {
         if (titleLow.indexOf(EBAY_SPORT_EXCLUDE[si]) !== -1) { excluded = true; break; }
       }
       if (excluded) continue;
-      var price = "", shipping = "", shippingNum = 0, timeLeft = "", condition = "";
+      var price = "", rawPrice = "", shipping = "", shippingNum = 0, shippingCurrency = "UNKNOWN", timeLeft = "", condition = "";
       var listingType = "", bids = "", binPrice = "";
       for (var j = i + 1; j < Math.min(i + 20, lines.length); j++) {
         var jl = lines[j].trim();
@@ -4805,15 +4806,10 @@ function COMCScannerPanel(props) {
         if (jl.indexOf("Opens in a new window or tab") !== -1) break;
         if (/^Related:|^Results Pagination|^Recently viewed|^Feedback$|^About eBay|^Tell us what/.test(jl)) break;
         if (!condition && /^(Pre-Owned|New \(Other\)|New|Brand New|Not Specified)/.test(jl)) { condition = jl; continue; }
-        if (!price && /^\$[\d,]+\.?\d*/.test(jl)) {
-          if (/to \$/.test(jl)) continue;
-          var pm = jl.match(/^\$([\d,]+\.?\d*)/);
-          if (pm) price = pm[1].replace(/,/g, "");
-          continue;
-        }
-        if (price && !binPrice && /^\$[\d,]+\.?\d*$/.test(jl)) {
-          var bpm = jl.match(/^\$([\d,]+\.?\d*)/);
-          if (bpm) binPrice = bpm[1].replace(/,/g, "");
+        var moneyLine = (/[$£€¥]|\b(?:USD|CAD|GBP|EUR|AUD|NZD|JPY|CHF|HKD|SGD)\b/i.test(jl) || /^\d+[.,]\d{2}$/.test(jl)) && /^(?:US|CA|C|CAN|AU|A|NZ|HK|SG|USD|CAD|GBP|EUR|AUD|NZD|JPY|CHF|HKD|SGD)?\s*[$£€¥]?[\d,.]+(?:\s*(?:USD|CAD|GBP|EUR|AUD|NZD|JPY|CHF|HKD|SGD))?(?:\s*\(.*\))?$/i.test(jl) ? window.ScanCurrency.parseMoney(jl) : null;
+        if (moneyLine && !moneyLine.conflict && moneyLine.amount != null) {
+          if (!price) { price = String(moneyLine.amount); rawPrice = jl; }
+          else if (!binPrice) binPrice = String(moneyLine.amount);
           continue;
         }
         if (/bids?\s*\xb7?\s*Time left/i.test(jl) || /^\d+ bids?\s*\xb7/.test(jl) || /Time left/i.test(jl) || /^\d+ bids?$/.test(jl)) {
@@ -4826,7 +4822,7 @@ function COMCScannerPanel(props) {
         if (/^or Best Offer/.test(jl)) { if (!listingType) listingType = "best_offer"; continue; }
         if (/delivery$/.test(jl) || /shipping$/.test(jl)) {
           if (/Free delivery|Free shipping/i.test(jl)) { shipping = "Free"; shippingNum = 0; }
-          else { var sm2 = jl.match(/\+?\$?([\d,.]+)/); if (sm2) { shipping = "$" + sm2[1]; shippingNum = parseFloat(sm2[1]) || 0; } }
+          else { var sm2 = window.ScanCurrency.parseMoney(jl); if (sm2 && sm2.amount != null && !sm2.conflict) { shipping = jl; shippingNum = sm2.amount; shippingCurrency = sm2.currency; } }
           continue;
         }
         if (/^Located in/.test(jl)) break;
@@ -4834,9 +4830,16 @@ function COMCScannerPanel(props) {
       if (!price) continue;
       var parsed = parseEbayTitle(title);
       parsed.price = price;
+      parsed.rawPrice = rawPrice;
+      parsed.currencyText = lines.slice(i, j).join("\n");
       parsed.shipping = shipping;
       parsed.shippingNum = shippingNum;
-      parsed.totalPrice = ((parseFloat(price) || 0) + shippingNum).toFixed(2);
+      parsed.shippingCurrency = shippingCurrency;
+      var itemCurrency = window.ScanCurrency.infer(parsed, {text:text,fallbackCurrency:scanCurrency}).currency;
+      if (shipping && shippingCurrency === "UNKNOWN") {
+        parsed.shippingCurrency = window.ScanCurrency.infer({price:shippingNum,rawPrice:shipping,source:"eBay"}, {text:parsed.currencyText + "\n" + text,fallbackCurrency:scanCurrency}).currency;
+      }
+      parsed.totalPrice = shippingNum === 0 || (itemCurrency !== "UNKNOWN" && parsed.shippingCurrency === itemCurrency) ? ((parseFloat(price) || 0) + shippingNum).toFixed(2) : "";
       parsed.timeLeft = timeLeft;
       parsed.condition = condition;
       parsed.listingType = listingType || "bin";
@@ -4864,7 +4867,9 @@ function COMCScannerPanel(props) {
     var date = (parts[2] || "").trim();
     var orderNum = (parts[3] || "").trim();
     var parsed = parseEbayTitle(title);
-    parsed.price = price;
+    parsed.price = window.ScanCurrency.amount(price) == null ? "" : String(window.ScanCurrency.amount(price));
+    parsed.rawPrice = (parts[1] || "").trim();
+    parsed.currencyText = line;
     parsed.date = date;
     parsed.orderNum = orderNum;
     parsed.recordType = "purchase";
@@ -4878,6 +4883,7 @@ function COMCScannerPanel(props) {
   }
 
   function parseCOMCShopText(text) {
+    if (multiSubject) return genericListings(text, "COMC");
     // Flexible parser for COMC marketplace copy-paste.
     // COMC listings may come in many formats depending on what the user selects/copies.
     // Strategy: find lines with a year + card-like info, grab price from nearby lines.
@@ -4944,22 +4950,19 @@ function COMCScannerPanel(props) {
       if (!variant) variant = "Base";
       
       // Extract price - check inline first, then next lines
-      var price = "";
-      var priceInline = line.match(/\$(\d+(?:[.,]\d+)?)/);
-      if (priceInline) {
-        price = priceInline[1].replace(",", "");
+      var price = "", rawPrice = "";
+      var priceInline = window.ScanCurrency.parseMoney(line);
+      if (priceInline && priceInline.amount != null && !priceInline.conflict) {
+        price = String(priceInline.amount);
+        rawPrice = line;
       } else {
         for (var look = 1; look <= 5 && i + look < lines.length; look++) {
           var nextLine = lines[i + look];
           if (!nextLine) continue;
-          // "5 from $1.45" or "$10.25" or "2 from $4.98"
-          var pm = nextLine.match(/\$(\d+(?:\.\d+)?)/);
-          if (pm) { price = pm[1]; break; }
-          // Plain number on its own line
-          var pm2 = nextLine.match(/^(\d+\.\d{2})$/);
-          if (pm2) { price = pm2[1]; break; }
-          // Stop looking if we hit another card line
-          if (/\b20[12]\d\b/.test(nextLine)) break;
+          // Stop before another listing; its amount cannot become this card's price.
+          if (/\b(?:19|20)\d{2}\b/.test(nextLine)) break;
+          var pm = window.ScanCurrency.parseMoney(nextLine);
+          if (pm && pm.amount != null && !pm.conflict && (/[$£€¥]|\b(?:USD|CAD|GBP|EUR|AUD)\b/i.test(nextLine) || /^\d+[.,]\d{2}$/.test(nextLine))) { price = String(pm.amount); rawPrice = nextLine; break; }
         }
       }
       
@@ -4970,7 +4973,7 @@ function COMCScannerPanel(props) {
       results.push({
         year: year, product: product, variant: variant,
         cardNo: cardNo, cardNoClean: cardNo.replace(/\.\d+$/, ""),
-        serial: "", printRun: printRun, price: price,
+        serial: "", printRun: printRun, price: price, rawPrice: rawPrice, source:"COMC",
         date: "", seller: "COMC",
         rawSet: line, description: "Tyler Black", orderNum: ""
       });
@@ -4981,6 +4984,13 @@ function COMCScannerPanel(props) {
   // ---- SportLots Parser ----
   // Splits a SportLots set name (year already stripped) into {product, variant}
   function splitSportLotsSet(setNoYear) {
+    if (multiSubject) {
+      var knownProducts = Array.from(new Set(cards.map(function(c){return String(c.product || "").replace(/^\d{4}\s+/,"");}))).sort(function(a,b){return b.length-a.length;});
+      for (var kp = 0; kp < knownProducts.length; kp++) {
+        if (setNoYear.toLowerCase().indexOf(knownProducts[kp].toLowerCase()) === 0) return {product:knownProducts[kp],variant:setNoYear.slice(knownProducts[kp].length).replace(/^\s*-?\s*/, "") || "Base"};
+      }
+      return {product:setNoYear,variant:"Base"};
+    }
     // Known base products ordered longest-first for greedy matching
     // sl = SportLots prefix (lowercase), db = TCDB product name, vp = variant prefix to prepend
     var BASES = [
@@ -5067,7 +5077,7 @@ function COMCScannerPanel(props) {
       var playerPart = cardMatch[2];
 
       // Must contain Tyler Black (filter out false positives like Tyler Woessner)
-      if (!/tyler\s*black/i.test(playerPart)) continue;
+      if (!acceptsSubject(playerPart)) continue;
 
       // Look backwards for the set name (should start with a 4-digit year)
       var setName = "";
@@ -5101,13 +5111,13 @@ function COMCScannerPanel(props) {
       if (varTag) variant = varTag + " Variations";
 
       // Look forward for price and quantity
-      var price = "";
+      var price = "", rawPrice = "";
       var quantity = "";
       for (var k = i + 1; k <= Math.min(lines.length - 1, i + 5); k++) {
         var nextLine = lines[k];
         if (!nextLine) continue;
-        var priceMatch = nextLine.match(/Low Price:\s*\$(\d+(?:\.\d+)?)/);
-        if (priceMatch) price = priceMatch[1];
+        var priceMatch = /Low Price:/i.test(nextLine) ? window.ScanCurrency.parseMoney(nextLine.replace(/^.*?Low Price:\s*/i, "")) : null;
+        if (priceMatch && priceMatch.amount != null && !priceMatch.conflict) { price = String(priceMatch.amount); rawPrice = nextLine; }
         var qtyMatch = nextLine.match(/Total Quantity:\s*(\d+)/);
         if (qtyMatch) quantity = qtyMatch[1];
         // Stop if we hit another card number or set name line
@@ -5121,10 +5131,10 @@ function COMCScannerPanel(props) {
       results.push({
         year: year, product: product, variant: variant,
         cardNo: cardNo, cardNoClean: cardNo.replace(/\.\d+$/, ""),
-        serial: "", printRun: printRun, price: price,
+        serial: "", printRun: printRun, price: price, rawPrice: rawPrice,
         date: "", seller: "SportLots", source: "SportLots",
         rawSet: setName + " #" + cardNo,
-        description: "Tyler Black", orderNum: "",
+        description: playerPart, subject: subjectNames(playerPart)[0] || "", orderNum: "",
         slQuantity: quantity
       });
     }
@@ -5139,9 +5149,9 @@ function COMCScannerPanel(props) {
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i].trim();
       // Look for price lines: US$XX.XX, US$XX, £XX, £XX.XX
-      var priceMatch = line.match(/^(?:US)?\$([\d,.]+)$/i) || line.match(/^£([\d,.]+)$/);
-      if (!priceMatch) continue;
-      var price = priceMatch[1].replace(/,/g, "");
+      var priceMatch = (/[$£€¥]|\b(?:USD|CAD|GBP|EUR|AUD|NZD|JPY|CHF|HKD|SGD)\b/i.test(line) || /^\d+[.,]\d{2}$/.test(line)) && /^(?:(?:US|CA|C|CAN|AU|A|NZ|HK|SG|USD|CAD|GBP|EUR|AUD|NZD|JPY|CHF|HKD|SGD)\s*)?[$£€¥]?[\d,.]+(?:\s*(?:USD|CAD|GBP|EUR|AUD|NZD|JPY|CHF|HKD|SGD))?$/i.test(line) ? window.ScanCurrency.parseMoney(line) : null;
+      if (!priceMatch || priceMatch.amount == null || priceMatch.conflict) continue;
+      var price = String(priceMatch.amount);
       // Look backwards for the title (skip blank lines, "Card image", UUIDs, seller repeats)
       var title = "";
       var seller = "";
@@ -5178,14 +5188,14 @@ function COMCScannerPanel(props) {
       if (!title) continue;
       var titleLow = title.toLowerCase();
       // Must contain "tyler black"
-      if (titleLow.indexOf("tyler black") === -1) continue;
+      if (!acceptsSubject(title)) continue;
       // Exclude other Tylers and non-baseball
       var excluded = false;
-      for (var ei = 0; ei < EBAY_NOT_TB.length; ei++) {
+      for (var ei = 0; !multiSubject && ei < EBAY_NOT_TB.length; ei++) {
         if (titleLow.indexOf(EBAY_NOT_TB[ei]) !== -1) { excluded = true; break; }
       }
       if (excluded) continue;
-      for (var si = 0; si < EBAY_SPORT_EXCLUDE.length; si++) {
+      for (var si = 0; !multiSubject && si < EBAY_SPORT_EXCLUDE.length; si++) {
         if (titleLow.indexOf(EBAY_SPORT_EXCLUDE[si]) !== -1) { excluded = true; break; }
       }
       if (excluded) continue;
@@ -5198,6 +5208,8 @@ function COMCScannerPanel(props) {
       // Use eBay title parser (reusable across marketplaces)
       var parsed = parseEbayTitle(title);
       parsed.price = price;
+      parsed.rawPrice = line;
+      parsed.currency = priceMatch.currency;
       parsed.seller = seller || "Whatnot";
       parsed.source = "Whatnot";
       parsed.rawSet = title;
@@ -5652,6 +5664,7 @@ function COMCScannerPanel(props) {
   var OTHER_TYLERS = ['tyler herro','tyler kolek','tyler shough','tyler seguin','tyler lockett','tyler soderstrom',"tyler o'neill",'tyler oneill','tyler smith','tyler toffoli','tyler ennis','tyler reddick','tyler boyd','tyler stephenson','tyler lacy','tyler pike','tyler ervin','tyler mattison','tyler booker','tyler warren','tyler locklear','tyler allgeier','tyler nubin','tyler bass','tyler glasnow','tyler johnson','tyler wade','tyler rogers','tyler anderson','tyler naquin','tyler flowers','tyler bey'];
   var NON_CARD_130 = ['hoodie','shirt','t-shirt','costume','cosplay','sandal','shoe','dress','jacket','pants','womens','mens ','replica','diecast','die-cast','nascar arc','seth rollins','wwe','wrestling','aew','black panther','comic','marvel','player break','case break','break #','break pyp','you pick','pick player','pick your','lot of (','lot of(','card lot','you choose','complete your set'];
   function is130ptTylerBlack(title) {
+    if (multiSubject) return acceptsSubject(title);
     var t = title.toLowerCase();
     if (t.indexOf('tyler black') === -1) return false;
     for (var i = 0; i < OTHER_TYLERS.length; i++) { if (t.indexOf(OTHER_TYLERS[i]) !== -1) return false; }
@@ -5671,19 +5684,19 @@ function COMCScannerPanel(props) {
         if (lines[i].trim().length > 0) block.push(lines[i].trim());
         i++;
       }
-      var platform = '', title = '', saleType = '', listPrice = null, salePrice = null, dateStr = '';
+      var platform = '', title = '', saleType = '', listPrice = null, salePrice = null, dateStr = '', saleRawPrice = '';
       for (var bi = 0; bi < block.length; bi++) {
         var bl = block[bi];
         if (bl === 'Sold Via:') continue;
         if (bl === 'eBay' || bl === 'COMC' || bl === 'SportLots') { platform = bl; continue; }
         if (bl.indexOf('Sale Price:') !== -1) {
-          var spNums = bl.replace(/[^0-9.]/g, '');
-          if (spNums) salePrice = parseFloat(spNums);
+          var spMoney = window.ScanCurrency.parseMoney(bl.replace('Sale Price:', '').trim());
+          if (spMoney && !spMoney.conflict) { salePrice = spMoney.amount; saleRawPrice = bl; }
           continue;
         }
         if (bl.indexOf('List Price:') !== -1) {
-          var lpNums = bl.replace(/[^0-9.]/g, '');
-          if (lpNums) listPrice = parseFloat(lpNums);
+          var lpMoney = window.ScanCurrency.parseMoney(bl.replace('List Price:', '').trim());
+          if (lpMoney && !lpMoney.conflict) listPrice = lpMoney.amount;
           continue;
         }
         if (bl.indexOf('Shipping Price:') !== -1) continue;
@@ -5726,7 +5739,7 @@ function COMCScannerPanel(props) {
       var discount = (isBestOffer && listPrice && listPrice > 0) ? Math.round((1 - salePrice / listPrice) * 100) : 0;
       results.push({
         year: year, product: product, cardNo: cardNo, cardNoClean: cardNo.replace(/-/g, ''),
-        variant: variant, price: String(salePrice), rawSet: title, source: '130point',
+        variant: multiSubject ? '' : variant, price: String(salePrice), rawPrice:saleRawPrice, currencyText:block.join('\n'), rawSet: title, source: '130point',
         listingType: isBestOffer ? 'best_offer' : 'fixed',
         date: parsedDate, seller: platform || '130pt', description: variant || product, printRun: printRun,
         _130pt: { title: title, saleType: saleType, listPrice: listPrice, salePrice: salePrice, isBestOffer: isBestOffer, discount: discount, platform: platform, date: parsedDate, printRun: printRun }
@@ -5752,8 +5765,9 @@ function COMCScannerPanel(props) {
         title = prev; break;
       }
       if (!title || !is130ptTylerBlack(title)) continue;
-      var priceStr = line.replace('Current Price:', '').replace('USD', '').trim();
-      var price = parseFloat(priceStr) || 0;
+      var priceStr = line.replace('Current Price:', '').trim();
+      var currentMoney = window.ScanCurrency.parseMoney(priceStr);
+      var price = currentMoney && !currentMoney.conflict ? currentMoney.amount : 0;
       var isBIN = false, bids = 0, endDate = '';
       for (var k = i + 1; k < lines.length && k <= i + 4; k++) {
         var nl = lines[k].trim();
@@ -5775,7 +5789,7 @@ function COMCScannerPanel(props) {
       var prMatch = title.match(/\/(\d+)/); var printRun = prMatch ? prMatch[1] : '';
       results.push({
         year: year, product: product, cardNo: cardNo, cardNoClean: cardNo.replace(/-/g, ''),
-        variant: variant, price: price > 0 ? String(price) : '', rawSet: title, source: '130point',
+        variant: multiSubject ? '' : variant, price: price > 0 ? String(price) : '', rawPrice:priceStr, rawSet: title, source: '130point',
         listingType: isBIN ? 'fixed' : (bids > 0 ? 'auction' : 'auction'), bids: bids,
         date: endDate, seller: 'For Sale', description: variant || product, printRun: printRun,
         _130pt: { title: title, saleType: isBIN ? 'BIN' : 'Auction', listPrice: price, salePrice: price, isBestOffer: false, discount: 0, platform: 'eBay', date: endDate, printRun: printRun, forSale: true }
@@ -5784,6 +5798,12 @@ function COMCScannerPanel(props) {
     return results;
   }
   function matchToCards(p) {
+    if (multiSubject) {
+      var scopedOverride = COMC_OVERRIDES[pinKey(p)];
+      var pinnedCard = scopedOverride && cards.find(function(c){return c.id === scopedOverride;});
+      if (pinnedCard && subjectNames((p.rawSet || "") + " " + (p.description || "")).indexOf(window.CollectionScanner.subject(pinnedCard,scanRoster)) >= 0) return {card:pinnedCard,score:100,override:true,subjectVerified:true};
+      return window.CollectionScanner.match(p, cards, scanRoster);
+    }
     // Priority 1: Check persistent COMC override
     var ck = pinKey(p);
     if (COMC_OVERRIDES[ck]) {
@@ -6165,7 +6185,7 @@ function COMCScannerPanel(props) {
       vals.push(cur.trim());
       var obj = {};
       for (var h = 0; h < headers.length; h++) obj[headers[h]] = vals[h] || "";
-      if (obj["Description"] && obj["Description"].toLowerCase().indexOf("tyler black") !== -1 && (!obj["Sport"] || obj["Sport"] === "Baseball")) {
+      if (obj["Description"] && acceptsSubject(obj["Description"]) && (multiSubject || !obj["Sport"] || obj["Sport"] === "Baseball")) {
         rows.push(obj);
       }
     }
@@ -6217,11 +6237,11 @@ function COMCScannerPanel(props) {
     var items = [];
     // Card line pattern: starts with 4-digit year, has # card number
     // Format: "{year} {product} [- {variant}] #{cardNumber} Tyler Black [{attrs}]"
-    var cardLineRe = /^(20[12]\d)\s+(.+?)\s+#(\S+)\s+Tyler\s+Black\b(.*)/i;
+    var cardLineRe = /^((?:19|20)\d{2})\s+(.+?)\s+#(\S+)\s+(.*)/i;
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i].trim();
       var m = cardLineRe.exec(line);
-      if (!m) continue;
+      if (!m || !acceptsSubject(m[4])) continue;
       var year = m[1];
       var fullProduct = m[2].trim();
       var cardNumber = m[3];
@@ -6257,7 +6277,8 @@ function COMCScannerPanel(props) {
         year: year,
         product: product,
         variant: variant,
-        cardNumber: cardNumber,
+        cardNumber: cardNumber, cardNo: cardNumber, cardNoClean: cardNumber,
+        description: rest, subject: subjectNames(rest)[0] || "",
         price: price,
         attrs: attrs,
         serialNumbered: serialNum,
@@ -6313,7 +6334,7 @@ function COMCScannerPanel(props) {
       savePriceHistory(ptBatch2);
       ptResults2.sort(function(a, b) { var dA = (a.parsed._130pt && a.parsed._130pt.date) || ""; var dB = (b.parsed._130pt && b.parsed._130pt.date) || ""; return dB.localeCompare(dA); });
       setParsed(ptResults2);
-      try { localStorage.setItem("tb-last-130pt-paste-v1", rawInput); } catch(e) {}
+      try { localStorage.setItem(tbk("last-130pt-paste-v1"), rawInput); } catch(e) {}
       setShowInput(false);
       return;
     }
@@ -6330,7 +6351,7 @@ function COMCScannerPanel(props) {
       var seenTitles = {};
       var dedupedListings = [];
       for (var di = 0; di < ebayListings.length; di++) {
-        var dk = (ebayListings[di].rawSet || "").trim();
+        var dk = (ebayListings[di].rawSet || "").trim() + "|" + parsedCurrency(ebayListings[di]);
         if (!dk) { dedupedListings.push(ebayListings[di]); continue; }
         if (seenTitles[dk] !== undefined) {
           var existTotal = parseFloat(dedupedListings[seenTitles[dk]].totalPrice) || 999999;
@@ -6379,7 +6400,7 @@ function COMCScannerPanel(props) {
       var deduped = [];
       for (var di = 0; di < shopResults.length; di++) {
         var item = shopResults[di];
-        var matchId = item.match && item.match.score >= 90 ? item.match.card.id : null;
+        var matchId = item.match && item.match.score >= 90 ? comparableListingKey(item.parsed, item.match.card.id) : null;
         if (!matchId) {
           deduped.push(item);
           continue;
@@ -6416,7 +6437,7 @@ function COMCScannerPanel(props) {
         var seenTitles = {};
         var dedupedListings = [];
         for (var di = 0; di < ebayListings.length; di++) {
-          var dk = (ebayListings[di].rawSet || "").trim();
+          var dk = (ebayListings[di].rawSet || "").trim() + "|" + parsedCurrency(ebayListings[di]);
           if (!dk) { dedupedListings.push(ebayListings[di]); continue; }
           if (seenTitles[dk] !== undefined) {
             // Keep the one with lower total price
@@ -6473,7 +6494,7 @@ function COMCScannerPanel(props) {
       var slDeduped = [];
       for (var sdi = 0; sdi < slResults.length; sdi++) {
         var sItem = slResults[sdi];
-        var sMatchId = sItem.match && sItem.match.score >= 90 ? sItem.match.card.id : null;
+        var sMatchId = sItem.match && sItem.match.score >= 90 ? comparableListingKey(sItem.parsed, sItem.match.card.id) : null;
         if (!sMatchId) { slDeduped.push(sItem); continue; }
         if (slSeen[sMatchId] === undefined) {
           slSeen[sMatchId] = slDeduped.length;
@@ -6507,7 +6528,7 @@ function COMCScannerPanel(props) {
       var wnDeduped = [];
       for (var wdi = 0; wdi < wnResults.length; wdi++) {
         var wItem = wnResults[wdi];
-        var wMatchId = wItem.match && wItem.match.score >= 90 ? wItem.match.card.id : null;
+        var wMatchId = wItem.match && wItem.match.score >= 90 ? comparableListingKey(wItem.parsed, wItem.match.card.id) : null;
         if (!wMatchId) { wnDeduped.push(wItem); continue; }
         if (wnSeen[wMatchId] === undefined) {
           wnSeen[wMatchId] = wnDeduped.length;
@@ -6544,7 +6565,7 @@ function COMCScannerPanel(props) {
         return dB.localeCompare(dA);
       });
       setParsed(ptResults);
-      try { localStorage.setItem("tb-last-130pt-paste-v1", rawInput); } catch(e) {}
+      try { localStorage.setItem(tbk("last-130pt-paste-v1"), rawInput); } catch(e) {}
       setShowInput(false);
     } else {
       var manualParsed = {
@@ -6552,7 +6573,7 @@ function COMCScannerPanel(props) {
         cardNo: manualCardNo, cardNoClean: manualCardNo.replace(/\.\d+$/, ""),
         serial: manualSerial, price: manualPrice, date: manualDate,
         seller: manualSeller, rawSet: manualYear + " " + manualProduct + (manualVariant ? " - " + manualVariant : ""),
-        description: "Tyler Black", orderNum: "", recordType: "purchase", source: "Manual", currency: scanCurrency, observationId: "manual:" + Date.now()
+        description: multiSubject ? manualSubject : "Tyler Black", subject: multiSubject ? manualSubject : "Tyler Black", orderNum: "", recordType: "purchase", source: "Manual", currency: scanCurrency, observationId: "manual:" + Date.now()
       };
       var match = matchToCards(manualParsed);
       setParsed([{ parsed: manualParsed, match: match, raw: {} }]);
@@ -6565,8 +6586,10 @@ function COMCScannerPanel(props) {
     var item = parsed[idx];
     if (!item || !item.match) return false;
     var card = item.match.card;
-    var p = Object.assign({}, item.parsed);
-    if (window.TrackerMarket.currency(p.currency) === "UNKNOWN") p.currency = scanCurrency;
+    var p = window.ScanCurrency.apply(item.parsed, {text:rawInput,fallbackCurrency:scanCurrency});
+    if (p.recordType === "purchase" && window.ScanCurrency.amount(p.price) > 0 && p.currencyEvidence.needsReview) {
+      setImportMessage(p.currencyEvidence.conflicts.join(" · ") || "Select the currency shown on this receipt before importing."); return false;
+    }
     if (p.recordType === "purchase") {
       if (!props.importPurchaseCopy) { setImportMessage("Sign in to save this purchase in your private copy inventory."); return false; }
       var result = await props.importPurchaseCopy(card, p);
@@ -6732,9 +6755,9 @@ function COMCScannerPanel(props) {
         {mode === "ebay" && parsed.some(function(item) { return item.parsed.recordType === "purchase"; }) && <button disabled={importBusy} onClick={applyAll} className="text-[10px] px-2 py-1 mb-2 bg-cyan-700 rounded disabled:opacity-50">{importBusy ? "Importing…" : "Import matched purchases · In Transit"}</button>}
         {showInput && <label className="flex items-center gap-2 text-[10px] text-gray-300 mb-2">Prices in this scan
           <select aria-label="Scan currency" value={scanCurrency} onChange={function(e) { setScanCurrency(e.target.value); }} className="bg-gray-900 border border-gray-600 rounded px-1 py-0.5">
-            {["UNKNOWN", "USD", "CAD", "GBP", "EUR", "AUD"].map(function(code) { return <option key={code} value={code}>{code === "UNKNOWN" ? "Currency not specified" : code}</option>; })}
+            {["UNKNOWN", "USD", "CAD", "GBP", "EUR", "AUD"].map(function(code) { return <option key={code} value={code}>{code === "UNKNOWN" ? "Auto" : code}</option>; })}
           </select>
-          <span className="text-gray-500">Use the currency shown by the source. Listed prices are not sold values.</span>
+          <span className="text-gray-500">From price, source or ship-to.</span>
         </label>}
         {!showInput && parsed.length > 0 ? (
           <div className="flex items-center gap-2 mt-1">
@@ -6745,6 +6768,7 @@ function COMCScannerPanel(props) {
         ) : mode === "manual" ? (
           <React.Fragment>
           <div className="grid grid-cols-2 gap-2">
+            {multiSubject && <select aria-label="Card subject" value={manualSubject} onChange={function(e){setManualSubject(e.target.value);}} className="bg-gray-900 text-gray-200 text-xs p-1.5 rounded border border-gray-600"><option value="">Player / subject</option>{Array.from(new Set(cards.filter(function(c){return !c.isTestCard;}).map(function(c){return window.CollectionScanner.subject(c,scanRoster);}))).filter(Boolean).sort().map(function(name){return <option key={name} value={name}>{name}</option>;})}</select>}
             <input value={manualYear} onChange={function(e){setManualYear(e.target.value);}} className="bg-gray-900 text-gray-200 text-xs p-1.5 rounded border border-gray-600" placeholder="Year (e.g. 2024)" />
             <input value={manualProduct} onChange={function(e){setManualProduct(e.target.value);}} className="bg-gray-900 text-gray-200 text-xs p-1.5 rounded border border-gray-600" placeholder="Product (e.g. Topps Chrome)" />
             <input value={manualCardNo} onChange={function(e){setManualCardNo(e.target.value);}} className="bg-gray-900 text-gray-200 text-xs p-1.5 rounded border border-gray-600" placeholder="Card # (e.g. 63)" />
@@ -6762,16 +6786,16 @@ function COMCScannerPanel(props) {
           <React.Fragment>
           <div className="flex gap-1 mb-1 flex-wrap">
             <button onClick={function(){ navigator.clipboard.readText().then(function(txt) { setRawInput(txt); setParsed([]); setApplied({}); }).catch(function() { alert("Clipboard access denied. Please paste manually with Ctrl+V."); }); }} className={"text-[9px] px-2 py-0.5 rounded border " + (mode === "ebay" ? "bg-yellow-900/40 border-yellow-600 text-yellow-300 hover:bg-yellow-800/40" : mode === "130pt" ? "bg-teal-900/40 border-teal-600 text-teal-300 hover:bg-teal-800/40" : mode === "sportlots" ? "bg-blue-900/40 border-blue-600 text-blue-300 hover:bg-blue-800/40" : mode === "whatnot" ? "bg-violet-900/40 border-violet-600 text-violet-300 hover:bg-violet-800/40" : "bg-gray-700 border-gray-500 text-gray-300 hover:bg-gray-600")} title="Read clipboard and paste into textarea">{"\uD83D\uDCCB"} Paste</button>
-            {(function(){ var keys = [{k:"tb-last-ebay-paste-v1",l:"eBay",c:"text-yellow-400"},{k:"tb-last-comc-paste-v1",l:"COMC",c:"text-green-400"},{k:"tb-last-sportlots-paste-v1",l:"SL",c:"text-blue-400"},{k:"tb-last-whatnot-paste-v1",l:"WN",c:"text-violet-400"},{k:"tb-last-130pt-paste-v1",l:"130pt",c:"text-teal-400"}]; return keys.map(function(item) { try { if (!localStorage.getItem(item.k)) return null; } catch(e) { return null; } return React.createElement("button", { key: item.k, onClick: function(){ try { var saved = localStorage.getItem(item.k); if (saved) { setRawInput(saved); setParsed([]); setApplied({}); } } catch(e) {} }, className: "text-[9px] px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded hover:bg-gray-700 " + item.c, title: "Reload last " + item.l + " paste" }, item.l); }); })()}
+            {(function(){ var keys = [{k:tbk("last-ebay-paste-v1"),l:"eBay",c:"text-yellow-400"},{k:tbk("last-comc-paste-v1"),l:"COMC",c:"text-green-400"},{k:tbk("last-sportlots-paste-v1"),l:"SL",c:"text-blue-400"},{k:tbk("last-whatnot-paste-v1"),l:"WN",c:"text-violet-400"},{k:tbk("last-130pt-paste-v1"),l:"130pt",c:"text-teal-400"}]; return keys.map(function(item) { try { if (!localStorage.getItem(item.k)) return null; } catch(e) { return null; } return React.createElement("button", { key: item.k, onClick: function(){ try { var saved = localStorage.getItem(item.k); if (saved) { setRawInput(saved); setParsed([]); setApplied({}); } } catch(e) {} }, className: "text-[9px] px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded hover:bg-gray-700 " + item.c, title: "Reload last " + item.l + " paste" }, item.l); }); })()}
           </div>
           <div className="relative">
-            <textarea value={rawInput} onChange={function(e){setRawInput(e.target.value); setParsed([]); setApplied({});}} className={"w-full bg-gray-900 text-gray-200 text-xs font-mono p-2 pr-7 rounded border focus:outline-none " + (mode === "ebay" ? "border-yellow-600 focus:border-yellow-400" : mode === "130pt" ? "border-teal-700 focus:border-teal-400" : mode === "sportlots" ? "border-blue-600 focus:border-blue-400" : mode === "whatnot" ? "border-violet-600 focus:border-violet-400" : mode === "shop" ? "border-green-700 focus:border-green-400" : mode === "tcdb" ? "border-cyan-600 focus:border-cyan-400" : "border-gray-600 focus:border-orange-400")} style={{height: parsed.length > 0 ? "80px" : "120px"}} placeholder={mode === "tcdb" ? "Paste from TCDB collection page:\n\n1. Go to your TCDB Tyler Black collection\n2. Filter by Have, Want, or In-Transit\n3. Ctrl+A to select all, Ctrl+C to copy\n4. Paste here and hit Scan\n\nAuto-detects which list (Have/Want/In-Transit) you copied from." : "Paste from any source \u2014 auto-detected:\n\u2022 eBay search results (Ctrl+A, Ctrl+C)\n\u2022 COMC marketplace listings\n\u2022 130point.com sold/for-sale results\n\u2022 SportLots player page\n\u2022 Whatnot search results\n\u2022 TCDB collection page (Have/Want/In-Transit)\n\nOr use tabs above to force a specific mode."} />
+            <textarea value={rawInput} onChange={function(e){setRawInput(e.target.value); setParsed([]); setApplied({});}} className={"w-full bg-gray-900 text-gray-200 text-xs font-mono p-2 pr-7 rounded border focus:outline-none " + (mode === "ebay" ? "border-yellow-600 focus:border-yellow-400" : mode === "130pt" ? "border-teal-700 focus:border-teal-400" : mode === "sportlots" ? "border-blue-600 focus:border-blue-400" : mode === "whatnot" ? "border-violet-600 focus:border-violet-400" : mode === "shop" ? "border-green-700 focus:border-green-400" : mode === "tcdb" ? "border-cyan-600 focus:border-cyan-400" : "border-gray-600 focus:border-orange-400")} style={{height: parsed.length > 0 ? "80px" : "120px"}} placeholder={mode === "tcdb" ? "Paste from TCDB collection page:\n\n1. Go to your TCDB collection\n2. Filter by Have, Want, or In-Transit\n3. Ctrl+A to select all, Ctrl+C to copy\n4. Paste here and hit Scan\n\nAuto-detects which list (Have/Want/In-Transit) you copied from." : "Paste from any source \u2014 auto-detected:\n\u2022 eBay search results (Ctrl+A, Ctrl+C)\n\u2022 COMC marketplace listings\n\u2022 130point.com sold/for-sale results\n\u2022 SportLots player page\n\u2022 Whatnot search results\n\u2022 TCDB collection page (Have/Want/In-Transit)\n\nOr use tabs above to force a specific mode."} />
             {rawInput && <button onClick={function(){ setRawInput(""); setParsed([]); setApplied({}); }} className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded bg-gray-700/80 hover:bg-red-800/80 text-gray-400 hover:text-red-300 text-xs font-bold" title="Clear input">{"\u2715"}</button>}
           </div>
           <div className="flex gap-2 mt-1 items-center">
             <button onClick={handleParse} className={"px-3 py-1 text-white text-xs font-bold rounded " + (mode === "ebay" ? "bg-yellow-600 hover:bg-yellow-500" : mode === "130pt" ? "bg-teal-600 hover:bg-teal-500" : mode === "sportlots" ? "bg-blue-600 hover:bg-blue-500" : mode === "whatnot" ? "bg-violet-600 hover:bg-violet-500" : mode === "shop" ? "bg-green-600 hover:bg-green-500" : "bg-orange-600 hover:bg-orange-500")}>{parsed.length > 0 ? "Re-scan" : "Scan"}</button>
             {rawInput.trim() && mode === "auto" && <span className="text-[9px] text-gray-500">{"Detected: " + (detectMode(rawInput) === "auto" ? "unknown" : detectMode(rawInput))}</span>}
-            {parsed.length > 0 && <span className="text-[9px] text-gray-400">{parsed.length} Tyler Black card{parsed.length !== 1 ? "s" : ""}</span>}
+            {parsed.length > 0 && <span className="text-[9px] text-gray-400">{parsed.length} card{parsed.length !== 1 ? "s" : ""}</span>}
           </div>
           </React.Fragment>
         )}
@@ -6800,6 +6824,7 @@ function COMCScannerPanel(props) {
         var matchedRows = compRows.filter(function(c) { return c.matched; });
         var unmatchedRows = compRows.filter(function(c) { return !c.matched; });
         var mismatchRows = matchedRows.filter(function(c) { return c.isMismatch; });
+        var importRows = mismatchRows.filter(function(c) { return window.CollectionScanner.tcdbImportStatus(c.trackerStatus, tcdbDetectedStatus) !== c.trackerStatus; });
         var agreeRows = matchedRows.filter(function(c) { return !c.isMismatch; });
         var filteredRows = tcdbFilter === "mismatch" ? mismatchRows : tcdbFilter === "agree" ? agreeRows : tcdbFilter === "unmatched" ? unmatchedRows : compRows;
 
@@ -6832,11 +6857,11 @@ function COMCScannerPanel(props) {
             React.createElement("button", {onClick:function(){setTcdbFilter("agree");}, className:"text-[10px] px-1.5 py-0.5 rounded font-bold " + (tcdbFilter === "agree" ? "bg-green-600 text-white" : "bg-gray-700 text-gray-300")}, "Match (" + agreeRows.length + ")"),
             React.createElement("button", {onClick:function(){setTcdbFilter("unmatched");}, className:"text-[10px] px-1.5 py-0.5 rounded font-bold " + (tcdbFilter === "unmatched" ? "bg-yellow-600 text-white" : "bg-gray-700 text-gray-300")}, "Unmatched (" + unmatchedRows.length + ")"),
             React.createElement("button", {onClick:function(){setTcdbFilter("all");}, className:"text-[10px] px-1.5 py-0.5 rounded font-bold " + (tcdbFilter === "all" ? "bg-gray-500 text-white" : "bg-gray-700 text-gray-300")}, "All (" + compRows.length + ")"),
-            mismatchRows.length > 0 && tcdbDetectedStatus !== "all" && tcdbDetectedStatus !== "unknown" && React.createElement("button", {onClick: function() {
-              if (!confirm("Update " + mismatchRows.length + " cards in tracker to match TCDB " + tcdbStatusLabel + " status?")) return;
-              mismatchRows.forEach(function(row) { setCardStatus(row.card.id, tcdbDetectedStatus); });
-              setApplied(function(prev) { var n = Object.assign({}, prev); mismatchRows.forEach(function(row) { n[row.card.id] = true; }); return n; });
-            }, className:"text-[10px] px-2 py-0.5 rounded font-bold bg-orange-700 hover:bg-orange-600 text-white ml-2"}, "Fix All " + mismatchRows.length + " in Tracker")
+            importRows.length > 0 && tcdbDetectedStatus !== "all" && tcdbDetectedStatus !== "unknown" && React.createElement("button", {onClick: function() {
+              var savedIds = [];
+              importRows.forEach(function(row) { if (setCardStatus(row.card.id, window.CollectionScanner.tcdbImportStatus(row.trackerStatus, tcdbDetectedStatus)) !== false) savedIds.push(row.card.id); });
+              setApplied(function(prev) { var n = Object.assign({}, prev); savedIds.forEach(function(id) { n[id] = true; }); return n; });
+            }, className:"text-[10px] px-2 py-0.5 rounded font-bold bg-orange-700 hover:bg-orange-600 text-white ml-2"}, "Import " + importRows.length + " additions")
           ),
           // Results table
           React.createElement("div", {className:"max-h-96 overflow-y-auto"},
@@ -6880,10 +6905,10 @@ function COMCScannerPanel(props) {
                       ),
                       // Action
                       React.createElement("td", {className:"text-center px-1 py-1"},
-                        row.matched && row.isMismatch && !isApplied && tcdbDetectedStatus !== "all" && tcdbDetectedStatus !== "unknown" ?
+                        row.matched && row.isMismatch && !isApplied && window.CollectionScanner.tcdbImportStatus(row.trackerStatus, tcdbDetectedStatus) !== row.trackerStatus ?
                           React.createElement("button", {onClick: function() {
                             var cid = row.card.id;
-                            setCardStatus(cid, tcdbDetectedStatus);
+                            if (setCardStatus(cid, window.CollectionScanner.tcdbImportStatus(row.trackerStatus, tcdbDetectedStatus)) === false) return;
                             setApplied(function(prev) { var n = Object.assign({}, prev); n[cid] = true; return n; });
                           }, className:"text-[9px] px-1.5 py-0.5 bg-orange-800 hover:bg-orange-700 text-orange-200 rounded"}, "Fix") :
                         isApplied ? React.createElement("span", {className:"text-green-600 text-[9px]"}, "Fixed") :
@@ -7138,17 +7163,17 @@ function COMCScannerPanel(props) {
                           <td className="px-0.5 py-0.5 text-gray-300 truncate" style={{maxWidth:"clamp(90px,12vw,200px)"}} title={isExact ? m.card.cardSet + (p.variant && p.variant !== (m.card.cardSet || "Base") ? " (listing: " + p.variant + ")" : "") : p.variant}>{isExact ? (m.card.cardSet || "Base") : (p.variant || "Base")}{isExact && sspBadge(m.card.cardSet)}{p.isAuto ? <span className="ml-0.5 text-yellow-400 text-[8px] font-bold bg-yellow-900/50 px-0.5 rounded">AU</span> : ""}{p.graded ? <span className="ml-0.5 text-pink-400 text-[8px] font-bold bg-pink-900/50 px-0.5 rounded">{p.graded}</span> : ""}</td>
                           <td className="px-0.5 py-0.5 font-mono whitespace-nowrap">{isExact ? <span className="text-gray-400">{m.card.cardNumber}</span> : (p.cardNoClean || p.cardNo ? <span className="text-gray-400">{p.cardNoClean || p.cardNo}</span> : "")}</td>
                           <td className="px-0.5 py-0.5 font-mono whitespace-nowrap">{p.serial ? <span className="text-yellow-300 font-bold bg-yellow-900/30 px-0.5 rounded">{"#" + p.serial}</span> : ""}{p.printRun ? <span className="text-purple-400 font-bold">{"/" + p.printRun}</span> : (isExact && m.card.copies ? <span className="text-purple-400/60">{"/" + m.card.copies}</span> : "")}</td>
-                          <td className={"px-0.5 py-0.5 text-right font-bold whitespace-nowrap " + (isNeed ? "text-green-300" : "text-gray-500")} style={{fontSize:"10px"}}>{p.listingType === "auction" ? <span className="text-red-400" style={{fontSize:"7px"}} title={"Auction - " + (p.bids || 0) + " bids"}>{"\uD83D\uDD28"}</span> : p.listingType === "best_offer" ? <span className="text-cyan-400" style={{fontSize:"7px"}} title="Best Offer">{"\uD83E\uDD1D"}</span> : ""}{parsedMoney(p)}<span className="block text-[8px] font-normal text-gray-400">{window.TrackerMarket.kindLabel(parsedPriceKind(p))}</span>{p.source === "eBay" && p.shippingNum > 0 ? <span className="text-gray-600 block" style={{fontSize:"8px"}}>{"Shipping + " + parsedMoney(p, p.shippingNum)}</span> : ""}{p.source === "SportLots" && p.slQuantity ? <span className="text-blue-400 block" style={{fontSize:"8px"}}>{"x" + p.slQuantity}</span> : ""}{p.source === "Whatnot" && p.seller ? <span className="text-violet-400 block" style={{fontSize:"8px"}}>{p.seller}</span> : ""}{p.source === "130point" && p._130pt ? <span className={p._130pt.forSale ? "text-lime-400 block" : "text-teal-500 block"} style={{fontSize:"7px"}} title={p._130pt.forSale ? "For Sale - ends " + p._130pt.date : p._130pt.isBestOffer ? "Listed " + parsedMoney(p, p._130pt.listPrice) + " sold " + parsedMoney(p, p._130pt.salePrice) : "Fixed price"}>{p._130pt.forSale ? "\uD83C\uDFF7\uFE0F" : ""}{p._130pt.forSale ? "" : p._130pt.date}{p._130pt.isBestOffer && !p._130pt.forSale ? " -" + p._130pt.discount + "%" : ""}</span> : ""}</td>
+                          <td className={"px-0.5 py-0.5 text-right font-bold whitespace-nowrap " + (isNeed ? "text-green-300" : "text-gray-500")} style={{fontSize:"10px"}}>{p.listingType === "auction" ? <span className="text-red-400" style={{fontSize:"7px"}} title={"Auction - " + (p.bids || 0) + " bids"}>{"\uD83D\uDD28"}</span> : p.listingType === "best_offer" ? <span className="text-cyan-400" style={{fontSize:"7px"}} title="Best Offer">{"\uD83E\uDD1D"}</span> : ""}{parsedMoney(p)}<span className="block text-[8px] font-normal text-gray-400">{window.TrackerMarket.kindLabel(parsedPriceKind(p))}</span>{p.source === "eBay" && p.shippingNum > 0 ? <span className="text-gray-600 block" style={{fontSize:"8px"}}>{"Shipping + " + window.TrackerMarket.formatMoney(p.shippingNum, p.shippingCurrency)}</span> : ""}{p.source === "SportLots" && p.slQuantity ? <span className="text-blue-400 block" style={{fontSize:"8px"}}>{"x" + p.slQuantity}</span> : ""}{p.source === "Whatnot" && p.seller ? <span className="text-violet-400 block" style={{fontSize:"8px"}}>{p.seller}</span> : ""}{p.source === "130point" && p._130pt ? <span className={p._130pt.forSale ? "text-lime-400 block" : "text-teal-500 block"} style={{fontSize:"7px"}} title={p._130pt.forSale ? "For Sale - ends " + p._130pt.date : p._130pt.isBestOffer ? "Listed " + parsedMoney(p, p._130pt.listPrice) + " sold " + parsedMoney(p, p._130pt.salePrice) : "Fixed price"}>{p._130pt.forSale ? "\uD83C\uDFF7\uFE0F" : ""}{p._130pt.forSale ? "" : p._130pt.date}{p._130pt.isBestOffer && !p._130pt.forSale ? " -" + p._130pt.discount + "%" : ""}</span> : ""}</td>
                           <td className="px-0.5 py-0.5 text-center">
                             {isExact ? <span className={"text-[9px] font-bold " + (m.variantMismatch ? "text-yellow-400" : "text-green-400")}>{(m.override ? "\ud83d\udccc" : m.score + "%" + (m.variantMismatch ? "\u26a0" : ""))}</span> : m ? <span className="text-[9px] text-red-400">~{m.score}%</span> : <span className="text-gray-600 text-[9px]">-</span>}
                           </td>
                           <td className="px-0.5 py-0.5 text-center" onClick={function(e){e.stopPropagation();}}>
                             <span className="flex gap-0.5 justify-center items-center" style={{fontSize:"9px"}}>
-                              {isExact && <a href={comcUrl(m.card)} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-200 font-bold" title="COMC">C</a>}
+                              {isExact && comcUrl(m.card) && <a href={comcUrl(m.card)} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-200 font-bold" title="COMC">C</a>}
                               {isExact && <a href={ebayUrl(m.card)} target="_blank" rel="noopener noreferrer" className="text-yellow-400 hover:text-yellow-200 font-bold" title="eBay">E</a>}
                               {isExact && <a href={tcdbUrl(m.card)} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-200 font-bold" title="TCDB">T</a>}
-                              {isExact && <a href={sportLotsUrl()} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-200 font-bold" title="SportLots">S</a>}
-                              {isExact && <a href={whatnotUrl()} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-200 font-bold" title="Whatnot">W</a>}
+                              {isExact && !multiSubject && <a href={sportLotsUrl()} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-200 font-bold" title="SportLots">S</a>}
+                              {isExact && <a href={whatnotUrl(m.card)} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-200 font-bold" title="Whatnot">W</a>}
                               {isExact && <a href={pt130Url(m.card)} target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-200 font-bold" title="130point">P</a>}
                               {/* Inline target toggle: cycles not targeted → active → watching → untargeted */}
                               {p.recordType !== "purchase" && isExact && isNeed && !isApplied && !hasBid && <button title="Watch this listing; ownership stays unchanged" onClick={function(){ addTarget(p, item.match, "watching"); }} className="ml-0.5 px-1 py-0 bg-yellow-700 hover:bg-yellow-600 text-white rounded font-bold" style={{fontSize:"8px"}}>+</button>}
@@ -7188,7 +7213,7 @@ function COMCScannerPanel(props) {
                                   <React.Fragment>
                                     <div>
                                       <span className="text-gray-500">Shipping: </span>
-                                      <span className="text-gray-300">{p.shipping ? parsedMoney(p, p.shippingNum != null ? p.shippingNum : p.shipping) : "Not recorded"}</span>
+                                      <span className="text-gray-300">{p.shipping ? window.TrackerMarket.formatMoney(p.shippingNum != null ? p.shippingNum : p.shipping, p.shippingCurrency) : "Not recorded"}</span>
                                       <span className="text-yellow-400 ml-2 font-bold">{p.totalPrice ? "Total: " + parsedMoney(p, p.totalPrice) : ""}</span>
                                     </div>
                                     <div>
@@ -7258,7 +7283,7 @@ function COMCScannerPanel(props) {
                                 <div className="col-span-2 mt-1 flex gap-0.5 flex-wrap items-center" style={{fontSize:"9px"}}>
                                   {/* Site links - logo styled */}
                                   {p.source === "eBay" && p.rawSet && <a href={"https://www.ebay.com/sch/i.html?_nkw=" + encodeURIComponent(p.rawSet)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0 bg-yellow-500/20 border border-yellow-500/60 text-yellow-200 rounded hover:bg-yellow-500/40 font-bold no-underline" title="Search this exact title on eBay">{"\uD83D\uDD0D Title"}</a>}
-                                  {isExact && <a href={comcUrl(m.card)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-[9px] px-1 py-0 rounded font-bold no-underline" style={{background:"#8b1a1a",borderWidth:1,borderColor:"#c62828",color:"#ffcdd2"}} title="Open on COMC">COMC</a>}
+                                  {isExact && comcUrl(m.card) && <a href={comcUrl(m.card)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-[9px] px-1 py-0 rounded font-bold no-underline" style={{background:"#8b1a1a",borderWidth:1,borderColor:"#c62828",color:"#ffcdd2"}} title="Open on COMC">COMC</a>}
                                   {isExact && <a href={ebayUrl(m.card)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-[9px] px-1 py-0 rounded font-bold no-underline" style={{background:"#1a3a6b",borderWidth:1,borderColor:"#3b82f6",color:"#93c5fd"}} title="Search this card on eBay">eBay</a>}
                                   {isExact && <a href={tcdbUrl(m.card)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-[9px] px-1 py-0 rounded font-bold no-underline" style={{background:"#7c3600",borderWidth:1,borderColor:"#c2410c",color:"#fed7aa"}} title="View on TCDB">TCDB</a>}
                                   {isExact && <a href={pt130Url(m.card)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-[9px] px-1 py-0 rounded font-bold no-underline" style={{background:"#134e4a",borderWidth:1,borderColor:"#2dd4bf",color:"#99f6e4"}} title="130point sold prices">130pt</a>}
@@ -7534,7 +7559,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
       var pk = k;
       if (/^\d+$/.test(k) && CARD_BY_ID[parseInt(k)]) {
         var card = CARD_BY_ID[parseInt(k)];
-        pk = card.product.slice(0,4) + "|" + card.product + "|" + card.cardNumber + "|" + (card.cardSet || "Base");
+        pk = globalPriceKey(card);
         changed = true;
         removals.push({cardKey:k,entries:raw[k] || []});restores.push({cardKey:pk,entries:raw[k] || []});
       }
@@ -7550,7 +7575,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
     var next = loadPriceHistory();
     var entries = expandedRow && expandedRow.pk === oldPK ? expandedRow.entries : (next[oldPK] || []);
     if (entries.length === 0) return;
-    var newPK = newCard.product.slice(0,4) + "|" + newCard.product + "|" + newCard.cardNumber + "|" + (newCard.cardSet || "Base");
+    var newPK = globalPriceKey(newCard);
     if (newPK === oldPK) return; // same card
     // Merge entries into new key
     if (!next[newPK]) next[newPK] = [];
@@ -7578,8 +7603,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
   var cardByPK = useMemo(function() {
     var m = {};
     ALL_CARDS.forEach(function(c) {
-      var pk = c.product.slice(0,4) + "|" + c.product + "|" + c.cardNumber + "|" + (c.cardSet || "Base");
-      if (!m[pk]) m[pk] = c;
+      window.PriceHistoryUtils.cardKeys(c, ALL_CARDS).forEach(function(pk) { if (!m[pk]) m[pk] = c; });
     });
     return m;
   }, []);
@@ -7588,9 +7612,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
   var idsByPK = useMemo(function() {
     var m = {};
     ALL_CARDS.forEach(function(c) {
-      var pk = c.product.slice(0,4) + "|" + c.product + "|" + c.cardNumber + "|" + (c.cardSet || "Base");
-      if (!m[pk]) m[pk] = [];
-      m[pk].push(c.id);
+      window.PriceHistoryUtils.cardKeys(c, ALL_CARDS).forEach(function(pk) { if (!m[pk]) m[pk] = []; m[pk].push(c.id); });
     });
     return m;
   }, []);
@@ -7775,7 +7797,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
                 <button onClick={function(e) { e.stopPropagation(); setActiveTab("detailed"); setDetailedProductFilter(c.product); setDetailedCardNumFilter(null); setDetailedStatusFilter("all"); setDetailedSnFilter("all"); }} className="text-[9px] px-1.5 py-0 rounded bg-gray-700/60 border border-gray-600/50 text-gray-300 hover:bg-gray-600/50 font-bold">Full Set</button>
                 <a href={tcdbUrl(c)} target="_blank" rel="noopener noreferrer" className="text-[9px] px-1.5 py-0 rounded bg-cyan-900/40 border border-cyan-700/50 text-cyan-300 hover:bg-cyan-800/50 font-bold inline-block">TCDB</a>
                 <a href={ebayUrl(c)} target="_blank" rel="noopener noreferrer" className="text-[9px] px-1.5 py-0 rounded bg-yellow-900/40 border border-yellow-700/50 text-yellow-300 hover:bg-yellow-800/50 font-bold inline-block">eBay</a>
-                <a href={comcUrl(c)} target="_blank" rel="noopener noreferrer" className="text-[9px] px-1.5 py-0 rounded bg-orange-900/40 border border-orange-700/50 text-orange-300 hover:bg-orange-800/50 font-bold inline-block">COMC</a>
+                {comcUrl(c) && <a href={comcUrl(c)} target="_blank" rel="noopener noreferrer" className="text-[9px] px-1.5 py-0 rounded bg-orange-900/40 border border-orange-700/50 text-orange-300 hover:bg-orange-800/50 font-bold inline-block">COMC</a>}
                 <a href={pt130Url(c)} target="_blank" rel="noopener noreferrer" className="text-[9px] px-1.5 py-0 rounded bg-teal-900/40 border border-teal-700/50 text-teal-300 hover:bg-teal-800/50 font-bold inline-block">130pt</a>
               </span>
             </div>
@@ -7922,7 +7944,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
                     filtered = filtered.filter(function(fc) { return fc.cardNumber.trim() === fv; });
                   }
                   filtered = filtered.filter(function(fc) {
-                    var fpk = fc.product.slice(0,4) + "|" + fc.product + "|" + fc.cardNumber + "|" + (fc.cardSet || "Base");
+                    var fpk = globalPriceKey(fc);
                     return fpk !== r.pk;
                   });
                   // Sort: need first, transit middle, owned last
@@ -7942,7 +7964,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
                             var cStatus = statuses[cand.id] || "not_owned";
                             var statusLabel = cStatus === "owned" ? "OWN" : cStatus === "in_transit" ? "TRNS" : "";
                             var candIsAuto = cardHasAutograph(cand);
-                            var existingPK = cand.product.slice(0,4) + "|" + cand.product + "|" + cand.cardNumber + "|" + (cand.cardSet || "Base");
+                            var existingPK = globalPriceKey(cand);
                             var hasExisting = ph[existingPK] && ph[existingPK].length > 0;
                             return (
                               <div key={cand.id} className="flex items-center gap-1.5 bg-gray-800/60 rounded px-2 py-1 hover:bg-gray-700/60">
@@ -9492,7 +9514,7 @@ window.addEventListener("error", function(e) {
 // Mount the app — wait for cloud hydration so useState initializers see hydrated localStorage
 (async function() {
   try {
-    if (window.storageReady) { try { await window.storageReady; } catch(e) { console.warn("storageReady failed:", e); } }
+    if (window.storageReady) await window.storageReady; // Do not mount editable cached state after a failed cloud initialization.
     mergeCustomCards();
     var root = document.getElementById("root");
     if (!root) { console.error("No #root element"); return; }
@@ -9501,7 +9523,46 @@ window.addEventListener("error", function(e) {
     // correct mode-prefixed storage key. State loss across mode switch is intentional.
     function TrackerRoot() {
       var mode = useTrackerMode();
-      return React.createElement(TylerBlackTracker, { key: mode });
+      var owner = useIsOwner();
+      function collectionRoute() {
+        var match = /^#collections(?:\/([^/]+))?$/.exec(location.hash);
+        return match ? (window.CollectionsUtils.SPORTS.includes(match[1]) ? match[1] : "racing") : null;
+      }
+      var [collections, setCollections] = useState(function() { return !!collectionRoute(); });
+      var [collectionSport, setCollectionSport] = useState(function() { return collectionRoute() || "racing"; });
+      var [navigationError, setNavigationError] = useState("");
+      var navigationBusy = useRef(false), showingCollections = useRef(collections);
+      showingCollections.current = collections;
+      function updateSport(sport) {
+        if (!window.CollectionsUtils.SPORTS.includes(sport)) return;
+        setCollectionSport(sport); history.replaceState(null,"","#collections/"+sport);
+      }
+      useEffect(function() {
+        async function open(event) {
+          if (!window.trackerAuth.isOwner() || navigationBusy.current) return;
+          var sport = event && event.detail && event.detail.sport || collectionRoute() || "racing";
+          if (!window.CollectionsUtils.SPORTS.includes(sport)) sport = "racing";
+          if (showingCollections.current) { updateSport(sport); return; }
+          navigationBusy.current = true;
+          var sourceMode = window.MODE, sourceOwner = window.trackerAuth.userId && window.trackerAuth.userId();
+          try {
+            var result = await window.trackerCollections.forMode(sourceMode).sync();
+            if (!result.cloudSaved) throw Error(result.error || "Save your pending edits before switching collections.");
+            if (!window.trackerAuth.isOwner() || window.MODE !== sourceMode || sourceOwner !== (window.trackerAuth.userId && window.trackerAuth.userId())) throw Error("Your session changed. Open Collections again after it reloads.");
+            setNavigationError(""); setCollections(true); updateSport(sport);
+          } catch(error) { setNavigationError(error.message); }
+          finally { navigationBusy.current = false; }
+        }
+        function route() {
+          var sport = collectionRoute();
+          if (sport) open({detail:{sport:sport}});
+          else if (showingCollections.current) window.dispatchEvent(new CustomEvent("close-collections"));
+        }
+        window.addEventListener("open-collections",open); window.addEventListener("hashchange",route);
+        return function() { window.removeEventListener("open-collections",open); window.removeEventListener("hashchange",route); };
+      }, []);
+      function close() { setNavigationError(""); setCollections(false); history.replaceState(null,"",location.pathname+location.search); }
+      return <>{navigationError && <div role="alert" className="text-xs p-2 text-amber-200 bg-amber-950">{navigationError}</div>}{owner && collections ? <window.SportCollectionsPanel onClose={close} initialSport={collectionSport} onSportChange={updateSport} /> : <TylerBlackTracker key={mode} />}</>;
     }
     ReactDOM.createRoot(root).render(React.createElement(TrackerRoot));
   } catch(e) {

@@ -253,3 +253,12 @@ test('a lot mentioned only in the title requests review without inferring a phys
   assert.equal(CI.resolveObservation(split.inventory,split.observationIds[0],{existingCopyId:'legacy:7:1'},context).changed,true);
   assert.equal(CI.purchaseUnits({title:'Tyler Black 7/25'}).requiresQuantityReview,false);
 });
+
+test('private purchase staging retains the exact currency evidence without changing ownership',()=>{
+  const evidence={currency:'CAD',basis:'shipping_destination',confidence:'inferred',raw:'Ship to Canada'},input={...purchase,paidPrice:'12.50',currency:'CAD',rawPrice:'$12.50',currencyEvidence:evidence};
+  const result=CI.upsertPurchase({},input,{...context,priceVerified:true});
+  const row=result.inventory.observations[result.observationId];
+  assert.equal(row.rawPrice,'$12.50');assert.deepEqual(row.currencyEvidence,evidence);
+  evidence.currency='USD';assert.equal(row.currencyEvidence.currency,'CAD');
+  assert.deepEqual(result.inventory.copies,{});assert.deepEqual(result.inventory.baselines,{});
+});
