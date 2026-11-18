@@ -1,5 +1,5 @@
 {
-  "buildCommand": "",
+  "buildCommand": "node --test tests/*.test.cjs",
   "outputDirectory": ".",
   "framework": null,
   "headers": [
