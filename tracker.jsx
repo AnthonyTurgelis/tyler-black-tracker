@@ -435,7 +435,7 @@ function CatalogScopeSelect({value, onChange}) {
 function privatePanelHasEdits() { return !!(window.CopyInventoryPanel?.hasPending() || window.SportCollectionWorkspace?.hasPending() || window.CollectionMarketScanner?.hasPending() || window.CollectionPricesPanel?.hasPending() || window.CollectionMediaEditor?.hasPending() || window.AutographPanel?.hasPending() || window.PurchaseReceiptsPanel?.hasPending()); }
 function TempoFocusSelect({value, onChange, counts, wants, wantsError}) {
   if (!counts) return null;
-  var options = [["primary", "Primary"], ["all", "All"], ["uniform", "Tempo jersey"], ["rookies", "Rookies"]];
+  var options = [["primary", "Primary"], ["all", "All"], ["tempo", "Tempo cards"], ["uniform", "Tempo jersey"], ["rookies", "Rookies"]];
   if (counts.wanted != null) options.push(["wanted", "Wantlist"]);
   return <div className="mb-1 border-b border-purple-900/60 pb-1" style={{fontSize:"clamp(9px,1vw,11px)"}}>
     <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Tempo collection focus">
@@ -445,12 +445,12 @@ function TempoFocusSelect({value, onChange, counts, wants, wantsError}) {
         return <button key={option[0]} aria-pressed={selected} onClick={function(){onChange(option[0]);}}
           className={"rounded px-1.5 py-0.5 " + (index < 2 ? "font-bold border " : "font-medium ") + (selected ? "bg-purple-700 border-purple-500 text-white" : index < 2 ? "bg-gray-900 border-gray-700 text-gray-200 hover:border-purple-600" : "text-gray-400 hover:text-purple-200")}>{option[1]} <span className="opacity-70 tabular-nums">{counts[option[0]] || 0}</span></button>;
       })}
-      <select aria-label="More Tempo views" value={value === "other" || value === "unverified" ? value : ""} onChange={function(e){if(e.target.value) onChange(e.target.value);}}
-        className={"bg-gray-900 border rounded px-1 py-0.5 " + (value === "other" || value === "unverified" ? "border-purple-500 text-purple-200" : "border-gray-800 text-gray-400")}>
-        <option value="">More views</option><option value="other">Outside Primary ({counts.other || 0})</option><option value="unverified">Jersey unverified ({counts.unverified || 0})</option>
+      <select aria-label="More Tempo views" value={["other","unverified","logo"].includes(value) ? value : ""} onChange={function(e){if(e.target.value) onChange(e.target.value);}}
+        className={"bg-gray-900 border rounded px-1 py-0.5 " + (["other","unverified","logo"].includes(value) ? "border-purple-500 text-purple-200" : "border-gray-800 text-gray-400")}>
+        <option value="">More views</option><option value="logo">Tempo logo verified ({counts.logo || 0})</option><option value="other">Outside Primary ({counts.other || 0})</option><option value="unverified">Jersey unverified ({counts.unverified || 0})</option>
       </select>
     </div>
-    <div className="text-gray-500 mt-0.5" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>Primary = verified Tempo jersey or rookie. Header totals cover the full checklist. Jersey evidence is incomplete.{value === "wanted" && <span className="text-amber-300 ml-1">TCDB want evidence; ownership unchanged.</span>}</div>
+    <div className="text-gray-500 mt-0.5" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>Primary = official Tempo cards, Tempo jerseys or rookies. Tempo cards can show an older jersey.{value === "wanted" && <span className="text-amber-300 ml-1">TCDB want evidence; ownership unchanged.</span>}</div>
     {wantsError && <p role="status" className="text-amber-300 text-[10px]">Wantlist unavailable: {wantsError}</p>}
     {wants && Object.keys(wants.heldAliases || {}).length > 0 && <details className="text-[10px] text-amber-300 mt-0.5"><summary className="cursor-pointer">{Object.keys(wants.heldAliases).length} TCDB want aliases held for review</summary><div className="text-gray-400 max-h-24 overflow-auto">{Object.entries(wants.heldAliases).map(function(entry) { var value=entry[1],evidence=(wants.evidence || {})[(value.evidenceRefs || [])[0]],url=evidence && evidence.sourceUrl;return <div key={entry[0]}>{value.reason}{url && /^https?:\/\//i.test(url) && <a href={url} target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-300 underline">TCDB source</a>}</div>;})}</div></details>}
   </div>;
@@ -462,6 +462,7 @@ function TempoCardEvidence({card}) {
     return /^https?:\/\//i.test(source || "") ? <a href={source} target="_blank" rel="noopener noreferrer" className="text-purple-300 underline decoration-purple-800 hover:text-purple-200">{label}</a> : <span>{label}</span>;
   }
   return <div className="col-span-2 flex flex-wrap gap-x-2 text-[10px] text-gray-500">
+    {profile.tempoCard && evidenceLink(profile.tempoLogo ? "Tempo logo verified" : "Official Tempo card", profile.tempoLogo ? profile.logoSourceUrl : profile.teamSourceUrl)}
     {profile.uniformKnown ? evidenceLink(profile.tempoUniform ? "Tempo jersey verified" : "Pictured jersey: " + (profile.evidence.depictedTeam || "not Tempo"), profile.uniformSourceUrl) : <span>Jersey not verified</span>}
     {profile.rookieKnown && evidenceLink(profile.rookie ? "Rookie verified" : "Non-rookie verified", profile.rookieSourceUrl)}
   </div>;
@@ -1560,7 +1561,7 @@ function TylerBlackTracker() {
   const collectionFocusCards = useMemo(function() {
     return tempoProfileEnabled ? ALL_CARDS.filter(function(card) { return tempoFocus === "wanted" ? !!tempoWants?.wants?.[card.id] : window.TempoProfile.matches(card, tempoFocus); }) : ALL_CARDS;
   }, [trackerMode, tempoProfileEnabled, tempoFocus, customEditVer, tempoWants]);
-  const tempoFocusLabel = {primary:"Primary",all:"All cards",uniform:"Tempo jersey",rookies:"Rookies",other:"Outside Primary",unverified:"Jersey unverified",wanted:"TCDB Wantlist"}[tempoFocus];
+  const tempoFocusLabel = {primary:"Primary",all:"All cards",tempo:"Tempo cards",logo:"Tempo logo verified",uniform:"Tempo jersey",rookies:"Rookies",other:"Outside Primary",unverified:"Jersey unverified",wanted:"TCDB Wantlist"}[tempoFocus];
   // Smart filters: each dropdown only shows options that are still valid given the OTHER active filters.
   // years respects player+product (so picking a player narrows the year dropdown to that player's cards)
   const years = useMemo(() => {
@@ -2054,7 +2055,7 @@ function TylerBlackTracker() {
                       <span className="text-gray-300 truncate">{card.cardSet}</span>
                     )}
                     {sspBadge(card.cardSet)}{catalogBadge(card)}
-                    {tempoProfile && tempoProfile.tempoUniform && <span className="rounded bg-purple-950 px-1 text-purple-200 text-[8px] whitespace-nowrap" title="Tempo jersey verified from card image; expand for source">Tempo</span>}
+                    {tempoProfile && (tempoProfile.tempoCard || tempoProfile.tempoUniform) && <span className="rounded bg-purple-950 px-1 text-purple-200 text-[8px] whitespace-nowrap" title={tempoProfile.tempoCard ? "Official Toronto Tempo card — the photo may show an older jersey; expand for source" : "Tempo jersey verified from card image; expand for source"}>{tempoProfile.tempoCard ? "Tempo" : "Tempo jersey"}</span>}
                     {tempoProfile && tempoProfile.rookie && <span className="rounded bg-amber-950 px-1 text-amber-300 text-[8px] whitespace-nowrap" title="Rookie card verified; expand for source">RC</span>}
                     {(card.copies || (details.printRun && details.printRun !== "?")) ? <span className="text-yellow-400 font-black whitespace-nowrap" style={{fontSize:"clamp(9px,1vw,12px)"}}>/{details.printRun && details.printRun !== "?" ? details.printRun : card.copies}</span> : null}
                     {isMissingSN(card, cardDetails) && <span className="text-orange-400 font-bold text-[8px] whitespace-nowrap ml-0.5" title="SN but print run unknown">SN?</span>}
