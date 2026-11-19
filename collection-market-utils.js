@@ -18,13 +18,17 @@
   }
   function priceKind(parsed){return ['asking','current_bid','sold','purchase'].includes(parsed.kind)?parsed.kind:parsed.recordType==='purchase'?'purchase':parsed.recordType==='sold'||parsed._130pt?.forSale===false?'sold':parsed.listingType==='auction'?'current_bid':'asking';}
   function label(card){return [S.subject(card),card.year,card.product,'#'+card.cardNumber,card.cardSet||card.variant||'Base'].filter(Boolean).join(' · ');}
+  function searchLinks(card){
+    const query=[S.subject(card),card.year,String(card.product||'').replace(/^\d{4}(?:-\d{2})?\s+/,''),card.cardNumber?'#'+card.cardNumber:'',/^(?:base)?$/i.test(card.cardSet||'')?'':card.cardSet||card.variant].filter(Boolean).join(' '),encoded=encodeURIComponent(query);
+    return {ebay:'https://www.ebay.ca/sch/i.html?_nkw='+encoded,comc:'https://www.comc.com/Cards?Search='+encoded,whatnot:'https://www.whatnot.com/search?q='+encoded+'&category=sports-cards',tcdb:M.safeUrl(card.sourceUrl||card.tcdbUrl)};
+  }
   function review(parsed,card,options){
     options=options||{};const errors=[],warnings=[];
     if(!card || card.isTestCard)errors.push('Choose the exact catalog card.');
     if(card){
       try{cardId(card.id);}catch(e){errors.push(e.message);}
-      const who=S.subject(card,options.roster);
-      if(parsed.subject&&S.norm(parsed.subject)!==S.norm(who))errors.push('The scanned subject differs from the selected card. Correct the subject evidence first.');
+      const who=S.cardSubjects(card,options.roster),scanned=S.cardSubjects({subject:parsed.subject});
+      if(parsed.subject&&!S.sameSubjects(scanned,who))errors.push('The scanned subject differs from the selected card. Correct the subject evidence first.');
       if(options.manual && !options.identityConfirmed)errors.push('Confirm the subject, year, set, number and variant.');
       if(!options.manual&&!S.match(parsed,[card],options.roster))errors.push('The full card identity needs manual review.');
       if(!options.manual&&String(card.copies||card.printRun||'')==='1')errors.push('Confirm this exact one-of-one variant manually.');
@@ -102,6 +106,6 @@
     for(const entry of entries||[]){const lifecycle=entry.isReturn?'Returned':String(entry.lifecycleStatus||''),key=M.seriesKey(entry)+'|'+lifecycle;if(!groups.has(key))groups.set(key,{key,currency:M.currency(entry.currency),kind:M.kind(entry.kind),conditionLabel:M.conditionLabel(entry),lifecycle,entries:[]});groups.get(key).entries.push(entry);}
     return [...groups.values()];
   }
-  const api={cardId,date,priceKind,label,review,entry,append,remove,reassign,target,legacyObservations,groupSeries};
+  const api={cardId,date,priceKind,label,searchLinks,review,entry,append,remove,reassign,target,legacyObservations,groupSeries};
   if(node)module.exports=api;if(root)root.CollectionMarket=api;
 })(typeof window!=='undefined'?window:globalThis);

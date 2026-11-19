@@ -1828,28 +1828,23 @@ function TylerBlackTracker() {
             >
               {superSearchMode ? "* SUPER" : "E"}
             </button>
-            {/* WNBA Tempo mode toggle — owner only */}
-            {isOwner && <button onClick={function() { window.dispatchEvent(new CustomEvent("open-collections")); }} className="px-2 py-0.5 rounded font-bold border border-orange-700 text-orange-300" style={{fontSize:"clamp(8px,0.9vw,10px)"}} title="Racing and other sport collections">Collections</button>}
-            {isOwner && (
-              <button
-                onClick={function() {
-                  if (privatePanelHasEdits()) { setSaveToast("Save or cancel the open autograph / receipt edit before switching collections."); return; }
-                  if (typeof window !== "undefined" && window.setMode) {
-                    window.setMode(trackerMode === "tb" ? "wnba" : "tb");
-                  }
-                }}
-                title={trackerMode === "tb" ? "Switch to Toronto Tempo (WNBA)" : "Switch to Tyler Black"}
-                className="px-2 py-0.5 rounded transition-colors font-bold border"
-                style={{
-                  fontSize: "clamp(8px,0.9vw,10px)",
-                  background: trackerMode === "wnba" ? "#7c2d92" : "transparent",
-                  borderColor: trackerMode === "wnba" ? "#a855f7" : "#374151",
-                  color: trackerMode === "wnba" ? "#fff" : "#9ca3af"
-                }}
-              >
-                {trackerMode === "wnba" ? "T" : "W"}
-              </button>
-            )}
+            {isOwner && <select aria-label="Collection" value={trackerMode}
+              onChange={async function(e) {
+                var next=e.target.value;
+                if (privatePanelHasEdits()) { setSaveToast("Save or cancel the open edit before switching collections."); return; }
+                if (window.CollectionsUtils.SPORTS.includes(next)) { window.dispatchEvent(new CustomEvent("open-collections",{detail:{sport:next}})); return; }
+                if (next!=="tb" && next!=="wnba" || next===trackerMode) return;
+                var sourceMode=window.MODE,sourceOwner=window.trackerAuth.userId();
+                try {
+                  var result=await window.trackerCollections.forMode(sourceMode).sync();
+                  if (!result.cloudSaved) throw Error(result.error || "Save pending edits before switching collections.");
+                  if (window.MODE!==sourceMode || sourceOwner!==window.trackerAuth.userId()) throw Error("Your collection or session changed. Try again.");
+                  if (privatePanelHasEdits()) throw Error("Save or cancel the open edit before switching collections.");
+                  window.setMode(next);
+                } catch(error) { setSaveToast(error.message); }
+              }} className="bg-gray-900 border border-gray-600 rounded px-1.5 py-0.5 font-bold text-gray-200" style={{fontSize:"clamp(9px,1vw,11px)"}}>
+              <option value="tb">Tyler Black</option><option value="wnba">Toronto Tempo</option><option value="racing">Racing</option><option value="baseball">Baseball</option><option value="basketball">Basketball</option><option value="football">Football</option><option value="hockey">Hockey</option><option value="soccer">Soccer</option><option value="other">Other</option>
+            </select>}
             {isOwner && <button 
               onClick={function() { setHidePrices(!hidePrices); }} 
               className={"px-1 py-0 rounded transition-colors " + (hidePrices ? "text-gray-600 hover:text-gray-400" : "text-gray-500 hover:text-gray-300 bg-gray-700/50")}
@@ -9642,7 +9637,13 @@ window.addEventListener("error", function(e) {
         return function() { window.removeEventListener("open-collections",open); window.removeEventListener("hashchange",route); };
       }, []);
       function close() { setNavigationError(""); setCollections(false); history.replaceState(null,"",location.pathname+location.search); }
-      return <>{navigationError && <div role="alert" className="text-xs p-2 text-amber-200 bg-amber-950">{navigationError}</div>}{owner && collections ? <window.SportCollectionsPanel onClose={close} initialSport={collectionSport} onSportChange={updateSport} /> : <TylerBlackTracker key={mode} />}</>;
+      function openTracker(nextMode) {
+        if (nextMode!=="tb" && nextMode!=="wnba") return false;
+        if (privatePanelHasEdits()) { setNavigationError("Save or cancel the open edit before switching collections."); return false; }
+        if (!window.setMode(nextMode)) { setNavigationError("Sign in to open this collection."); return false; }
+        close();return true;
+      }
+      return <>{navigationError && <div role="alert" className="text-xs p-2 text-amber-200 bg-amber-950">{navigationError}</div>}{owner && collections ? <window.SportCollectionsPanel onClose={close} onOpenTracker={openTracker} initialSport={collectionSport} onSportChange={updateSport} /> : <TylerBlackTracker key={mode} />}</>;
     }
     ReactDOM.createRoot(root).render(React.createElement(TrackerRoot));
   } catch(e) {

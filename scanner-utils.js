@@ -5,51 +5,81 @@
   function norm(value) { return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " "); }
   function subject(card, roster) {
     if (!card) return "";
+    if (Array.isArray(card.subjects) && card.subjects.length) return card.subjects.map(function(value){return typeof value==='string'?value:value.name||'';}).filter(Boolean).join(' / ');
     return String(card.subject || card.playerName || card.name || (roster && roster[card.player] && roster[card.player].name) || card.player || "");
   }
+  function cardSubjects(card, roster) {return subject(card,roster).split(/\s+\/\s+|\s+&\s+|\s*;\s*/).map(function(name){return name.trim();}).filter(Boolean);}
+  function sameSubjects(a,b) {var clean=function(values){return Array.from(new Set(values.map(norm).filter(Boolean))).sort();};return JSON.stringify(clean(a))===JSON.stringify(clean(b));}
+  function variantName(value){return norm(String(value||'').replace(/\b(?:SN|PR)\s*\d+\b/ig,'').replace(/\/\s*\d+\b/g,''));}
   function subjects(text, cards, roster) {
     var names = [], hay = " " + norm(text) + " ";
-    (cards || []).forEach(function(card) { var name = subject(card, roster); if (name && name !== "__test__" && names.indexOf(name) < 0 && hay.indexOf(" " + norm(name) + " ") >= 0) names.push(name); });
+    // A large wantlist repeats the same drivers thousands of times. Normalize
+    // each distinct subject once per lookup, without caching mutable card data.
+    var unique=new Set((cards||[]).filter(function(card){return !card.isTestCard;}).map(function(card){return subject(card,roster);}));
+    unique.forEach(function(value){cardSubjects({subject:value}).forEach(function(name){if (name && name !== "__test__" && !names.some(function(known){return norm(known)===norm(name);}) && hay.indexOf(" " + norm(name) + " ") >= 0) names.push(name);});});
     // A parent name must not match a junior's title just because it is shorter.
     return names.filter(function(name) { return !names.some(function(other) { return norm(other) !== norm(name) && (" " + norm(other) + " ").indexOf(" " + norm(name) + " ") >= 0; }) && !new RegExp("(?:^| )" + norm(name).replace(/ /g, "\\s+") + "\\s+(?:jr|junior|ii|iii)(?: |$)").test(norm(text)); });
   }
   function parseTitle(title, options) {
     options = options || {};
-    var names = subjects(title, options.cards, options.roster), year = String(title || "").match(/\b((?:19|20)\d{2})(?:-\d{2})?\b/);
+    var names = subjects(title, options.cards, options.roster), year = String(title || "").match(/\b((?:19|20)\d{2}(?:-\d{2})?)\b/);
     var serial = String(title || "").match(/\b(\d+)\s*\/\s*(\d+)\b/), run = String(title || "").match(/\/\s*(\d+)\b/);
     var cardNo = String(title || "").replace(/\bserial\s*#?\s*\d+/ig, "").replace(/#\d+\s*\/\s*\d+/g, "").match(/#([a-z0-9][a-z0-9_.-]*)/i);
     var fullProduct = String(title || "").match(/^(?:19|20)\d{2}(?:-\d{2})?\s+(.+?)\s+#/);
     var product = fullProduct ? fullProduct[1].split(/\s+-\s+/)[0] : "";
     var variant = fullProduct && /\s+-\s+/.test(fullProduct[1]) ? fullProduct[1].split(/\s+-\s+/).slice(1).join(" ").replace(/\[Base\]/g, "").trim() : "";
     return { year: year ? year[1] : "", product: product, variant: variant, cardNo: cardNo ? cardNo[1] : "", cardNoClean: cardNo ? cardNo[1] : "",
-      serial: serial ? serial[1] : "", printRun: run ? run[1] : "", subject: names.length === 1 ? names[0] : "", description: names.join(" / "),
-      rawSet: String(title || ""), source: options.source || "", seller: options.source || "", isAuto: /\b(?:auto|autograph|autographs|signed)\b/i.test(title), subjectAmbiguous: names.length !== 1 };
+      serial: serial ? serial[1] : "", printRun: run ? run[1] : "", subject: names.length ? names.join(' / ') : "", subjects:names, description: names.join(" / "),
+      rawSet: String(title || ""), source: options.source || "", seller: options.source || "", isAuto: /\b(?:auto|autograph|autographs|signed)\b/i.test(title), subjectAmbiguous: !names.length || !(options.cards||[]).some(function(card){return sameSubjects(names,cardSubjects(card,options.roster));}) };
   }
   function match(parsed, cards, roster) {
     var title = parsed.rawSet || "", names = subjects([title,parsed.subject,parsed.description].join(" "), cards, roster);
-    if (names.length !== 1 || !parsed.year) return null;
+    if (!names.length || !parsed.year) return null;
     var titleNorm = " " + norm(title) + " ";
     var candidates = (cards || []).filter(function(card) {
-      if (card.isTestCard || norm(subject(card, roster)) !== norm(names[0])) return false;
+      if (card.isTestCard || !sameSubjects(cardSubjects(card,roster),names)) return false;
       var year = String(card.year || (String(card.product).match(/\b(?:19|20)\d{2}\b/) || [""])[0]);
       if (year !== String(parsed.year)) return false;
       var cardNo = String(card.cardNumber || "").trim();
       if (!cardNo || !parsed.cardNo || norm(cardNo) !== norm(parsed.cardNo)) return false;
-      var product = norm(card.product).replace(/^\d{4}\s+/, ""), given = norm(parsed.product);
+      var product = norm(String(card.product||'').replace(/^\d{4}(?:-\d{2})?\s+/, "")), given = norm(parsed.product);
       if (given !== product) {
         var words = product.split(" ").filter(function(w) { return !/^(?:panini|topps|leaf|wnba|nba|nascar|racing|baseball|basketball|football|hockey|the)$/.test(w); });
         if (!words.length || !words.every(function(w) { return titleNorm.indexOf(" " + w + " ") >= 0; })) return false;
       }
       var cardRun = String(card.copies || card.printRun || "");
       if (parsed.printRun && cardRun !== String(parsed.printRun)) return false;
-      var variant = norm(card.cardSet || card.variant || "Base").replace(/\b(?:sn|pr)\d+\b/g, "").replace(/\s+\d+$/, "").trim();
-      var requested = norm(parsed.variant).replace(/\b(?:sn|pr)\d+\b/g, "").replace(/\s+\d+$/, "").trim();
+      var variant = variantName(card.cardSet || card.variant || "Base");
+      var requested = variantName(parsed.variant);
+      var remainder=norm(title);names.forEach(function(name){remainder=remainder.replace(norm(name),'');});
+      // Remove one product occurrence only. A second "Prizm" or "Gold"
+      // after the card identity can be a parallel, not another product label.
+      product.split(' ').forEach(function(word){remainder=remainder.replace(new RegExp('(?:^| )'+word+'(?= |$)'),' ');});
+      var variantWords=/\b(?:gold|silver|red|blue|green|orange|purple|pink|black|white|yellow|teal|aqua|lime|platinum|bronze|neon|refractor|refractors|superfractor|superfractors|prizm|prizms|foil|parallel|auto|autograph|autographs|signed|signature|signatures|variation|wave|shimmer|zebra|tiger|elephant|snake|mojo|scope|disco|pulsar|cosmic|galactic|tie|dye|cracked|ice|camo|velocity|laser|lazer|holo|holographic|checkerboard|checkers|hyper|sparkle|sparkles|vinyl|pandora|patch|jersey|relic|swatch|printing|plate|plates|cyan|magenta)\b/g;
+      var markers=remainder.match(variantWords)||[],allowed=variant.split(' ');
+      if(markers.some(function(word){return !allowed.some(function(term){return term.replace(/s$/,'')===word.replace(/s$/,'');});}))return false;
+      // Structured variant fields never override contradictory raw title text.
       if (requested) return variant === requested;
-      if (variant === "base") return !/\b(?:gold|silver|red|blue|green|orange|purple|pink|black|white|refractor|prizm|prizms|foil|parallel|auto|autograph|signed|variation|wave|shimmer)\b/.test(norm(title).replace(norm(card.product).replace(/^\d{4}\s+/, ""), "").replace(norm(names[0]), ""));
+      if (variant === "base") return true;
       var terms = variant.split(" ").filter(function(w) { return w !== "base"; });
       return terms.length > 0 && terms.every(function(w) { return titleNorm.indexOf(" " + w + " ") >= 0 || titleNorm.indexOf(" " + w.replace(/s$/, "") + " ") >= 0; });
     });
     return candidates.length === 1 ? {card:candidates[0],score:100,subjectVerified:true} : null;
+  }
+  // Suggestions help review incomplete titles; they never grant an exact match.
+  function candidates(parsed,cards,roster){
+    parsed=parsed||{};var names=subjects([parsed.rawSet,parsed.subject,parsed.description].join(' '),cards,roster),title=' '+norm(parsed.rawSet)+' ';
+    if(!names.length)return [];
+    return (cards||[]).filter(function(card){return !card.isTestCard&&cardSubjects(card,roster).some(function(name){return names.some(function(found){return norm(found)===norm(name);});});}).map(function(card){
+      var reasons=[],score=0,who=cardSubjects(card,roster);
+      if(sameSubjects(names,who)){score+=40;reasons.push('Subject');}
+      if(String(card.year)===String(parsed.year)){score+=30;reasons.push('Year');}else if(parsed.year)return null;
+      if(parsed.cardNo&&norm(card.cardNumber)===norm(parsed.cardNo)){score+=30;reasons.push('Number');}else if(parsed.cardNo)return null;
+      var product=norm(String(card.product||'').replace(/^\d{4}(?:-\d{2})?\s+/,''));
+      if(product&&product.split(' ').filter(function(w){return !/^(?:panini|topps|leaf|wnba|nba|nascar|racing)$/.test(w);}).every(function(w){return title.includes(' '+w+' ');})){score+=15;reasons.push('Set');}
+      if(parsed.variant&&norm(parsed.variant)===norm(card.cardSet||card.variant)){score+=15;reasons.push('Variant');}
+      return {card:card,score:score,reasons:reasons,requiresReview:true};
+    }).filter(Boolean).sort(function(a,b){return b.score-a.score||subject(a.card,roster).localeCompare(subject(b.card,roster))||String(a.card.cardSet).localeCompare(String(b.card.cardSet));}).slice(0,100);
   }
   function titleLine(line, options) {
     line=String(line||'').trim();
@@ -232,7 +262,7 @@
     if (itemId) return String(entry.itemId || "") === String(itemId);
     return !!parsed.rawSet && (entry.titles || []).indexOf(parsed.rawSet) >= 0;
   }
-  var api = {norm:norm,subject:subject,subjects:subjects,parseTitle:parseTitle,match:match,parseListings:parseListings,tcdbImportStatus:tcdbImportStatus,sameListingEvidence:sameListingEvidence};
+  var api = {norm:norm,subject:subject,cardSubjects:cardSubjects,sameSubjects:sameSubjects,subjects:subjects,parseTitle:parseTitle,match:match,candidates:candidates,parseListings:parseListings,tcdbImportStatus:tcdbImportStatus,sameListingEvidence:sameListingEvidence};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.CollectionScanner = api;
 })(typeof window !== "undefined" ? window : typeof globalThis !== "undefined" ? globalThis : this);

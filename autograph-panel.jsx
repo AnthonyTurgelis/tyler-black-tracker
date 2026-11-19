@@ -7,7 +7,16 @@
   function subject(card) { return card?.subject || card?.playerName || window.TEMPO_ROSTER?.[card?.player]?.name || card?.name || ""; }
   function cardLabel(card) { return card ? [subject(card),card.year,card.product,"#"+card.cardNumber,card.cardSet].filter(Boolean).join(" · ") : "Card no longer in catalog"; }
   function blank(card) { return {id:"",cardId:card?String(card.id):"",copyId:"",status:"target",signer:subject(card),signedDate:"",event:"",location:"",proofText:"",certificate:"",verificationNotes:""}; }
-  function AutographPanel({scope,cards=[],statuses={},details={},copyInventory,imports,isOwner,active=true,inventoryReady=true,inventoryError="",onRefreshInventory,onPendingChange}) {
+  function useAutographCardFocus({scope,initialCardId,active,blocked,onFocus}) {
+    const [focus,setFocus]=React.useState(String(initialCardId || "")),applied=React.useRef(null);
+    React.useEffect(()=>{
+      const id=String(initialCardId || ""),request=JSON.stringify([scope,id]);
+      if(!active || blocked || applied.current===request)return;
+      applied.current=request;setFocus(id);if(onFocus)onFocus(id);
+    },[scope,initialCardId,active,blocked,onFocus]);
+    return [focus,setFocus];
+  }
+  function AutographPanel({scope,cards=[],statuses={},details={},copyInventory,imports,isOwner,active=true,inventoryReady=true,inventoryError="",onRefreshInventory,onPendingChange,initialCardId}) {
     const U=window.AutographUtils;
     const [state,setState]=React.useState(()=>U.empty()),[ready,setReady]=React.useState(false),[busy,setBusy]=React.useState(false),[error,setError]=React.useState(""),[notice,setNotice]=React.useState(""),[conflict,setConflict]=React.useState(false);
     const [filter,setFilter]=React.useState("target"),[query,setQuery]=React.useState(""),[cardQuery,setCardQuery]=React.useState(""),[draft,setDraft]=React.useState(null),[limit,setLimit]=React.useState(100),[authEpoch,setAuthEpoch]=React.useState(0);
@@ -16,6 +25,8 @@
     const context={statuses,details,copyInventory,imports};
     const cardMap=React.useMemo(()=>new Map(cards.map(c=>[String(c.id),c])),[cards]);
     const unsaved=!!draft || busy;
+    const [cardFocus,setCardFocus]=useAutographCardFocus({scope,initialCardId,active,blocked:unsaved,onFocus:id=>{if(id)setFilter("all");setLimit(100);}});
+    const focusCard=cardMap.get(cardFocus);
     // Only non-sensitive flags are shared with navigation; drafts stay in memory.
     pending.set(token.current,unsaved);
     React.useEffect(()=>{if(onPendingChange)onPendingChange(unsaved);},[unsaved,onPendingChange]);
@@ -52,14 +63,15 @@
       }catch(e){setError(e.message);}
     }
     async function archive(record){if(lock.current)return;try{await persist(U.archiveRecord(state,record.id),"Autograph record archived; history retained.");}catch(e){setError(e.message);}}
-    const records=U.review(state,context),currentRecords=records.filter(record=>!record.archived),counts={target:currentRecords.filter(r=>r.status==="target").length,signed:currentRecords.filter(r=>r.status==="signed").length,all:currentRecords.length,archived:records.filter(r=>r.archived).length};
+    const records=U.review(state,context).filter(record=>!cardFocus || String(record.cardId)===cardFocus),currentRecords=records.filter(record=>!record.archived),counts={target:currentRecords.filter(r=>r.status==="target").length,signed:currentRecords.filter(r=>r.status==="signed").length,all:currentRecords.length,archived:records.filter(r=>r.archived).length};
     const rows=records.filter(record=>(filter==="archived" ? record.archived : !record.archived && (filter==="all" || record.status===filter)) && (!query || [cardLabel(cardMap.get(String(record.cardId))),record.signer,record.event,record.location,record.verificationNotes].join(" ").toLowerCase().includes(query.toLowerCase())));
     const selected=draft && cardMap.get(String(draft.cardId)),slots=draft && inventoryReady?U.slots(draft.cardId,context):[];
     const choices=cards.filter(card=>!cardQuery || cardLabel(card).toLowerCase().includes(cardQuery.toLowerCase())).slice(0,75);
     if(selected && !choices.some(c=>String(c.id)===String(selected.id)))choices.unshift(selected);
     if(!isOwner)return <div className="p-3 text-xs text-slate-400">Sign in to view your private in-person autograph records.</div>;
     return <section className="text-slate-200 text-xs p-1" aria-label="In-person autographs">
-      <div className="flex flex-wrap items-center gap-2 mb-2"><h2 className="font-bold text-sm">In-person autographs</h2><span className="text-slate-500">Private · separate from factory autographs</span><button disabled={!ready || busy || !!draft || conflict} onClick={()=>{setDraft(blank());setCardQuery("");setError("");}} className={button+" ml-auto bg-purple-950"}>Add to sign</button><button disabled={busy || !!draft && !conflict} onClick={()=>load(!!draft)} className={button}>{conflict?"Reload saved; keep draft":"Refresh"}</button></div>
+      <div className="flex flex-wrap items-center gap-2 mb-2"><h2 className="font-bold text-sm">In-person autographs</h2><span className="text-slate-500">Private · separate from factory autographs</span><button disabled={!ready || busy || !!draft || conflict} onClick={()=>{setDraft(blank(focusCard));setCardQuery("");setError("");}} className={button+" ml-auto bg-purple-950"}>Add to sign</button><button disabled={busy || !!draft && !conflict} onClick={()=>load(!!draft)} className={button}>{conflict?"Reload saved; keep draft":"Refresh"}</button></div>
+      {cardFocus && <div className="flex flex-wrap items-center gap-2 border border-purple-800 bg-purple-950/30 rounded px-2 py-1 mb-2"><b>{cardLabel(focusCard)}</b><button className={button+" ml-auto"} disabled={busy || !!draft} onClick={()=>setCardFocus("")}>Show all cards</button></div>}
       {!ready && !error && <p className="text-slate-400 p-2">Loading private autograph records…</p>}
       {!inventoryReady && <p className="text-amber-300 mb-2">{inventoryError || "Loading physical copies. To Sign targets remain available; signed records need the current copy inventory."}{onRefreshInventory && <button className={button+" ml-2"} onClick={onRefreshInventory}>Refresh copies</button>}</p>}
       {error && <div role="alert" className="text-amber-200 border border-amber-800 rounded p-2 mb-2">{error}{conflict && <p className="mt-1">Another session saved changes. Reload saved records, then review and save your retained draft.</p>}</div>}
