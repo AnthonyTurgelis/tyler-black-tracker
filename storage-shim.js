@@ -39,6 +39,8 @@
     "tempo-custom-cards-v1"
   ];
   var COLLECTION_MODES = ["racing","baseball","basketball","football","hockey","soccer","other"];
+  var SPORT_AUX_SUFFIXES = ["targets-v1","price-history-v1","tcdb-fixes-v1","tcdb-flags-v1","ebay-blocked-v1","ebay-bids-v1","comc-overrides-v1","custom-cards-v1","catalog-meta-v1","card-media-v1"];
+  var sportAuxSnapshots = {}, sportAuxReads = {}, sportAuxWrites = {};
   var SCOPED_COLLECTION_KEYS = COLLECTION_MODES.map(function(mode) { return "collect-"+mode+"-alldata-v1"; });
   var CLOUD_KEYS = TB_CLOUD_KEYS.concat(TEMPO_CLOUD_KEYS, SCOPED_COLLECTION_KEYS);          // + TEMPO
 
@@ -148,14 +150,22 @@
     return "collection_kv";                                          // + TEMPO
   }                                                                  // + TEMPO
 
-  // ── Mode (TB default; WNBA owner-only; never persisted) ──        // + TEMPO
+  function sportMode(mode) { return COLLECTION_MODES.includes(mode); }
+  function modePrefix(mode) { return mode === "tb" ? "tb" : mode === "wnba" ? "tempo" : sportMode(mode) ? "collect-"+mode : null; }
+  function modeKey(suffix,mode) {
+    var prefix=modePrefix(mode || window.MODE || "tb");
+    if(!prefix) throw Error("Choose a supported collection.");
+    return prefix+"-"+String(suffix).replace(/^(?:tb|tempo)-/,"");
+  }
+  // One tracker can display every collection; private modes are never persisted.
   window.MODE = "tb";                                                 // + TEMPO
   window.setMode = function (m) {                                     // + TEMPO
-    if (m === "wnba" && !isOwner) {                                   // + TEMPO
-      console.warn("[storage] WNBA mode requires owner login");      // + TEMPO
+    if (!modePrefix(m)) return false;
+    if (m !== "tb" && !isOwner) {
+      console.warn("[storage] Private collections require owner login");
       return false;                                                   // + TEMPO
     }                                                                 // + TEMPO
-    if (m !== "tb" && m !== "wnba") return false;                    // + TEMPO
+    if (window.MODE!==m && scopes[window.MODE]?.api.hasPending()) return false;
     window.MODE = m;                                                  // + TEMPO
     window.dispatchEvent(new CustomEvent("modechange", { detail: { mode: m } })); // + TEMPO
     return true;                                                      // + TEMPO
@@ -174,6 +184,7 @@
     if (!changed && !force) return;
     privateOwnerId = ownerId;
     privateGeneration++;
+    sportAuxSnapshots={};sportAuxReads={};sportAuxWrites={};
     if(changed && typeof scopes!=="undefined") {
       for(const scope of Object.values(scopes)) {
         scope.syncEngine.begin(null);
@@ -181,7 +192,7 @@
       }
     }
     isOwner = !!ownerId;
-    if (!isOwner && window.MODE === "wnba") {
+    if ((!isOwner || changed) && window.MODE !== "tb") {
       window.MODE = "tb";
       window.dispatchEvent(new CustomEvent("modechange", { detail: { mode: "tb" } }));
     }
@@ -241,7 +252,7 @@
       updateSessionIdentity(null, true);
       await supabase.auth.signOut();
       // If we were in WNBA mode, force back to TB on logout            // + TEMPO
-      if (window.MODE === "wnba") {                                     // + TEMPO
+      if (window.MODE !== "tb") {
         window.MODE = "tb";                                              // + TEMPO
         window.dispatchEvent(new CustomEvent("modechange", { detail: { mode: "tb" } })); // + TEMPO
       }                                                                  // + TEMPO
@@ -345,7 +356,9 @@
           .select("value, revision, updated_at").eq("owner_id", user.id).eq("key", key).maybeSingle();
         await privateUser(generation, user.id);
         if (result.error) throw new Error(result.error.message || "Could not load the private inventory.");
-        return { ok: true, ownerId: user.id, value: result.data ? result.data.value : null, revision: result.data ? result.data.revision : null, updatedAt: result.data ? result.data.updated_at : null };
+        var loaded={ ok: true, ownerId: user.id, value: result.data ? result.data.value : null, revision: result.data ? result.data.revision : null, updatedAt: result.data ? result.data.updated_at : null };
+        rememberSportAux(key,loaded);
+        return loaded;
       } catch (error) { return { ok: false, signedOut: !!error.signedOut, error: error.message || "Could not load the private inventory." }; }
     },
     async save(key, value, revision, expectedOwnerId) {
@@ -365,7 +378,10 @@
         await privateUser(generation, expectedOwnerId);
         if (result.error && result.error.code !== "23505") throw new Error(result.error.message || "Could not save the private inventory.");
         if (result.error || !result.data) return { ok: false, conflict: true, error: "Your copy inventory changed in another session. Refresh it before saving; your newer cloud records were preserved." };
-        return { ok: true, ownerId: user.id, value: result.data.value, revision: result.data.revision, updatedAt: result.data.updated_at };
+        var saved={ ok: true, ownerId: user.id, value: result.data.value, revision: result.data.revision, updatedAt: result.data.updated_at };
+        rememberSportAux(key,saved);
+        if(sportAuxDescriptor(key)?.field==="history") window.dispatchEvent(new CustomEvent("price-history-saved",{detail:{key}}));
+        return saved;
       } catch (error) { return { ok: false, signedOut: !!error.signedOut, error: error.message || "Could not save the private inventory." }; }
     }
   };
@@ -375,6 +391,85 @@
   if (window.CollectionAdapters) window.trackerSportStores = window.CollectionAdapters.create(window.trackerPrivateStore, {
     CopyInventory:window.CopyInventory, TrackerMedia:window.TrackerMedia, PriceHistoryUtils:window.PriceHistoryUtils
   });
+
+  // Compatibility for the shared tracker: sport settings remain in their
+  // existing private stores. History and targets share one revisioned envelope.
+  function sportAuxDescriptor(key) {
+    if(typeof key!=="string") return null;
+    var mode=COLLECTION_MODES.find(function(value){return key.startsWith("collect-"+value+"-");});
+    if(!mode) return null;
+    var prefix="collect-"+mode+"-",suffix=key.slice(prefix.length);
+    if(suffix==="alldata-v1") return null;
+    if(!SPORT_AUX_SUFFIXES.includes(suffix)) return {key,mode,unsupported:true};
+    return {key,mode,suffix,storeKey:prefix+(suffix==="targets-v1"?"price-history-v1":suffix),field:suffix==="targets-v1"?"targets":suffix==="price-history-v1"?"history":null};
+  }
+  function sportAuxValue(descriptor,snapshot) {
+    var value=snapshot && snapshot.value;
+    if(descriptor.field) return value && value[descriptor.field] || {};
+    return value == null ? (descriptor.suffix==="custom-cards-v1" ? [] : descriptor.suffix==="card-media-v1" ? {version:1,cards:{}} : {}) : value;
+  }
+  function sportAuxSnapshot(descriptor) {
+    var snapshot=sportAuxSnapshots[descriptor.storeKey];
+    return isOwner && snapshot && snapshot.ownerId===privateOwnerId ? snapshot : null;
+  }
+  function rememberSportAux(key,result) {
+    var descriptor=sportAuxDescriptor(key);
+    if(!descriptor || descriptor.unsupported || descriptor.storeKey!==key || !result.ok || result.ownerId!==privateOwnerId) return;
+    var previous=sportAuxSnapshot(descriptor);
+    if(!previous || Number(result.revision)>=Number(previous.revision)) sportAuxSnapshots[key]=result;
+  }
+  async function readSportAux(descriptor) {
+    if(!isOwner || descriptor.unsupported) return null;
+    var generation=privateGeneration,owner=privateOwnerId,snapshot=sportAuxSnapshot(descriptor);
+    if(!snapshot) {
+      var pending=sportAuxReads[descriptor.storeKey];
+      if(!pending) {
+        pending=window.trackerPrivateStore.load(descriptor.storeKey);
+        sportAuxReads[descriptor.storeKey]=pending;
+      }
+      var result=await pending;
+      if(sportAuxReads[descriptor.storeKey]===pending) delete sportAuxReads[descriptor.storeKey];
+      if(generation!==privateGeneration || owner!==privateOwnerId) throw privateSessionError();
+      if(!result.ok) throw Error(result.error || "Private collection settings could not load.");
+      rememberSportAux(descriptor.storeKey,result);snapshot=sportAuxSnapshot(descriptor);
+    }
+    return {key:descriptor.key,value:JSON.stringify(sportAuxValue(descriptor,snapshot)),shared:false,private:true};
+  }
+  async function saveSportAux(descriptor,value) {
+    var generation=privateGeneration,owner=privateOwnerId;
+    var previous=sportAuxWrites[descriptor.storeKey] || Promise.resolve();
+    var pending=previous.catch(function(){}).then(async function(){
+      try {
+        if(descriptor.unsupported) throw Error("Use this collection's dedicated editor for this private record.");
+        if(generation!==privateGeneration || owner!==privateOwnerId || !isOwner) throw privateSessionError();
+        var snapshot=sportAuxSnapshot(descriptor);
+        if(!snapshot) throw Error("Load this collection's saved settings before editing them.");
+        var incoming=typeof value==="string" ? JSON.parse(value) : value,next;
+        if(descriptor.field) {
+          var current=snapshot.value || {schemaVersion:1,history:{},targets:{}};
+          if(current.schemaVersion!==1 || !current.history || !current.targets) throw Error("Private price history needs review. Nothing was replaced.");
+          next=Object.assign({},current);
+          next[descriptor.field]=descriptor.field==="history" ? window.PriceHistoryUtils.merge(current.history,incoming) : incoming;
+        } else next=descriptor.suffix==="card-media-v1" ? window.TrackerMedia.normalizeScopedMedia(incoming) : incoming;
+        var result=await window.trackerPrivateStore.save(descriptor.storeKey,next,snapshot.revision,owner);
+        if(generation!==privateGeneration || owner!==privateOwnerId) throw privateSessionError();
+        if(!result.ok) {
+          if(result.conflict || result.signedOut) delete sportAuxSnapshots[descriptor.storeKey];
+          throw Error(result.error || "The private collection settings were not saved.");
+        }
+        sportAuxSnapshots[descriptor.storeKey]=result;
+        delete window.storageSyncIssues[descriptor.key];
+        return {key:descriptor.key,value:JSON.stringify(sportAuxValue(descriptor,result)),shared:false,private:true,localSaved:false,cloudSaved:true};
+      } catch(error) {
+        reportSyncIssue(descriptor.key,error.message);
+        return {key:descriptor.key,shared:false,private:true,localSaved:false,cloudSaved:false,error:error.message};
+      }
+    });
+    sportAuxWrites[descriptor.storeKey]=pending;
+    var result=await pending;
+    if(sportAuxWrites[descriptor.storeKey]===pending) delete sportAuxWrites[descriptor.storeKey];
+    return result;
+  }
 
   // Public catalogue references have their own read path so Refresh can replace
   // an old local cache. Copy photos are never supplied to this public store.
@@ -476,6 +571,21 @@
     if(!scopes[mode]) throw Error("Unknown collection sport.");
     return scopes[mode].api;
   }};
+  window.trackerModes={isSport:sportMode,prefix:modePrefix,keyForMode:modeKey,modes:["tb","wnba",...COLLECTION_MODES],
+    hasPending:function(){return Object.keys(sportAuxWrites).length>0;},
+    async prepare(mode) {
+      if(window.storageReady) await window.storageReady;
+      if(!modePrefix(mode) || mode!=="tb" && !isOwner) return {ok:false,error:"Sign in to open this collection."};
+      try {
+        var generation=privateGeneration,value=await scopes[mode].api.read();
+        // Other collections do not preload market prices/targets/bids. Existing
+        // financial evidence remains available through explicit private reads.
+        if(sportMode(mode)) await Promise.all(["tcdb-fixes-v1","tcdb-flags-v1","ebay-blocked-v1","comc-overrides-v1"].map(function(suffix){return readSportAux(sportAuxDescriptor(modeKey(suffix,mode)));}));
+        if(generation!==privateGeneration) throw privateSessionError();
+        return {ok:true,value,key:keyForCollection(mode)};
+      } catch(error) {return {ok:false,error:error.message};}
+    }
+  };
 
   async function hydrateFromCloud() {
     if (!supabase || hydrated) return;
@@ -655,10 +765,16 @@
   // ── window.storage API (same interface tracker already uses) ──
   window.storage = {
     peek(key) {
+      var descriptor=sportAuxDescriptor(key);
+      if(descriptor) {var snapshot=!descriptor.unsupported && sportAuxSnapshot(descriptor);return snapshot?JSON.stringify(sportAuxValue(descriptor,snapshot)):null;}
+      var scope=collectionScopeForKey(key);
+      if(scope && sportMode(scope.mode)) return isOwner && scope.saved ? JSON.stringify(scope.saved) : null;
       if(isPriceHistoryKey(key) && priceHistoryMemory[key]) return priceHistoryMemory[key];
       try {return localStorage.getItem(key);} catch(_) {return null;}
     },
     async get(key) {
+      var descriptor=sportAuxDescriptor(key);
+      if(descriptor) return readSportAux(descriptor);
       if(isPriceHistoryKey(key) && priceHistoryMemory[key]) return {key:key,value:priceHistoryMemory[key],shared:false};
       const collectionScope=collectionScopeForKey(key);
       if(collectionScope) {
@@ -692,6 +808,8 @@
     },
 
     async set(key, value) {
+      var descriptor=sportAuxDescriptor(key);
+      if(descriptor) return saveSportAux(descriptor,value);
       const collectionScope=collectionScopeForKey(key);
       if(collectionScope) return collectionScope.api.sync(value);
       if (key === "tb-card-media-v1") value = window.TrackerMedia.normalizePublicMedia(value);
@@ -729,6 +847,7 @@
     },
 
     async delete(key) {
+      if(sportAuxDescriptor(key)) return {key,deleted:false,error:"Change private collection records through their saved editors."};
       if(collectionScopeForKey(key)) return {key,deleted:false,error:"Change collection entries individually."};
       if(isPriceHistoryKey(key)) delete priceHistoryMemory[key];
       try { localStorage.removeItem(key); } catch (e) {}
@@ -741,9 +860,11 @@
       try {
         for (var i = 0; i < localStorage.length; i++) {
           var k = localStorage.key(i);
+          if(sportAuxDescriptor(k) || SCOPED_COLLECTION_KEYS.includes(k)) continue;
           if (!prefix || k.startsWith(prefix)) keys.push(k);
         }
       } catch (e) {}
+      if(isOwner) COLLECTION_MODES.forEach(function(mode){SPORT_AUX_SUFFIXES.forEach(function(suffix){var key=modeKey(suffix,mode),descriptor=sportAuxDescriptor(key);if(sportAuxSnapshot(descriptor) && (!prefix || key.startsWith(prefix)))keys.push(key);});});
       return { keys: keys, prefix: prefix || null, shared: false };
     }
   };

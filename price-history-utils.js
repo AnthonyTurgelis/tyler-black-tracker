@@ -89,17 +89,26 @@
   function cardSubject(card) {
     return String(card && (card.player || card.subject || card.playerName) || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
   }
+  function isSportCard(card){return !!card && ["racing","baseball","basketball","football","hockey","soccer","other"].indexOf(card.collectionScope)>=0;}
+  function sportCardKey(card) {
+    if(!isSportCard(card) || typeof card.id==="number"&&!Number.isSafeInteger(card.id))return null;
+    var id=card.id==null?"":String(card.id);
+    return id && ["__proto__","prototype","constructor",META].indexOf(id)<0 ? id : null;
+  }
   function legacyCardKey(card) {
     if (!card) return null;
+    if(isSportCard(card))return sportCardKey(card);
     if (card.priceKey) return String(card.priceKey).replace(/\|subject:[^|]*$/, "");
     var product = String(card.product || "");
     return product.slice(0,4) + "|" + product + "|" + card.cardNumber + "|" + (card.cardSet || "Base");
   }
   function cardKey(card) {
+    if(isSportCard(card))return sportCardKey(card);
     var base = legacyCardKey(card), who = cardSubject(card);
     return base == null ? null : base + (who ? "|subject:" + encodeURIComponent(who) : "");
   }
   function cardKeys(card, cards) {
+    if(isSportCard(card)){var sportKey=sportCardKey(card);return sportKey===null?[]:[sportKey];}
     var key = cardKey(card), legacy = legacyCardKey(card);
     if (!key) return [];
     if (key === legacy) return [key];

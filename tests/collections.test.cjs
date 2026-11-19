@@ -153,6 +153,25 @@ test('actual TCDB rendered rows preserve multi-token numbers, exact item ID, sou
  assert.equal(p.row.itemId,'865449557');assert.equal(p.row.sourceSport,'Hockey');assert.equal(p.row.sport,'racing');assert.equal(p.row.isMem,'Yes');
  assert.equal(p.row.collectionStatus,'owned');assert.equal(p.row.serial,'#12');
 });
+test('rendered TCDB rows require an explicit unambiguous collection filter',()=>{
+ const url='https://www.tcdb.com/ViewCollectionMode.cfm?Type=Racing';
+ for(const page of [{url},{url:url+'&Filter='},{url:url+'&Filter=G&Filter=W'},{url:url+'&Filter=I',sourceFilter:'G'}]){
+  const result=C.parseRenderedCard(rendered(),page);
+  assert.ok(result.error);assert.equal(result.row,undefined);
+ }
+ for(const [filter,status] of [['G','owned'],['W','wanted'],['I','in_transit']]){
+  assert.equal(C.parseRenderedCard(rendered(),{url,sourceFilter:filter}).row.status,status);
+  assert.equal(C.parseRenderedCard(rendered(),{url:url+'&Filter='+filter,sourceFilter:filter}).row.status,status);
+ }
+});
+test('explicit purchase sources default to incoming and never infer owned from a missing filter',()=>{
+ const result=C.parseRenderedCard(rendered(),{url:'https://www.tcdb.com/ViewCollectionMode.cfm?Type=Racing',sourceType:'purchase'});
+ assert.equal(result.row.status,'in_transit');assert.equal(result.row.collectionStatus,'in_transit');assert.equal(result.row.sourceFilter,'');
+ const purchased=C.normalizeRow({...raw,status:'',sourceType:'purchase'});
+ assert.equal(purchased.status,'in_transit');assert.equal(purchased.qty,1);
+ assert.equal(C.normalizeRow({...raw,status:''},{sourceType:'purchase'}).status,'in_transit');
+ assert.equal(C.normalizeRow({...raw,status:'unresolved',sourceType:'purchase'}).status,'catalog');
+});
 test('rendered TCDB variation notes distinguish photo and letter patches sharing one title',()=>{
  const r=rendered({title:'2020 Panini Prizm #56 Hailie Deegan',url:'https://www.tcdb.com/ViewCard.cfm/sid/241385/cid/15401916/2020-Panini-Prizm-56-Hailie-Deegan',cells:['2','','','','','2020 Panini Prizm #56 Hailie Deegan VAR\n\nVAR: Close-up photo','','','']});
  r.cells[5]=r.cells[5].replace(/\\n/g,'\n');

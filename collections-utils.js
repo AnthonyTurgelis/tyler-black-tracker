@@ -92,7 +92,9 @@
     row.cardSet=text(row.cardSet || row.variant || "Base");
     row.tcdbId=tcdbId(row.tcdbId || row.sourceUrl);
     row.sourceUrl=safeUrl(row.sourceUrl || options.sourceUrl);
-    row.status=parseStatus(row.status || options.status) || "catalog";
+    const purchaseSource=norm(row.sourceType || options.sourceType)==="purchase";
+    const sourceStatus=row.status || options.status;
+    row.status=parseStatus(sourceStatus) || (purchaseSource && !text(sourceStatus)?"in_transit":"catalog");
     row.qty=quantity(row.qty, row.status==="catalog"?0:1);
     for(const field of ["ownedQty","wantedQty","transitQty"])if(own(row,field) && row[field]!=="")row[field]=quantity(row[field],null);else delete row[field];
     const pr=text(row.printRun).match(/^(?:SN\s*|\/)?(\d+)$/i) || row.cardSet.match(/(?:\/|\bof\s+)(\d+)\b/i);
@@ -142,10 +144,14 @@
     raw=raw || {};page=page || {};
     let pageUrl;try{pageUrl=new URL(page.url);}catch(_){return {error:"Missing collection page URL",raw};}
     const sourceSport=text(page.sourceSport || pageUrl.searchParams.get("Type") || "Baseball");
-    const sourceFilter=text(page.sourceFilter || pageUrl.searchParams.get("Filter") || "G").toUpperCase();
+    const filters=[page.sourceFilter,...pageUrl.searchParams.getAll("Filter")].map(value=>text(value).toUpperCase()).filter(Boolean);
+    const sourceFilters=Array.from(new Set(filters));
+    if(sourceFilters.length>1)return {error:"Conflicting TCDB collection filters; row held for review",raw};
+    const sourceFilter=sourceFilters[0] || "";
     const statuses={G:"owned",W:"wanted",I:"in_transit",S:"for_sale"};
-    const status=statuses[sourceFilter];
-    if(!status)return {error:"Unrecognized TCDB collection filter: "+sourceFilter,raw};
+    const purchaseSource=norm(page.sourceType || raw.sourceType)==="purchase";
+    const status=sourceFilter?statuses[sourceFilter]:(purchaseSource?"in_transit":"");
+    if(!status)return {error:sourceFilter?"Unrecognized TCDB collection filter: "+sourceFilter:"Missing TCDB collection filter; row held for review",raw};
     const title=text(raw.title),match=title.match(/^(\d{4}(?:-\d{2,4})?)\s+(.+?)\s+#(.+)$/);
     if(!match)return {error:"Card title has no reliable year, set and #number boundary",raw};
     const pieces=match[3].split(" ");let numberWords=1;

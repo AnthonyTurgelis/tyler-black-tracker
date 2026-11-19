@@ -111,7 +111,7 @@ var PRICE_HISTORY = {}; // Populated from localStorage - historical pricing data
 // Returns the storage key for the current mode. tb-* in TB mode, tempo-* in WNBA mode.
 // window.MODE is managed by storage-shim.js and defaults to "tb" on every page load.
 function tbk(suffix) {
-  return ((typeof window !== "undefined" && window.MODE === "wnba") ? "tempo-" : "tb-") + suffix;
+  return window.CollectionProfile.prefix(window.MODE || "tb") + "-" + suffix;
 }
 // React hook: subscribes to modechange events from storage-shim
 function useTrackerMode() {
@@ -137,27 +137,31 @@ function useIsOwner() {
 }
 // ──────────────────────────────────────────────────────────────────────────
 
-function loadPriceHistory() { try { var k=tbk("price-history-v1"), raw=JSON.parse((window.storage?.peek ? window.storage.peek(k) : localStorage.getItem(k)) || "{}"); return /^(tb|tempo)-price-history-v1$/.test(k) ? window.PriceHistoryUtils.visible(raw) : raw; } catch(e) { return {}; } }
+function isSportMode(mode) { return window.CollectionProfile.isSport(mode || window.MODE); }
+function collectionStored(suffix) { var key=tbk(suffix); return window.storage?.peek ? window.storage.peek(key) : isSportMode() ? null : localStorage.getItem(key); }
+function cacheCollectionValue(key,value) { if (!isSportMode()) localStorage.setItem(key,value); }
+function loadPriceHistory() { if(window.MODE !== "tb") return {}; try { var k=tbk("price-history-v1"), raw=JSON.parse((window.storage?.peek ? window.storage.peek(k) : localStorage.getItem(k)) || "{}"); return /^(?:tb|tempo|collect-[a-z]+)-price-history-v1$/.test(k) ? window.PriceHistoryUtils.visible(raw) : raw; } catch(e) { return {}; } }
 function savePriceHistory(obj, changes) {
+  if(window.MODE !== "tb") return {cloudSaved:false,error:"Price tracking is enabled only for Tyler Black."};
   var k = tbk("price-history-v1"), value=obj;
-  if (/^(tb|tempo)-price-history-v1$/.test(k)) {
+  if (/^(?:tb|tempo|collect-[a-z]+)-price-history-v1$/.test(k)) {
     value=window.PriceHistoryUtils.merge(window.storage?.peek ? window.storage.peek(k) : localStorage.getItem(k),obj);
     if (changes) value=window.PriceHistoryUtils.applyChanges(value,changes.removals,changes.restores);
   }
-  try {localStorage.setItem(k,JSON.stringify(value));} catch(e) {}
+  try {cacheCollectionValue(k,JSON.stringify(value));} catch(e) {}
   try { var pending=window.storage.set(k,JSON.stringify(value)); if(pending && pending.catch) pending.catch(function(error){window.dispatchEvent(new CustomEvent("storage-sync-issue",{detail:{key:k,error:error.message || "Price history could not be saved."}}));}); } catch(e) {}
-  PRICE_HISTORY = /^(tb|tempo)-price-history-v1$/.test(k) ? window.PriceHistoryUtils.visible(value) : value;
+  PRICE_HISTORY = /^(?:tb|tempo|collect-[a-z]+)-price-history-v1$/.test(k) ? window.PriceHistoryUtils.visible(value) : value;
 }
 var TCDB_FLAGS = {}; // Populated from localStorage -- flagged bad links
 var EBAY_BLOCKED = {}; // Populated from localStorage -- blocked eBay listings
-function loadEbayBlocked() { try { return JSON.parse(localStorage.getItem(tbk("ebay-blocked-v1")) || "{}"); } catch(e) { return {}; } }
-function saveEbayBlocked(obj) { var k = tbk("ebay-blocked-v1"); localStorage.setItem(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} EBAY_BLOCKED = obj; }
-function loadEbayBids() { try { return JSON.parse(localStorage.getItem(tbk("ebay-bids-v1")) || "{}"); } catch(e) { return {}; } }
-function saveEbayBids(obj) { var k = tbk("ebay-bids-v1"); localStorage.setItem(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} }
-function loadTargets() { try { return JSON.parse(localStorage.getItem(tbk("targets-v1")) || "{}"); } catch(e) { return {}; } }
-function saveTargets(obj) { var k = tbk("targets-v1"); localStorage.setItem(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} }
+function loadEbayBlocked() { try { return JSON.parse(collectionStored("ebay-blocked-v1") || "{}"); } catch(e) { return {}; } }
+function saveEbayBlocked(obj) { var k = tbk("ebay-blocked-v1"); cacheCollectionValue(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} EBAY_BLOCKED = obj; }
+function loadEbayBids() { try { return JSON.parse(collectionStored("ebay-bids-v1") || "{}"); } catch(e) { return {}; } }
+function saveEbayBids(obj) { var k = tbk("ebay-bids-v1"); cacheCollectionValue(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} }
+function loadTargets() { if(window.MODE !== "tb")return {};try { return JSON.parse(collectionStored("targets-v1") || "{}"); } catch(e) { return {}; } }
+function saveTargets(obj) { if(window.MODE !== "tb")return; var k = tbk("targets-v1"); cacheCollectionValue(k, JSON.stringify(obj)); try { window.storage.set(k, JSON.stringify(obj)); } catch(e) {} }
 function globalPriceKey(card) {
-  return window.PriceHistoryUtils.cardKey(card);
+  return isSportMode() ? String(card.id) : window.PriceHistoryUtils.cardKey(card);
 }
 function Sparkline({ card, width, height }) {
   var pk = globalPriceKey(card);
@@ -266,6 +270,7 @@ function extractColors(cardSet) {
   return found;
 }
 function tcdbUrl(card) {
+  if (isSportMode()) { var source=card && (card.tcdbUrl || card.sourceUrl);return /^https:\/\/(?:www\.)?tcdb\.com\//i.test(source || "") ? source : tcdbSearchUrl(card); }
   // Priority 1: user-corrected links
   var fix = card && TCDB_USER_FIXES[card.id];
   if (fix) {
@@ -287,6 +292,7 @@ function tcdbUrl(card) {
   return "https://www.tcdb.com/Search.cfm/ty/cards/fo/0/sn/" + encodeURIComponent(q);
 }
 function tcdbSearchUrl(card) {
+  if (isSportMode()) return "https://www.tcdb.com/Search.cfm/ty/cards/fo/0/sn/"+encodeURIComponent(card ? [window.CollectionProfile.subject(card),cardYear(card),card.product,card.cardNumber,card.cardSet].filter(Boolean).join(" ") : window.CollectionProfile.title(window.MODE));
   // Construct a TCDB search URL from card metadata - always reliable regardless of TCDB_LINKS accuracy
   if (!card) return TCDB_PLAYER;
   var yr = (card.product.match(/^\d{4}/) || [""])[0];
@@ -340,7 +346,8 @@ function ebayUrlsSuper(card) {
 }
 var COMC_PLAYER = "https://www.comc.com/Players/Baseball/Tyler_Black/c389004";
 function comcUrl(card) {
-  if (!card || card.player || card.subject || card.playerName) return null;
+  if (!card) return null;
+  if (window.MODE !== "tb") return window.CollectionMarket.searchLinks({...card,subject:window.CollectionScanner.subject(card,window.TEMPO_ROSTER || {})}).comc;
   var terms = card.product.replace(/'/g, "").replace(/\s*\([^)]*\)/g, "") + " " + card.cardNumber + " " + card.cardSet;
   return COMC_PLAYER + ",+" + terms.replace(/[&\/]/g, " ").replace(/\s+/g, " ").trim().replace(/ /g, "+");
 }
@@ -348,12 +355,13 @@ var SPORTLOTS_PLAYER = "https://sportlots.com/Baseball/cards/Tyler-Black.tpl";
 function sportLotsUrl() { return SPORTLOTS_PLAYER; }
 var WHATNOT_SEARCH = "https://www.whatnot.com/search?q=tyler+black&category=sports-cards&subcategory=baseball-cards";
 function whatnotUrl(card) {
+  if (!card && isSportMode()) return "https://www.whatnot.com/search?q="+encodeURIComponent(window.CollectionProfile.title(window.MODE))+"&category=sports-cards";
   if (!card) return window.MODE === "wnba" ? "https://www.whatnot.com/search?q=Toronto%20Tempo&category=sports-cards" : WHATNOT_SEARCH;
   var name = window.CollectionScanner.subject(card, window.TEMPO_ROSTER || {}) || "Tyler Black";
   return "https://www.whatnot.com/search?q=" + encodeURIComponent(name + " " + cardYear(card) + " " + card.cardNumber + " " + String(card.product || "").replace(/^\d{4}\s*/, "")) + "&category=sports-cards";
 }
 function pt130Url(card) {
-  if (!card) return "https://130point.com/sales/?search=" + encodeURIComponent(window.MODE === "wnba" ? "Toronto Tempo" : "Tyler Black");
+  if (!card) return "https://130point.com/sales/?search=" + encodeURIComponent(window.CollectionProfile.title(window.MODE));
   var yr = cardYear(card);
   var prodNoYear = card.product.replace(/^\d{4}\s*/, "").replace(/\s*\(NOT_ON_TCDB\)/, "");
   var name = window.CollectionScanner.subject(card, window.TEMPO_ROSTER || {}) || "Tyler Black";
@@ -363,31 +371,25 @@ function pt130Url(card) {
 let TB_ALL_CARDS = expandData(RAW_DATA).filter(function(c) { return c.id !== 1; }).concat(window.TB_CATALOG_UPDATES || []);
 if (window.applyTylerCatalogueCorrections) TB_ALL_CARDS = window.applyTylerCatalogueCorrections(TB_ALL_CARDS);
 let ALL_CARDS = TB_ALL_CARDS;
-// Swap card source on mode change. WNBA mode loads window.TEMPO_ALL_CARDS (without test card).
-if (typeof window !== "undefined") {
-  window.addEventListener("modechange", function(e) {
-    if (e.detail.mode === "wnba" && window.TEMPO_ALL_CARDS) {
-      ALL_CARDS = window.TEMPO_ALL_CARDS.filter(function(c) { return !c.isTestCard; });
-    } else {
-      ALL_CARDS = TB_ALL_CARDS;
-    }
-    // Rebuild CARD_BY_ID to match new ALL_CARDS
-    if (typeof CARD_BY_ID === "object") {
-      Object.keys(CARD_BY_ID).forEach(function(k) { delete CARD_BY_ID[k]; });
-      ALL_CARDS.forEach(function(c) { CARD_BY_ID[c.id] = c; });
-    }
-  });
+// Every collection uses this same tracker and its existing source IDs.
+var SPORT_CATALOG_STATE = Object.create(null);
+function activateCollectionCatalog(mode,state) {
+  if (isSportMode(mode)) { if(state) SPORT_CATALOG_STATE[mode]=state; ALL_CARDS=window.CollectionProfile.cards(mode,SPORT_CATALOG_STATE[mode] || {cards:{}}).filter(card=>!card.archived); }
+  else ALL_CARDS=mode === "wnba" ? window.TEMPO_ALL_CARDS.filter(card=>!card.isTestCard) : TB_ALL_CARDS;
+  if (typeof CARD_BY_ID === "object") { Object.keys(CARD_BY_ID).forEach(key=>delete CARD_BY_ID[key]);ALL_CARDS.forEach(card=>{CARD_BY_ID[card.id]=card;}); }
 }
+window.addEventListener("modechange",function(event){ activateCollectionCatalog(event.detail.mode); });
 
 // Custom cards added by user via COMC Scanner "Add to DB" feature
-var CUSTOM_CARDS_KEY = (typeof window !== "undefined" && window.MODE === "wnba") ? "tempo-custom-cards-v1" : "tb-custom-cards-v1";
+var CUSTOM_CARDS_KEY = tbk("custom-cards-v1");
 // Refresh CUSTOM_CARDS_KEY on mode change (used by load/save below)
 if (typeof window !== "undefined") {
   window.addEventListener("modechange", function() {
-    CUSTOM_CARDS_KEY = (window.MODE === "wnba") ? "tempo-custom-cards-v1" : "tb-custom-cards-v1";
+    CUSTOM_CARDS_KEY = tbk("custom-cards-v1");
   });
 }
 function loadCustomCards() {
+  if (isSportMode()) return Object.values(SPORT_CATALOG_STATE[window.MODE]?.cards || {}).filter(card=>card.isCustom);
   try {
     var stored = localStorage.getItem(CUSTOM_CARDS_KEY);
     return window.CardCatalog.normalizeCustomCards(stored ? JSON.parse(stored) : []);
@@ -404,7 +406,7 @@ async function saveCustomCards(cards) {
   return result;
 }
 function loadCatalogMeta() {
-  if (window.MODE === "wnba") return {};
+  if (window.MODE !== "tb") return {};
   try { return JSON.parse(localStorage.getItem("tb-catalog-meta-v1") || "{}"); } catch(e) { return {}; }
 }
 function applyCatalogMeta() {
@@ -412,27 +414,27 @@ function applyCatalogMeta() {
   ALL_CARDS.forEach(function(card) { card.catalogMeta = metadata[card.id] || null; });
 }
 function inChecklist(card) {
-  return window.MODE === "wnba" ? !card.isCustom : window.CardCatalog.isChecklistCard(card);
+  return window.MODE !== "tb" ? !card.archived : window.CardCatalog.isChecklistCard(card);
 }
 function matchesCatalogScope(card, scope) {
-  return window.MODE === "wnba" || window.CardCatalog.matchesScope(card, scope);
+  return window.MODE !== "tb" || window.CardCatalog.matchesScope(card, scope);
 }
 function catalogBadge(card) {
-  if (window.MODE === "wnba") return null;
+  if (window.MODE !== "tb") return null;
   var info = window.CardCatalog.getInfo(card);
   if (info.issueType === "standard" && info.verification !== "unverified") return null;
   var label = window.CardCatalog.isProof(card) ? "Proof · " + (info.signature === "unknown" ? "signature unconfirmed" : info.signature) : info.issueType === "custom" ? "Custom" : "Review";
   return React.createElement("span", {className:"ml-1 inline-block rounded px-1 text-[9px] text-violet-300 bg-violet-950/70",title:window.CardCatalog.kindLabel(info.issueType)}, label);
 }
-function cardHasAutograph(card) { return window.MODE === "wnba" ? card.isAuto === "Yes" : window.CardCatalog.hasAutograph(card); }
+function cardHasAutograph(card) { return window.MODE !== "tb" ? card.isAuto === "Yes" : window.CardCatalog.hasAutograph(card); }
 function listingHasAutograph(record) {
   return window.CardCatalog.hasAutograph({product:record.product || "",cardSet:record.rawSet || record.title || record.rawTitle || record.variant || "",issueType:record.issueType,signature:record.signature,isAuto:record.isAuto ? "Yes" : ""});
 }
 function CatalogScopeSelect({value, onChange}) {
-  if (window.MODE === "wnba") return null;
+  if (window.MODE !== "tb") return null;
   return <label className="inline-flex items-center gap-1 text-[11px] text-gray-400">Show <select aria-label="Card category" value={value} onChange={function(e){onChange(e.target.value);}} className="bg-gray-900 border border-gray-700 text-gray-200 rounded px-1 py-1"><option value="checklist">Checklist</option><option value="proofs">All proofs & prototypes</option><option value="preproduction">Pre-production proofs</option><option value="manufacturer_proofs">Other manufacturer proofs</option><option value="proofs_signed">Proofs · signed</option><option value="proofs_unsigned">Proofs · unsigned</option><option value="proofs_unknown">Proofs · signature unconfirmed</option><option value="custom">Custom / fantasy</option><option value="review">Needs review</option><option value="all">All cards</option></select></label>;
 }
-function privatePanelHasEdits() { return !!(window.CopyInventoryPanel?.hasPending() || window.SportCollectionWorkspace?.hasPending() || window.CollectionMarketScanner?.hasPending() || window.CollectionPricesPanel?.hasPending() || window.CollectionMediaEditor?.hasPending() || window.AutographPanel?.hasPending() || window.PurchaseReceiptsPanel?.hasPending()); }
+function privatePanelHasEdits() { return !!(window.CardCatalogPanel?.hasPending?.() || window.trackerModes?.hasPending?.() || window.CopyInventoryPanel?.hasPending() || window.SportCollectionWorkspace?.hasPending() || window.CollectionMarketScanner?.hasPending() || window.CollectionPricesPanel?.hasPending() || window.CollectionMediaEditor?.hasPending() || window.AutographPanel?.hasPending() || window.PurchaseReceiptsPanel?.hasPending()); }
 function TempoFocusSelect({value, onChange, counts, wants, wantsError}) {
   if (!counts) return null;
   var options = [["primary", "Primary"], ["all", "All"], ["tempo", "Tempo cards"], ["uniform", "Tempo jersey"], ["rookies", "Rookies"]];
@@ -479,10 +481,11 @@ function useCatalogRevision() {
 function canSyncCardToTcdb(cardId) {
   var card = CARD_BY_ID[cardId];
   if (!card) return false;
-  if (window.MODE === "wnba") return !NOT_ON_TCDB.has(cardId) && !MISSING_FROM_TCDB.has(cardId);
+  if (window.MODE !== "tb") return !NOT_ON_TCDB.has(cardId) && !MISSING_FROM_TCDB.has(cardId);
   return inChecklist(card) && !HIDDEN_DUPES.has(cardId) && !MISSING_FROM_TCDB.has(cardId) && !!(TCDB_LINKS[cardId] || TCDB_USER_FIXES[cardId]);
 }
 function mergeCustomCards() {
+  if (isSportMode()) {activateCollectionCatalog(window.MODE);return;}
   var custom = loadCustomCards();
   // Explicit IDs preserve every legacy status, target and detail when a card is archived.
   for (var ri = ALL_CARDS.length - 1; ri >= 0; ri--) {
@@ -530,7 +533,7 @@ let HIDDEN_DUPES = TB_HIDDEN_DUPES;
 // Swap DUPES/HIDDEN_DUPES on mode change so TB IDs don't poison WNBA card lookups
 if (typeof window !== "undefined") {
   window.addEventListener("modechange", function(e) {
-    if (e.detail.mode === "wnba") {
+    if (e.detail.mode !== "tb") {
       DUPES = [];
       HIDDEN_DUPES = new Set();
       EXTRA_DUPES = HIDDEN_DUPES;
@@ -559,7 +562,7 @@ const TB_MULTI_EBAY = new Set([57,112,307,314,349,437,643,653,660,666,693,736,87
 let MULTI_EBAY = TB_MULTI_EBAY;
 const TB_EBAY_ORDERS={"3":"01-10569-82556","8":"19-10579-25938","12":"05-13269-40771","32":"14-13863-41516","57":"07-14016-02005","91":"10-13989-82166","92":"07-13996-14051","106":"23-13802-33304","112":"23-13802-33304","113":"09-14061-68316","121":"04-14163-75237","145":"25-14081-12262","158":"16-14152-79872","199":"08-13992-50613","202":"20-13660-42140","204":"19-13809-83289","227":"16-13813-95195","232":"23-13802-33304","253":"15-13505-52573","255":"05-14106-79011","258":"25-13241-99537","272":"08-13188-68193","273":"05-13541-82282","276":"19-14000-28543","277":"21-13999-14291","293":"13-13941-50267","302":"09-10667-00902","307":"07-14045-70384","308":"24-13317-71730","314":"09-14061-68317","319":"09-14061-68317","331":"09-14061-68315","334":"14-13188-86252","349":"04-13329-51743","361":"12-13815-42719","373":"22-13970-20992","388":"23-13802-33304","437":"09-14120-70554","451":"01-13830-87479","454":"17-14109-43575","459":"22-14043-40803","483":"22-13173-03861","500":"19-14075-98262","512":"01-14073-62987","514":"03-14074-39244","534":"20-13973-58268","549":"15-13180-05837","573":"02-13621-05141","616":"20-13804-06916","626":"09-13207-17087","643":"27-13988-02244","650":"12-13838-36620","652":"22-12653-78553","653":"20-13931-61616","657":"07-12663-64721","658":"26-12644-44368","660":"25-13797-11931","664":"10-14118-70535","666":"24-13817-48959","673":"12-13838-36620","675":"15-12654-01101","683":"11-13471-09535","684":"14-12655-26561","685":"10-12665-41096","687":"08-12667-63770","691":"21-12652-40109","693":"05-12667-66600","699":"07-12787-09777","711":"15-13638-67907","736":"23-13800-09954","758":"23-13251-64587","760":"15-13855-78087","775":"09-14032-83495","780":"26-13840-52249","808":"23-14077-11619","841":"07-12534-67938","849":"24-14114-37037","855":"14-13188-86252","856":"13-13614-54271","862":"10-14119-26694","863":"20-13612-97452","871":"14-13782-17023","879":"05-14095-95800","881":"21-13315-97580","887":"09-13749-35221","888":"04-14069-26885","899":"06-13827-98668","906":"22-13622-24600","924":"01-13490-79609","934":"20-13804-11045","940":"24-13185-19070","945":"05-13193-65487","952":"25-13452-47031","953":"18-13093-66593","954":"27-14036-69268","958":"10-13475-38186","964":"12-13469-96808","965":"25-13453-85178","971":"27-13804-88657","975":"19-13814-37357","977":"04-14139-74277","978":"17-13817-08536","980":"07-13854-71671","981":"18-12650-80902","983":"13-13826-86488","985":"25-14094-11278","988":"06-13836-55786","989":"20-13979-31887","1000":"10-12665-43528","1002":"20-12649-63500","1005":"20-13794-54378","1012":"11-14153-43763","1018":"12-12657-91135","1023":"03-12669-49550","1025":"13-12658-12767","1029":"02-12669-81516","1041":"10-13286-26132","1056":"15-13947-06800","1068":"12-12663-27978","1069":"27-12645-79442","1094":"11-13644-16209","1098":"07-14045-70385","1104":"24-13991-56188","1107":"22-13933-67704","1109":"07-13989-68962","1116":"06-13832-65499","1137":"24-12659-72975","1139":"02-12670-90573","1151":"27-13966-28254","1209":"25-14032-36475","1212":"01-14046-06072","1218":"07-13935-14571","1221":"27-13907-21909","1232":"26-13795-88577","1241":"24-13285-91373","1250":"22-14004-49033","1257":"15-13619-68949","1276":"09-14089-64729","1286":"24-13925-99770","1288":"04-13939-23947","1304":"07-13822-27916","1308":"27-13595-87051","1311":"25-13909-96233","1313":"20-13175-58858","1316":"18-13310-99826","1317":"22-12653-78553","1330":"16-13637-37471","1357":"16-14000-46274","1371":"11-13929-44435","1383":"01-13943-96198","1388":"15-14134-48316","1390":"20-13917-17991","1396":"07-13569-92315","1398":"19-13174-33264","1401":"22-13593-67618","1417":"10-14115-17049","1420":"19-14102-65835"};
 let EBAY_ORDERS = TB_EBAY_ORDERS;
-function orderUrl(card) { if(window.MODE === "wnba") return null; var oid = EBAY_ORDERS[String(card.id)]; return oid ? "https://order.ebay.ca/ord/show?orderId=" + oid : null; }
+function orderUrl(card) { if(window.MODE !== "tb") return null; var oid = EBAY_ORDERS[String(card.id)]; return oid ? "https://order.ebay.ca/ord/show?orderId=" + oid : null; }
 const STATUS_CONFIG = {
   owned: { label: "Owned", dot: "bg-green-500", bg: "bg-green-900/30", border: "border-green-500", emoji: "v" },
   in_transit: { label: "In Transit", dot: "bg-emerald-400", bg: "bg-emerald-900/30", border: "border-emerald-400", emoji: ">" },
@@ -575,7 +578,8 @@ function TylerBlackTracker() {
   const [isOwner, setIsOwner] = useState(false);
   // WNBA Tempo mode subscription — fires re-render on modechange events from storage-shim
   var trackerMode = useTrackerMode();
-  const copyStorageKey=trackerMode === "wnba" ? "tempo-copy-inventory-v1" : "tb-copy-inventory-v1";
+  const copyStorageKey=window.CollectionProfile.prefix(trackerMode)+"-copy-inventory-v1";
+  const sportMode=isSportMode(trackerMode),collectionTitle=window.CollectionProfile.title(trackerMode);
   useEffect(function() {
     function onAuth(event) { setIsOwner(!!event.detail.isOwner); }
     window.addEventListener("authchange", onAuth);
@@ -593,6 +597,11 @@ function TylerBlackTracker() {
   const [publicMedia, setPublicMedia] = useState(function() { return window.TrackerMedia.normalizePublicMedia(null); });
   const [mediaStorage, setMediaStorage] = useState({loading:false,error:""});
   const refreshPublicMedia = useCallback(async function() {
+    if(sportMode) {
+      setMediaStorage({loading:true,error:""});
+      try {var result=await window.trackerSportStores.forMode(trackerMode).media.load();if(window.MODE!==trackerMode)return {ok:false};if(!result.ok)throw Error(result.error || "Could not load card photos.");setPublicMedia(result.value);setMediaStorage({loading:false,error:""});return result;}
+      catch(error){if(window.MODE===trackerMode)setMediaStorage({loading:false,error:error.message});return {ok:false,error:error.message};}
+    }
     if(trackerMode !== "tb") {setPublicMedia(window.TrackerMedia.normalizePublicMedia(null));setMediaStorage({loading:false,error:""});return {ok:true};}
     setMediaStorage({loading:true,error:""});
     try {
@@ -704,9 +713,10 @@ function TylerBlackTracker() {
   const [showDupes, setShowDupes] = useState(false);
   const [activeTab, setActiveTabState] = useState("summary");
   const setActiveTab = useCallback(function(next) {
-    if (window.CopyInventoryPanel?.hasPending() && next !== "copies") { setSaveToast("Save or cancel the open copy edit before changing tabs."); return false; }
+    if (window.MODE !== "tb" && ["prices","targets"].includes(next)) return false;
+    if (privatePanelHasEdits() && next !== activeTab) { setSaveToast("Save or cancel the open copy edit before changing tabs."); return false; }
     setActiveTabState(next); return true;
-  }, []);
+  }, [activeTab]);
   const [detailedSnFilter, setDetailedSnFilter] = useState(null);
   const [detailedStatusFilter, setDetailedStatusFilter] = useState(null);
   const [detailedCardId, setDetailedCardId] = useState(null);
@@ -805,9 +815,9 @@ function TylerBlackTracker() {
   function saveCustomCardEdit() {
     if (!editingCustom) return;
     var ec = editingCustom;
-    if (!ec.cardSet || !ec.cardSet.trim()) { 
-      setEditingCustom(Object.assign({}, ec, {error: "Variant cannot be empty"})); 
-      return; 
+    if (!ec.cardSet || !ec.cardSet.trim()) {
+      setEditingCustom(Object.assign({}, ec, {error: "Variant cannot be empty"}));
+      return;
     }
     // Try localStorage save (non-critical)
     try {
@@ -835,7 +845,30 @@ function TylerBlackTracker() {
       setEditingCustom(Object.assign({}, ec, {error: "Card #" + ec.cardId + " not found in memory (idx=" + ec.idx + ")"}));
     }
   }
+  async function saveSportCatalogRecord(form, original, archived) {
+    if(!sportMode || !loadComplete.current || window.MODE!==trackerMode || !window.trackerAuth.isOwner())return {ok:false,error:"Reload this collection before editing."};
+    var raw=allDataRef.current.cards || {},existing=original && raw[String(original.id)];
+    if(original && !existing)return {ok:false,error:"The source card is no longer available. Reload before editing."};
+    var id=existing ? existing.id : "card:"+(crypto.randomUUID ? crypto.randomUUID() : Date.now()+"-"+Math.random().toString(36).slice(2));
+    var next=Object.assign({},existing || {},form || {},{id:id,updatedAt:new Date().toISOString()});
+    delete next.collectionScope;delete next.catalogMeta;
+    if(!existing)next.isCustom=true;
+    if(archived!==undefined)next.archived=archived;
+    if(!String(next.subject || next.playerName || "").trim() || !String(next.year || "").trim() || !String(next.product || "").trim() || !String(next.cardNumber || "").trim())return {ok:false,error:"Enter the subject, year, set and card number."};
+    if(existing){next.id=existing.id;["tcdbId","sourceItemIds","sources"].forEach(key=>{if(existing[key]!==undefined)next[key]=existing[key];});}
+    var proposed={...raw,[String(id)]:next};
+    try { window.CollectionProfile.cards(trackerMode,{cards:proposed}); }
+    catch(error){return {ok:false,error:error.message};}
+    persistField("cards",proposed);
+    logChange(id,"catalogue","catalogue",existing ? "Existing record" : "New card",archived===true ? "Archived" : archived===false ? "Restored" : "Catalogue edited");
+    var result=await window.trackerCollections.forMode(trackerMode).sync();
+    if(!result.cloudSaved)return {ok:false,error:result.error || "Save failed. Your edit remains pending."};
+    if(window.MODE!==trackerMode)return {ok:false,error:"Collection changed during save."};
+    activateCollectionCatalog(trackerMode,allDataRef.current);window.dispatchEvent(new CustomEvent("catalogchange"));
+    return {ok:true,cloudSaved:true,card:next};
+  }
   async function saveCatalogCard(form, original) {
+    if(sportMode)return saveSportCatalogRecord(form,original);
     if (!window.trackerAuth || !window.trackerAuth.isOwner()) return {ok:false,error:"Sign in to edit your collection."};
     var existing = original && CARD_BY_ID[original.id];
     if (original && !existing) return {ok:false,error:"This card is no longer active. Reopen the catalogue before editing."};
@@ -877,6 +910,7 @@ function TylerBlackTracker() {
     return {ok:!!(result && (result.localSaved || result.cloudSaved)), cloudSaved:!!(result && result.cloudSaved), error:result && result.error, card:CARD_BY_ID[candidate.id] || candidate};
   }
   async function archiveCatalogCard(card) {
+    if(sportMode)return saveSportCatalogRecord({},card,true);
     if (!window.trackerAuth || !window.trackerAuth.isOwner()) return {ok:false,error:"Sign in to edit your collection."};
     var customs = loadCustomCards();
     var index = customs.findIndex(function(item) { return item.id === card.id; });
@@ -886,6 +920,7 @@ function TylerBlackTracker() {
     return {ok:!!(result && (result.localSaved || result.cloudSaved)),cloudSaved:!!(result && result.cloudSaved),error:result && result.error};
   }
   async function restoreCatalogCard(card) {
+    if(sportMode)return saveSportCatalogRecord({},card,false);
     if (!window.trackerAuth || !window.trackerAuth.isOwner()) return {ok:false,error:"Sign in to edit your collection."};
     var customs = loadCustomCards();
     var index = customs.findIndex(function(item) { return item.id === card.id; });
@@ -948,12 +983,12 @@ function TylerBlackTracker() {
       flashSave("OK Saved");
       setStorageDiag("Saved at " + new Date().toLocaleTimeString());
       // BACKUP: Also write to localStorage in case window.storage fails on next load
-      try { localStorage.setItem(saveKey.replace("alldata-v1","alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
+      try { if(!sportMode) localStorage.setItem(saveKey.replace("alldata-v1","alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
     } else {
       flashSave("WARN Save FAILED");
       setStorageDiag("SAVE FAILED at " + new Date().toLocaleTimeString());
       // Even if window.storage fails, try localStorage as emergency backup
-      try { localStorage.setItem(saveKey.replace("alldata-v1","alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
+      try { if(!sportMode) localStorage.setItem(saveKey.replace("alldata-v1","alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
     }
   }, [flashSave]);
 
@@ -970,7 +1005,7 @@ function TylerBlackTracker() {
     window.trackerCollections.forMode(window.MODE || "tb").stage(allDataRef.current);
     allDataRef.current._saveTimestamp = Date.now();
     // IMMEDIATE sync backup to localStorage on every change (sync = guaranteed)
-    try { localStorage.setItem(tbk("alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
+    try { if(!sportMode) localStorage.setItem(tbk("alldata-backup-v1"), JSON.stringify(allDataRef.current)); } catch(e) {}
     scheduleSave();
   }, [scheduleSave]);
 
@@ -984,26 +1019,30 @@ function TylerBlackTracker() {
       if (prev.length > 0 && prev[0].cardId === cardId && prev[0].field === field) {
         var elapsed = new Date(now) - new Date(prev[0].ts);
         if (elapsed < 10000) {
-          var updated = [{ ...prev[0], ts: now, to: newVal || "" }, ...prev.slice(1)].slice(0, 500);
+          var updated = [{ ...prev[0], ts: now, to: newVal || "" }, ...prev.slice(1)].slice(0, sportMode ? undefined : 500);
           persistField("changelog", updated);
           return updated;
         }
       }
       var entry = { ts: now, cardId: cardId, cardLabel: label, type: changeType, field: field, from: oldVal || "", to: newVal || "", sid: sid };
-      var next = [entry, ...prev].slice(0, 500);
+      var next = [entry, ...prev].slice(0, sportMode ? undefined : 500);
       persistField("changelog", next);
       return next;
     });
   }, [persistField]);
 
   useEffect(() => {
+    let active=true;
     async function load() {
+      const sourceMode=trackerMode,sourceOwner=window.trackerAuth?.userId(),sourcePrefix=window.CollectionProfile.prefix(trackerMode)+"-";
+      const stillCurrent=()=>active && window.MODE===sourceMode && sourceOwner===window.trackerAuth?.userId();
       if (window.storageReady) { try { await window.storageReady; } catch(e) { console.error("Collection loading stopped:",e); return; } }
+      if(!stillCurrent())return;
       let diagParts = [];
       let allData = null;
       // Try consolidated key first (single read)
       try {
-        var result = await window.storage.get(tbk("alldata-v1"));
+        var result = await window.storage.get(sourcePrefix+"alldata-v1");
         if (result && result.value) {
           allData = JSON.parse(result.value);
           diagParts.push("Loaded consolidated data");
@@ -1011,17 +1050,18 @@ function TylerBlackTracker() {
       } catch (e) {
         diagParts.push("Consolidated read error: " + e.message);
       }
+      if(!stillCurrent())return;
       // Tyler Black replays individual pending edits. A newer local backup can
       // just be an idle tab. Only use it as a fallback if no saved copy is available.
       try {
-        const backup = JSON.parse(localStorage.getItem(tbk("alldata-backup-v1")) || "null");
+        const backup = sportMode ? null : JSON.parse(localStorage.getItem(sourcePrefix+"alldata-backup-v1") || "null");
         if (backup && !allData) allData=backup;
       } catch (_) {}
       // If no consolidated data, or consolidated data is missing the migration flag
       // (meaning a broken build may have written partial data), try legacy keys.
       // GUARD: legacy keys are TB-only (`tb-statuses-v2`, etc.). In WNBA mode we must
       // never read from them — doing so would contaminate `tempo-alldata-v1` with TB data.
-      if ((typeof window === "undefined" || window.MODE !== "wnba") && (!allData || !allData._migrationComplete)) {
+      if ((typeof window === "undefined" || window.MODE === "tb") && (!allData || !allData._migrationComplete)) {
         if (!allData) allData = {};
         var legacyKeys = [
           ["tb-statuses-v2", "statuses"],
@@ -1051,13 +1091,19 @@ function TylerBlackTracker() {
           diagParts.push("Migrated " + migratedCount + " legacy keys");
           // Save consolidated immediately so migration only happens once
           try {
-            await window.storage.set(tbk("alldata-v1"), JSON.stringify(allData));
+            await window.storage.set(sourcePrefix+"alldata-v1", JSON.stringify(allData));
             diagParts.push("Migration saved");
           } catch (e) { diagParts.push("Migration save failed: " + e.message); }
         } else if (Object.keys(allData.statuses || {}).length === 0) {
           diagParts.push("Fresh start");
         }
       }
+      if (!stillCurrent()) return;
+      if (!allData && sportMode) { setStorageDiag("Collection could not be loaded. Reload to retry; editing is disabled.");setLoading(false);return; }
+      allData=allData || {};
+      if(sportMode) activateCollectionCatalog(sourceMode,allData);
+      PRICE_HISTORY=loadPriceHistory();
+      EBAY_BLOCKED=loadEbayBlocked();
       // Extract fields from consolidated data
       var stored = allData.statuses || {};
       var details = allData.details || {};
@@ -1071,7 +1117,7 @@ function TylerBlackTracker() {
       // GUARD: PRESET_OWNED / PRESET_INTRANSIT are TB-only seed lists baked into RAW_DATA.
       // Applying them in WNBA mode would falsely mark WNBA cards as owned/in-transit
       // by ID collision (e.g. TB card #2 → WNBA card #2).
-      if (typeof window === "undefined" || window.MODE !== "wnba") {
+      if (typeof window === "undefined" || window.MODE === "tb") {
         PRESET_OWNED.forEach(id => { if (!merged[id]) merged[id] = "owned"; });
         PRESET_INTRANSIT.forEach(id => { if (!merged[id]) merged[id] = "in_transit"; });
       }
@@ -1085,7 +1131,7 @@ function TylerBlackTracker() {
       // GUARD: PRESET_DETAILS is TB-only — applying it in WNBA mode would attach TB
       // serial numbers / prices / notes to WNBA cards by ID collision.
       const mergedDetails = {};
-      if (typeof window === "undefined" || window.MODE !== "wnba") {
+      if (typeof window === "undefined" || window.MODE === "tb") {
         Object.entries(PRESET_DETAILS).forEach(([id, d]) => {
           mergedDetails[id] = {};
           if (d.s) mergedDetails[id].serial = d.s;
@@ -1099,7 +1145,7 @@ function TylerBlackTracker() {
         mergedDetails[id] = { ...(mergedDetails[id] || {}), ...d };
       });
       // Initialize qty from duplicate copy data
-      Object.entries(window.MODE === "wnba" ? {} : DUPE_QTY_INIT).forEach(function([id, extraQty]) {
+      Object.entries(window.MODE !== "tb" ? {} : DUPE_QTY_INIT).forEach(function([id, extraQty]) {
         if (!mergedDetails[id]) mergedDetails[id] = {};
         if (mergedDetails[id].qty == null || mergedDetails[id].qty === "") mergedDetails[id].qty = String(1 + extraQty);
       });
@@ -1110,17 +1156,19 @@ function TylerBlackTracker() {
       setChangelog(changelogArr);
       // Load TCDB fixes and flags (separate small storage)
       try {
-        var tcdbFixesResult = await window.storage.get(tbk("tcdb-fixes-v1"));
+        var tcdbFixesResult = await window.storage.get(sourcePrefix+"tcdb-fixes-v1");
         if (tcdbFixesResult && tcdbFixesResult.value) setTcdbFixes(JSON.parse(tcdbFixesResult.value));
       } catch(e) {}
       try {
-        var tcdbFlagsResult = await window.storage.get(tbk("tcdb-flags-v1"));
+        var tcdbFlagsResult = await window.storage.get(sourcePrefix+"tcdb-flags-v1");
         if (tcdbFlagsResult && tcdbFlagsResult.value) setTcdbFlags(JSON.parse(tcdbFlagsResult.value));
       } catch(e) {}
+      if(!stillCurrent())return;
       // Store initial state for undo-all
       sessionInitial.current = { statuses: { ...merged }, cardDetails: JSON.parse(JSON.stringify(mergedDetails)), forSaleFlags: { ...fsFlags }, dirtyIds: new Set(dirtyArr) };
       // Populate allDataRef with current state for future saves
       allDataRef.current = {
+        ...allData,
         statuses: merged,
         details: details,
         forsale: fsFlags,
@@ -1130,17 +1178,18 @@ function TylerBlackTracker() {
         changelog: changelogArr,
         _migrationComplete: true
       };
-      window.trackerCollections.forMode(window.MODE || "tb").begin(allDataRef.current);
+      window.trackerCollections.forMode(sourceMode).begin(allDataRef.current);
       loadComplete.current = true; // Now safe to save
       // Capture which mode this data was loaded for. Saves that fire from
       // stale closures after a mode toggle will see a mismatch and abort.
-      loadedModeRef.current = (typeof window !== "undefined" ? (window.MODE || "tb") : "tb");
+      loadedModeRef.current = sourceMode;
       var statusCount = Object.keys(merged).filter(function(k) { return merged[k] !== "not_owned"; }).length;
       diagParts.push(statusCount + " tracked cards");
       setLoading(false);
       setStorageDiag(diagParts.join(" | "));
     }
     load();
+    return ()=>{active=false;};
   }, []);
   useEffect(function() {
     const collectionApi=window.trackerCollections.forMode(trackerMode);
@@ -1167,6 +1216,7 @@ function TylerBlackTracker() {
         if(detail[id].qty == null || detail[id].qty === "") detail[id].qty=String(1+extra);
       }
       allDataRef.current=projected;
+      if(sportMode){activateCollectionCatalog(trackerMode,projected);setCustomEditVer(value=>value+1);}
       collectionApi.begin(projected);
       setStatuses(marked);setCardDetails(detail);setForSaleFlags(sale);
       setSyncedIds(new Set(data.synced));setDirtyIds(new Set(data.dirty));
@@ -1199,7 +1249,7 @@ function TylerBlackTracker() {
   const saveDetails = useCallback(async (newDetails) => {
     // Keep provenance and future detail fields, including explicit cleared
     // preset values. The old whitelist silently discarded purchase metadata.
-    var userEdits = window.TrackerMarket.detailOverrides(newDetails, window.MODE === "wnba" ? {} : PRESET_DETAILS);
+    var userEdits = window.TrackerMarket.detailOverrides(newDetails, window.MODE !== "tb" ? {} : PRESET_DETAILS);
     persistField("details", userEdits);
     flashSave("");
   }, [persistField, flashSave]);
@@ -1361,7 +1411,7 @@ function TylerBlackTracker() {
     });
   }, [saveStatuses, saveDetails, persistField]);
   const updateCardDetail = useCallback((cardId, field, value) => {
-    if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
+    if (window.trackerAuth && !window.trackerAuth.isOwner() || !loadComplete.current) return;
     setSessionChanges(prev => prev + 1);
     setCardDetails(prev => {
       var oldVal = (prev[cardId] || {})[field] || "";
@@ -1393,8 +1443,8 @@ function TylerBlackTracker() {
     } catch(error) { window.alert(error.message || "Unable to save allocation."); }
   }, [statuses,cardDetails,saveCopyInventory]);
   const setCardStatus = useCallback((cardId, status) => {
-    if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
-    if (trackerMode === "tb" || trackerMode === "wnba") {
+    if (window.trackerAuth && !window.trackerAuth.isOwner() || !loadComplete.current) return;
+    if (trackerMode === "tb" || trackerMode === "wnba" || sportMode) {
       if (!copyStateRef.current.ready) { window.alert("Copy inventory is still loading. Try the status edit again once it is ready."); return false; }
       var quick = window.CopyInventory.quickStatusPresence(copyStateRef.current.inventory,cardId,status,{statuses:statuses,cardDetails:cardDetails});
       if (quick.handled) {
@@ -1441,12 +1491,10 @@ function TylerBlackTracker() {
   }, [saveStatuses, pushUndo, logChange, persistField, trackerMode, statuses, cardDetails, quickSaveHand, saveCopyInventory]);
   const copySummaries = useMemo(function() {
     if (!isOwner || !copyStorage.ready || copyStateRef.current.key!==copyStorageKey) return null;
-    var result = {};
-    ALL_CARDS.forEach(function(card) { result[card.id] = window.CopyInventory.summarizeCard(copyInventory, card.id, statuses, cardDetails); });
-    return result;
+    return window.CopyInventory.summarizeCards(copyInventory,ALL_CARDS,statuses,cardDetails);
   }, [copyInventory, statuses, cardDetails, isOwner, trackerMode, customEditVer,copyStorage.ready,copyStorageKey]);
-  // Summary charts use one slice per variant; a mixed variant belongs to Owned.
-  // The Collection/Detailed views retain both independent flags for filtering.
+  // Legacy status consumers receive a dominant status; shared views use the
+  // independent copy summary flags so mixed cards remain in both filters.
   const summaryStatuses = useMemo(function() {
     if (!copySummaries) return statuses;
     var result = { ...statuses };
@@ -1458,8 +1506,8 @@ function TylerBlackTracker() {
   // crosses 0->1, auto-set status to in_transit (newly-acquired). If crosses 1+ -> 0,
   // auto-set status to not_owned. Setting an explicit value uses setCardQty below.
   const adjustCardQty = useCallback((cardId, delta) => {
-    if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
-    if (copySummaries && copySummaries[cardId] && copySummaries[cardId].managed) { quickSaveCount(cardId, Math.max(0, copySummaries[cardId].total + (delta || 0))); return; }
+    if (window.trackerAuth && !window.trackerAuth.isOwner() || !loadComplete.current) return;
+    if (sportMode || copySummaries && copySummaries[cardId] && copySummaries[cardId].managed) { quickSaveCount(cardId, Math.max(0, collectionCardState(cardId,statuses,cardDetails,copySummaries).total + (delta || 0))); return; }
     var current = getCardQty(cardDetails, statuses, cardId);
     var next = Math.max(0, current + (delta || 0));
     if (next === current) return;
@@ -1472,8 +1520,8 @@ function TylerBlackTracker() {
     }
   }, [cardDetails, statuses, updateCardDetail, setCardStatus, copySummaries, openCardCopies, quickSaveCount]);
   const setCardQty = useCallback((cardId, newQty) => {
-    if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
-    if (copySummaries && copySummaries[cardId] && copySummaries[cardId].managed) { quickSaveCount(cardId, Math.max(0, parseInt(newQty) || 0)); return; }
+    if (window.trackerAuth && !window.trackerAuth.isOwner() || !loadComplete.current) return;
+    if (sportMode || copySummaries && copySummaries[cardId] && copySummaries[cardId].managed) { quickSaveCount(cardId, Math.max(0, parseInt(newQty) || 0)); return; }
     var current = getCardQty(cardDetails, statuses, cardId);
     var n = Math.max(0, parseInt(newQty) || 0);
     if (n === current) return;
@@ -1507,7 +1555,7 @@ function TylerBlackTracker() {
     });
   }, [saveStatuses, pushUndo, logChange, persistField]);
   const toggleForSale = useCallback((cardId) => {
-    if (window.trackerAuth && !window.trackerAuth.isOwner()) return;
+    if (window.trackerAuth && !window.trackerAuth.isOwner() || !loadComplete.current) return;
     setSessionChanges(prev => prev + 1);
     setForSaleFlags(prev => {
       var wasFlagged = !!prev[cardId];
@@ -1605,7 +1653,7 @@ function TylerBlackTracker() {
       if (s === "tcdb:flagged") { if (!tcdbFlags[card.id]) return false; }
       else if (s === "tcdb:fixed") { if (!tcdbFixes[card.id]) return false; }
       else if (s === "tcdb:nolink") { if (TCDB_LINKS[card.id] || tcdbFixes[card.id]) return false; }
-      else if (s && !card.product.toLowerCase().includes(s) && !card.cardSet.toLowerCase().includes(s) && !card.cardNumber.toLowerCase().includes(s)) return false;
+      else if (s && !window.CollectionProfile.subject(card).toLowerCase().includes(s) && !card.product.toLowerCase().includes(s) && !card.cardSet.toLowerCase().includes(s) && !card.cardNumber.toLowerCase().includes(s)) return false;
       return true;
     });
   }, [statuses, cardDetails, copySummaries, forSaleFlags, tcdbFlags, tcdbFixes, filterYear, filterProduct, filterCardNum, filterStatus, search, filterPlayer, filterColor, catalogScope, collectionFocusCards, customEditVer]);
@@ -1625,8 +1673,8 @@ function TylerBlackTracker() {
   // anyone with at least one card appears (including waived / inactive / non-roster
   // players). TEMPO_ROSTER is consulted only to look up display names.
   const collectionPlayerList = useMemo(function() {
-    if (trackerMode !== "wnba") return [];
-    var roster = (typeof window !== "undefined" && window.TEMPO_ROSTER) ? window.TEMPO_ROSTER : {};
+    if (trackerMode === "tb") return [];
+    var roster = window.CollectionProfile.roster(ALL_CARDS,trackerMode === "wnba" ? window.TEMPO_ROSTER : {});
     var keysSeen = {}, focusCounts = {};
     ALL_CARDS.forEach(function(card) {
       cardPlayers(card).forEach(function(player){keysSeen[player]=(keysSeen[player] || 0)+1;});
@@ -1637,14 +1685,12 @@ function TylerBlackTracker() {
       return { key: k, name: name, last: name.split(" ").pop(), total:keysSeen[k], shown:focusCounts[k] || 0 };
     }).sort(function(a, b) { return a.last.localeCompare(b.last); });
   }, [trackerMode, collectionFocusCards]);
-  useEffect(function() { if (trackerMode === "wnba" && filterPlayer && !collectionPlayerList.some(function(player) { return player.key === filterPlayer; })) setFilterPlayer(null); }, [trackerMode, filterPlayer, collectionPlayerList]);
+  useEffect(function() { if (trackerMode !== "tb" && filterPlayer && !collectionPlayerList.some(function(player) { return player.key === filterPlayer; })) setFilterPlayer(null); }, [trackerMode, filterPlayer, collectionPlayerList]);
   // Lookup map for fast player-name resolution in card rows
   const playerNameByKey = useMemo(function() {
-    if (typeof window === "undefined" || !window.TEMPO_ROSTER) return {};
-    var m = {};
-    Object.keys(window.TEMPO_ROSTER).forEach(function(k) { m[k] = window.TEMPO_ROSTER[k].name; });
-    return m;
-  }, []);
+    var roster=window.CollectionProfile.roster(ALL_CARDS,trackerMode === "wnba" ? window.TEMPO_ROSTER : {}),m={};
+    Object.keys(roster).forEach(function(k){m[k]=roster[k].name;});return m;
+  }, [trackerMode,customEditVer]);
   // Color slicer: compute keyword frequency from cards matching all OTHER filters
   // (excluding the color filter itself, so the chips reflect what's available to pick).
   const colorFrequencies = useMemo(function() {
@@ -1721,7 +1767,7 @@ function TylerBlackTracker() {
   const needRegular = stats.notOwned - stats.notOwned1of1;
   const TABS = [
     {id:"collection",label:"Collection",color:"yellow",ownerOnly:true},
-    {id:"catalog",label:"Catalogue",color:"purple",tbOnly:true},
+    {id:"catalog",label:"Catalogue",color:"purple",noTempo:true},
     {id:"gallery",label:"Gallery",color:"amber"},
     {id:"copies",label:"Copies",color:"cyan",ownerOnly:true},
     {id:"autographs",label:"IP autos",color:"purple",ownerOnly:true},
@@ -1730,8 +1776,8 @@ function TylerBlackTracker() {
     {id:"detailed",label:"Detailed",color:"emerald"},
     {id:"summary",label:"Summary",color:"cyan"},
     {id:"comc_scanner",label:"Scanner",color:"orange",ownerOnly:true},
-    {id:"targets",label:"Targets",color:"pink",badge:Object.keys(loadTargets()).length,ownerOnly:true},
-    {id:"prices",label:"Prices",color:"indigo",badge:Object.keys(loadPriceHistory()).length,ownerOnly:true},
+    {id:"targets",label:"Targets",color:"pink",tbOnly:true,badge:Object.keys(loadTargets()).length,ownerOnly:true},
+    {id:"prices",label:"Prices",color:"indigo",tbOnly:true,badge:Object.keys(loadPriceHistory()).length,ownerOnly:true},
     {id:"sync",label:"Sync",color:"orange",badge:unsyncedCards.length,ownerOnly:true},
     {id:"cleanup",label:"Cleanup",color:"amber",badge:issueCounts.total,ownerOnly:true},
     {id:"changelog",label:"Log",color:"rose",ownerOnly:true},
@@ -1739,7 +1785,7 @@ function TylerBlackTracker() {
     {id:"board",label:"Board",color:"blue",ownerOnly:true},
     {id:"tweets",label:"Tweets",color:"blue"},
     {id:"save",label:"Export",color:"emerald",ownerOnly:true},
-  ].filter(function(t) { return (!t.ownerOnly || isOwner) && (!t.tbOnly || trackerMode === "tb"); });
+  ].filter(function(t) { return (!t.ownerOnly || isOwner) && (!t.tbOnly || trackerMode === "tb") && (!t.noTempo || trackerMode !== "wnba"); });
   const tabColorMap = {yellow:"border-yellow-400 text-yellow-300",cyan:"border-yellow-400 text-yellow-300",teal:"border-yellow-400 text-yellow-300",purple:"border-yellow-400 text-yellow-300",orange:"border-yellow-400 text-yellow-300",emerald:"border-yellow-400 text-yellow-300",amber:"border-yellow-400 text-yellow-300",rose:"border-yellow-400 text-yellow-300",indigo:"border-yellow-400 text-yellow-300",blue:"border-yellow-400 text-yellow-300",pink:"border-yellow-400 text-yellow-300",lime:"border-yellow-400 text-yellow-300"};
   const badgeActiveMap = {orange:"bg-orange-400 text-gray-900",amber:"bg-amber-400 text-gray-900",emerald:"bg-emerald-400 text-gray-900",indigo:"bg-indigo-400 text-gray-900"};
   const badgeInactiveMap = {orange:"bg-orange-900 text-orange-300",amber:"bg-amber-900 text-amber-300",emerald:"bg-emerald-900 text-emerald-300",indigo:"bg-indigo-900 text-indigo-300"};
@@ -1748,30 +1794,30 @@ function TylerBlackTracker() {
       {/* STICKY HEADER */}
       <div className="flex-shrink-0 backdrop-blur-sm border-b z-30" style={{background:"rgba(10,22,40,0.97)",borderColor:"#1a2d4a",padding:"clamp(2px,0.3vw,4px) clamp(4px,0.6vw,12px)"}}>
         <div className="flex items-center gap-1.5">
-          <span className="font-black tracking-tight whitespace-nowrap" style={{color: trackerMode === "wnba" ? "#a855f7" : "#FFC52F", fontSize:"clamp(13px,1.8vw,18px)"}}>{trackerMode === "wnba" ? "TORONTO TEMPO" : "TYLER BLACK"}</span>
+          <span className="font-black tracking-tight whitespace-nowrap" style={{color: trackerMode === "wnba" ? "#a855f7" : "#FFC52F", fontSize:"clamp(13px,1.8vw,18px)"}}>{collectionTitle.toUpperCase()}</span>
           {trackerMode === "wnba" && window.Tempo2026 && <details className="relative text-[10px] text-purple-300"><summary className="cursor-pointer whitespace-nowrap" title="Checklist source coverage">Coverage</summary><div className="absolute left-0 top-5 w-72 max-w-[85vw] p-2 rounded border border-purple-800 bg-slate-950 text-slate-300 z-50">{window.TEMPO_CATALOG_COVERAGE_NOTE || window.Tempo2026.coverageNote}</div></details>}
           {trackerMode === "wnba" && <span className="text-gray-500 text-[9px]" title="Totals across the full Tempo collection">Overall</span>}
           <div className="flex-1 rounded-full h-1.5 overflow-hidden min-w-8 max-w-24" style={{background:"#1a2d4a"}}>
             <div className="h-full flex">
-              <button 
+              <button
                 onClick={function() { setActiveTab("detailed"); setDetailedStatusFilter("owned"); setDetailedSnFilter(null); }}
                 className="transition-all cursor-pointer"
                 style={{width: pct + "%", background:"#22c55e"}}
                 title="Click to view owned cards"
               />
-              <button 
+              <button
                 onClick={function() { setActiveTab("detailed"); setDetailedStatusFilter("in_transit"); setDetailedSnFilter(null); }}
                 className="transition-all cursor-pointer"
                 style={{width: (pctWithTransit - pct) + "%", background:"#86efac"}}
                 title="Click to view in-transit cards"
               />
-              <button 
+              <button
                 onClick={function() { setActiveTab("detailed"); setDetailedStatusFilter("not_owned"); setDetailedSnFilter("not_1of1"); }}
                 className="transition-all cursor-pointer"
                 style={{width: (stats.total ? (needRegular / stats.total * 100) : 0) + "%", background:"rgba(220,80,80,0.5)"}}
                 title="Click to view needed cards (non-1/1s)"
               />
-              <button 
+              <button
                 onClick={function() { setActiveTab("detailed"); setDetailedStatusFilter("not_owned"); setDetailedSnFilter("1of1"); }}
                 className="bg-red-300/40 transition-all hover:bg-red-300/60 cursor-pointer"
                 style={{width: (stats.total ? (stats.notOwned1of1 / stats.total * 100) : 0) + "%"}}
@@ -1779,18 +1825,19 @@ function TylerBlackTracker() {
               />
             </div>
           </div>
-          <span className="font-bold whitespace-nowrap" style={{fontSize:"clamp(9px,1.1vw,11px)",color:"#22c55e"}}>{pctWithTransit}%</span>
+          <span className="font-bold whitespace-nowrap" style={{fontSize:"clamp(9px,1.1vw,11px)",color:"#22c55e"}} title="Checklist acquired: owned or in transit">{pctWithTransit}%</span>
           <span style={{color:"#2a3f5f"}}>|</span>
           <div className="flex items-center gap-1 flex-shrink-0" style={{fontSize:"clamp(9px,1.1vw,11px)"}}>
-            <button 
-              onClick={function() { setActiveTab("detailed"); setDetailedStatusFilter("acquired"); setDetailedSnFilter(null); }}
+            <button
+              onClick={function() { setActiveTab("detailed"); setDetailedStatusFilter("owned"); setDetailedSnFilter(null); }}
               className="hover:bg-gray-800/50 rounded px-1 -mx-1 transition-colors"
-              title="Click to view owned + in-transit cards"
+              title="Click to view owned cards"
             >
-              <span className="font-bold" style={{color:"#22c55e"}}>{acquired}</span><span style={{color:"#7a8ba8"}} className="ml-0.5">own</span>
+              <span className="font-bold" style={{color:"#22c55e"}}>{stats.owned}</span><span style={{color:"#7a8ba8"}} className="ml-0.5">owned</span>
             </button>
+            <button onClick={function(){setActiveTab("detailed");setDetailedStatusFilter("in_transit");setDetailedSnFilter(null);}} className="hover:bg-gray-800/50 rounded px-1" title="Click to view in-transit cards"><span className="font-bold text-emerald-300">{stats.inTransit}</span><span className="ml-0.5 text-gray-400">in transit</span></button>
             <span style={{color:"#2a3f5f"}} className="mx-0.5">&middot;</span>
-            <button 
+            <button
               onClick={function() { setActiveTab("detailed"); setDetailedStatusFilter("not_owned"); setDetailedSnFilter(null); }}
               className="hover:bg-gray-800/50 rounded px-1 -mx-1 transition-colors"
               title="Click to view needed cards"
@@ -1799,7 +1846,7 @@ function TylerBlackTracker() {
             </button>
           </div>
           <span style={{color:"#2a3f5f"}}>|</span>
-          <button 
+          <button
             onClick={function() { setActiveTab("detailed"); setDetailedSnFilter("1of1"); setDetailedStatusFilter("acquired"); }}
             className="flex items-center gap-1 flex-shrink-0 hover:bg-gray-800/50 rounded px-1 -mx-1 transition-colors"
             style={{fontSize:"clamp(9px,1.1vw,11px)"}}
@@ -1820,8 +1867,8 @@ function TylerBlackTracker() {
             )}
             <span className={"w-1.5 h-1.5 rounded-full inline-block " + (lastSaveTime ? "bg-green-500" : "bg-gray-700")}></span>
             <span style={{color:"#2a3f5f"}} className="mx-1">|</span>
-            <button 
-              onClick={function() { setSuperSearchMode(!superSearchMode); }} 
+            <button
+              onClick={function() { setSuperSearchMode(!superSearchMode); }}
               className={"px-2 py-0.5 rounded transition-colors font-bold " + (superSearchMode ? "bg-yellow-600 text-yellow-50 hover:bg-yellow-500" : "bg-gray-700 text-gray-400 hover:bg-gray-600")}
               style={{fontSize:"clamp(8px,0.9vw,10px)"}}
               title={superSearchMode ? "Super Search ON - eBay links open 5 search variations" : "Super Search OFF - eBay links open normal search"}
@@ -1829,32 +1876,21 @@ function TylerBlackTracker() {
               {superSearchMode ? "* SUPER" : "E"}
             </button>
             {isOwner && <select aria-label="Collection" value={trackerMode}
-              onChange={async function(e) {
-                var next=e.target.value;
-                if (privatePanelHasEdits()) { setSaveToast("Save or cancel the open edit before switching collections."); return; }
-                if (window.CollectionsUtils.SPORTS.includes(next)) { window.dispatchEvent(new CustomEvent("open-collections",{detail:{sport:next}})); return; }
-                if (next!=="tb" && next!=="wnba" || next===trackerMode) return;
-                var sourceMode=window.MODE,sourceOwner=window.trackerAuth.userId();
-                try {
-                  var result=await window.trackerCollections.forMode(sourceMode).sync();
-                  if (!result.cloudSaved) throw Error(result.error || "Save pending edits before switching collections.");
-                  if (window.MODE!==sourceMode || sourceOwner!==window.trackerAuth.userId()) throw Error("Your collection or session changed. Try again.");
-                  if (privatePanelHasEdits()) throw Error("Save or cancel the open edit before switching collections.");
-                  window.setMode(next);
-                } catch(error) { setSaveToast(error.message); }
+              onChange={function(e) {
+                window.dispatchEvent(new CustomEvent("open-tracker-collection",{detail:{mode:e.target.value}}));
               }} className="bg-gray-900 border border-gray-600 rounded px-1.5 py-0.5 font-bold text-gray-200" style={{fontSize:"clamp(9px,1vw,11px)"}}>
               <option value="tb">Tyler Black</option><option value="wnba">Toronto Tempo</option><option value="racing">Racing</option><option value="baseball">Baseball</option><option value="basketball">Basketball</option><option value="football">Football</option><option value="hockey">Hockey</option><option value="soccer">Soccer</option><option value="other">Other</option>
             </select>}
-            {isOwner && <button 
-              onClick={function() { setHidePrices(!hidePrices); }} 
+            {isOwner && trackerMode === "tb" && <button
+              onClick={function() { setHidePrices(!hidePrices); }}
               className={"px-1 py-0 rounded transition-colors " + (hidePrices ? "text-gray-600 hover:text-gray-400" : "text-gray-500 hover:text-gray-300 bg-gray-700/50")}
               style={{fontSize:"clamp(7px,0.8vw,9px)"}}
               title={hidePrices ? "Prices hidden — click to show" : "Prices visible — click to hide"}
             >
               {"$"}
             </button>}
-            <button 
-              onClick={function() { setShowKbHelp(true); }} 
+            <button
+              onClick={function() { setShowKbHelp(true); }}
               className="px-1.5 py-0.5 rounded transition-colors bg-gray-800 text-gray-500 hover:text-white hover:bg-gray-700 font-bold"
               style={{fontSize:"clamp(8px,0.9vw,10px)"}}
               title="Keyboard shortcuts (?)"
@@ -1876,14 +1912,14 @@ function TylerBlackTracker() {
       </div>
       {/* SCROLLABLE CONTENT */}
       <div className="flex-1 flex flex-col overflow-hidden" style={{padding:"clamp(2px,0.3vw,6px) clamp(4px,0.6vw,12px)"}}>
-        {isOwner && window.AutographPanel && <div className={activeTab === "autographs" ? "flex-1 min-h-0 overflow-auto" : "hidden"}><window.AutographPanel key={trackerMode} scope={trackerMode === "wnba" ? "tempo" : "tb"} cards={ALL_CARDS} statuses={statuses} details={cardDetails} copyInventory={copyInventory} inventoryReady={copyStorage.ready} inventoryError={copyStorage.error} onRefreshInventory={refreshCopyInventory} isOwner={isOwner} active={activeTab === "autographs"}/></div>}
-        {isOwner && window.PurchaseReceiptsPanel && <div className={activeTab === "receipts" ? "flex-1 min-h-0 overflow-auto" : "hidden"}><window.PurchaseReceiptsPanel key={trackerMode} scope={trackerMode === "wnba" ? "tempo" : "tb"} cards={ALL_CARDS} isOwner={isOwner} active={activeTab === "receipts"}/></div>}
+        {isOwner && window.AutographPanel && <div className={activeTab === "autographs" ? "flex-1 min-h-0 overflow-auto" : "hidden"}><window.AutographPanel key={trackerMode} scope={window.CollectionProfile.scope(trackerMode)} cards={ALL_CARDS} statuses={statuses} details={cardDetails} copyInventory={copyInventory} inventoryReady={copyStorage.ready} inventoryError={copyStorage.error} onRefreshInventory={refreshCopyInventory} isOwner={isOwner} active={activeTab === "autographs"}/></div>}
+        {isOwner && window.PurchaseReceiptsPanel && <div className={activeTab === "receipts" ? "flex-1 min-h-0 overflow-auto" : "hidden"}><window.PurchaseReceiptsPanel key={trackerMode} scope={window.CollectionProfile.scope(trackerMode)} cards={ALL_CARDS} isOwner={isOwner} active={activeTab === "receipts"}/></div>}
         {activeTab === "autographs" || activeTab === "receipts" ? null : activeTab === "collection" ? (
         <div className="mx-auto flex-1 flex flex-col min-h-0 w-full" style={{maxWidth:"min(100%, 1800px)"}}>
         {/* COLLECTION TAB */}
         <div className="flex items-center justify-between mb-1">
           {/* TB-specific external links — hidden in WNBA mode since they all hardcode Tyler Black URLs */}
-          {trackerMode !== "wnba" ? (
+          {trackerMode === "tb" ? (
             <div className="flex gap-2" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
               <a href="https://www.tcdb.com/Person.cfm/pid/325590/Tyler-Black" target="_blank" rel="noopener noreferrer" style={{color:"#7abfff"}} className="hover:opacity-80">TCDB</a>
               <a href="https://www.tcdb.com/ViewCollectionP.cfm/pid/325590" target="_blank" rel="noopener noreferrer" style={{color:"#7abfff"}} className="hover:opacity-80">My Collection</a>
@@ -1893,7 +1929,7 @@ function TylerBlackTracker() {
             </div>
           ) : (
             <div className="flex gap-2" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
-              <span className="text-purple-400 font-bold">Toronto Tempo Collection</span>
+              <span className="text-purple-400 font-bold">{collectionTitle} Collection</span>
               {filterPlayer && playerNameByKey[filterPlayer] && (
                 <span className="text-purple-300">• {playerNameByKey[filterPlayer]}</span>
               )}
@@ -1930,9 +1966,9 @@ function TylerBlackTracker() {
         )}
         {tempoProfileEnabled && <TempoFocusSelect value={tempoFocus} onChange={setTempoFocus} counts={tempoFocusCounts} wants={tempoWants} wantsError={tempoWantsError}/>}
         {/* WNBA-only: player filter chip row. Single click to filter Collection to one player. */}
-        {trackerMode === "wnba" && collectionPlayerList.length > 0 && (
+        {trackerMode !== "tb" && collectionPlayerList.length > 0 && (
           <div className="flex flex-wrap gap-1 items-center mb-1 pb-1" style={{borderBottom:"1px solid #1a2d4a"}}>
-            <span className="font-bold mr-1" style={{color:"#a855f7",fontSize:"clamp(8px,0.9vw,10px)"}}>Player:</span>
+            <span className="font-bold mr-1" style={{color:"#a855f7",fontSize:"clamp(8px,0.9vw,10px)"}}>{trackerMode === "racing" ? "Driver:" : "Player:"}</span>
             <button onClick={function(){ setFilterPlayer(null); }}
               className={"px-1.5 py-0.5 rounded font-semibold transition-colors "+
                 (filterPlayer===null ? "bg-purple-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700")}
@@ -1942,7 +1978,7 @@ function TylerBlackTracker() {
                 className={"px-1.5 py-0.5 rounded font-semibold transition-colors "+
                   (filterPlayer===p.key ? "bg-purple-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700")}
                 style={{fontSize:"clamp(9px,1vw,11px)"}}
-                title={p.name+" · "+p.shown+" in this focus / "+p.total+" catalogued"}>{p.last} <span className="font-normal opacity-60">{tempoFocus === "all" ? p.total : p.shown+"/"+p.total}</span></button>);
+                title={p.name+" · "+p.shown+" in this focus / "+p.total+" catalogued"}>{sportMode ? p.name : p.last} <span className="font-normal opacity-60">{tempoFocus === "all" ? p.total : p.shown+"/"+p.total}</span></button>);
             })}
           </div>
         )}
@@ -2010,7 +2046,7 @@ function TylerBlackTracker() {
           <div className="flex gap-1">
             <button onClick={function(){ var urls = []; var seen = {}; filtered.slice(0, 30).forEach(function(c){ var u = tcdbUrl(c); if (u !== TCDB_PLAYER && !seen[u]) { seen[u] = true; urls.push(u); }}); urls.forEach(function(u){window.open(u, "_blank");}); }} className="px-1.5 py-0 bg-cyan-950/60 border border-cyan-800 text-cyan-400 rounded hover:bg-cyan-900/60">TCDB</button>
             <button onClick={function(){ if (superSearchMode) { filtered.slice(0, 30).forEach(function(c){ ebayUrlsSuper(c).forEach(function(url){ window.open(url, "_blank"); }); }); } else { filtered.slice(0, 30).forEach(function(c){window.open(ebayUrl(c), "_blank");}); } }} className="px-1.5 py-0 bg-yellow-950/60 border border-yellow-800 text-yellow-400 rounded hover:bg-yellow-900/60">eBay</button>
-            {trackerMode !== "wnba" && <button onClick={function(){ var urls = []; var seen = {}; filtered.forEach(function(c){ var u = comcUrl(c); if (!seen[u]) { seen[u] = true; urls.push(u); }}); urls.slice(0, 30).forEach(function(u){window.open(u, "_blank");}); }} className="px-1.5 py-0 bg-orange-950/60 border border-orange-800 text-orange-400 rounded hover:bg-orange-900/60">COMC</button>}
+            {<button onClick={function(){ var urls = []; var seen = {}; filtered.forEach(function(c){ var u = comcUrl(c); if (!seen[u]) { seen[u] = true; urls.push(u); }}); urls.slice(0, 30).forEach(function(u){window.open(u, "_blank");}); }} className="px-1.5 py-0 bg-orange-950/60 border border-orange-800 text-orange-400 rounded hover:bg-orange-900/60">COMC</button>}
           </div>
         </div>
         {/* Card list - ultra dense */}
@@ -2037,7 +2073,7 @@ function TylerBlackTracker() {
                 <div className="flex items-center gap-1 cursor-pointer" style={{padding:"clamp(1px,0.2vw,3px) clamp(3px,0.5vw,8px)"}} onClick={function(){setExpandedCard(isExpanded ? null : card.id);}}>
                   <div className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + cfg.dot} />
                   {/* WNBA-only: player name as a colored pill so user instantly sees whose card this is */}
-                  {trackerMode === "wnba" && card.player && playerNameByKey[card.player] && (
+                  {trackerMode !== "tb" && card.player && playerNameByKey[card.player] && (
                     <span className="font-bold px-1 py-0 rounded bg-purple-900/50 border border-purple-700 text-purple-200 whitespace-nowrap flex-shrink-0"
                       style={{fontSize:"clamp(8px,0.9vw,10px)"}}
                       title={cardPlayers(card).map(player=>playerNameByKey[player] || player).join(" / ")}>{cardPlayers(card).map(player=>(playerNameByKey[player] || player).split(" ").pop()).join(" / ")}</span>
@@ -2194,13 +2230,13 @@ function TylerBlackTracker() {
         ) : activeTab === "tweets" ? (
           <LinkedTweetsPanel isOwner={isOwner} />
         ) : activeTab === "comc_scanner" ? (
-          <COMCScannerPanel cards={ALL_CARDS} statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} importPurchaseCopy={importPurchaseCopy} needsSync={needsSync} setDetailedCardId={setDetailedCardId} setActiveTab={setActiveTab} persistedState={scannerStateRef.current} onStateChange={function(s) { scannerStateRef.current = s; }} editCustomCardById={editCustomCardById} />
+          <COMCScannerPanel copySummaries={copySummaries} cards={ALL_CARDS} statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} importPurchaseCopy={importPurchaseCopy} needsSync={needsSync} setDetailedCardId={setDetailedCardId} setActiveTab={setActiveTab} persistedState={scannerStateRef.current} onStateChange={function(s) { scannerStateRef.current = s; }} editCustomCardById={editCustomCardById} />
         ) : activeTab === "targets" ? (
           <TargetsPanel cards={ALL_CARDS} statuses={statuses} setCardStatus={setCardStatus} updateCardDetail={updateCardDetail} setDetailedCardId={setDetailedCardId} setActiveTab={setActiveTab} initialCardFilter={targetCardFilter} setTargetCardFilter={setTargetCardFilter} />
         ) : activeTab === "prices" ? (
           <PricesPanel cards={ALL_CARDS} statuses={statuses} setActiveTab={setActiveTab} setDetailedCardId={setDetailedCardId} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} setDetailedProductFilter={setDetailedProductFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} initialSearch={pricesSearchFilter} setPricesSearchFilter={setPricesSearchFilter} />
         ) : activeTab === "export" || activeTab === "save" ? (
-          <ExportPanel statuses={statuses} cardDetails={cardDetails} forSaleFlags={forSaleFlags} needsSync={needsSync} lastCheckpoint={lastCheckpoint} setLastCheckpoint={setLastCheckpoint} isSavingCheckpoint={isSavingCheckpoint} setIsSavingCheckpoint={setIsSavingCheckpoint} saveCount={saveCount} flashSave={flashSave} saveToast={saveToast} exportCsvRef={exportCsvRef} persistField={persistField} setStatuses={setStatuses} setCardDetails={setCardDetails} setForSaleFlags={setForSaleFlags} allDataRef={allDataRef} />
+          <ExportPanel statuses={statuses} copySummaries={copySummaries} cardDetails={cardDetails} forSaleFlags={forSaleFlags} needsSync={needsSync} lastCheckpoint={lastCheckpoint} setLastCheckpoint={setLastCheckpoint} isSavingCheckpoint={isSavingCheckpoint} setIsSavingCheckpoint={setIsSavingCheckpoint} saveCount={saveCount} flashSave={flashSave} saveToast={saveToast} exportCsvRef={exportCsvRef} persistField={persistField} setStatuses={setStatuses} setCardDetails={setCardDetails} setForSaleFlags={setForSaleFlags} allDataRef={allDataRef} />
         ) : activeTab === "sync" ? (
           <SyncPanel cards={unsyncedCards} touchupCards={touchupCards} cardDetails={cardDetails} syncIndex={syncIndex} setSyncIndex={setSyncIndex} markSynced={markSynced} hidePrices={hidePrices} />
         ) : activeTab === "cleanup" ? (
@@ -2208,15 +2244,15 @@ function TylerBlackTracker() {
         ) : activeTab === "detailed" ? (
           <DetailedPanel statuses={statuses} copySummaries={copySummaries} openCardCopies={openCardCopies} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} needsSync={needsSync} initialSnFilter={detailedSnFilter} initialStatusFilter={detailedStatusFilter} initialCardId={detailedCardId} setDetailedCardId={setDetailedCardId} initialProductFilter={detailedProductFilter} setDetailedProductFilter={setDetailedProductFilter} initialCardNumFilter={detailedCardNumFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} editCustomCardById={editCustomCardById} customEditVer={customEditVer} targetByCardId={targetByCardId} setActiveTab={setActiveTab} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
         ) : activeTab === "copies" && isOwner ? (
-          <window.CopyInventoryPanel key={copyStorageKey+":"+(copyStateRef.current.ownerId || "signed-out")} initialCardId={copyCardId} cards={ALL_CARDS.filter(function(card) { return trackerMode === "wnba" || !HIDDEN_DUPES.has(card.id); })} statuses={statuses} cardDetails={cardDetails} inventory={copyInventory} publicMedia={publicMedia} onInventoryChange={saveCopyInventory} onRefresh={refreshCopyInventory} isOwner={isOwner} storageReady={copyStorage.ready} loading={copyStorage.loading} readOnlyReason={copyStorage.error} />
+          <window.CopyInventoryPanel key={copyStorageKey+":"+(copyStateRef.current.ownerId || "signed-out")} initialCardId={copyCardId} cards={ALL_CARDS.filter(function(card) { return trackerMode !== "tb" || !HIDDEN_DUPES.has(card.id); })} statuses={statuses} cardDetails={cardDetails} inventory={copyInventory} publicMedia={publicMedia} onInventoryChange={saveCopyInventory} onRefresh={refreshCopyInventory} isOwner={isOwner} storageReady={copyStorage.ready} loading={copyStorage.loading} readOnlyReason={copyStorage.error} />
         ) : activeTab === "gallery" ? (
-          <window.CardGalleryPanel key={copyStorageKey+":"+(copyStateRef.current.ownerId || "public")} cards={ALL_CARDS.filter(function(card){return trackerMode === "wnba" || !HIDDEN_DUPES.has(card.id);})} statuses={statuses} cardDetails={cardDetails} inventory={isOwner ? copyInventory : null} publicMedia={publicMedia} isOwner={isOwner} onOpenCopies={isOwner ? openCardCopies : null} loading={mediaStorage.loading || isOwner && copyStorage.loading} loadError={mediaStorage.error} onRefresh={async function(){var results=await Promise.all([refreshPublicMedia(),isOwner ? refreshCopyInventory() : Promise.resolve({ok:true})]);return results.find(function(result){return result && result.ok === false;}) || {ok:true};}} />
-        ) : activeTab === "catalog" && trackerMode === "tb" ? (
-          <window.CardCatalogPanel cards={ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id);}).concat(isOwner ? loadCustomCards().filter(function(card){return card.archived;}) : [])} statuses={statuses} isOwner={isOwner} initialEditId={catalogEditId} onClearEdit={function(){setCatalogEditId(null);}} onSave={saveCatalogCard} onArchive={archiveCatalogCard} onRestore={restoreCatalogCard} onOpen={function(card){setDetailedCardId(card.id);setActiveTab("detailed");}} onStatusChange={setCardStatus} revision={customEditVer}/>
+          <window.CardGalleryPanel key={copyStorageKey+":"+(copyStateRef.current.ownerId || "public")} cards={ALL_CARDS.filter(function(card){return trackerMode !== "tb" || !HIDDEN_DUPES.has(card.id);})} statuses={statuses} cardDetails={cardDetails} inventory={isOwner ? copyInventory : null} publicMedia={publicMedia} isOwner={isOwner} onOpenCopies={isOwner ? openCardCopies : null} loading={mediaStorage.loading || isOwner && copyStorage.loading} loadError={mediaStorage.error} onRefresh={async function(){var results=await Promise.all([refreshPublicMedia(),isOwner ? refreshCopyInventory() : Promise.resolve({ok:true})]);return results.find(function(result){return result && result.ok === false;}) || {ok:true};}} />
+        ) : activeTab === "catalog" && trackerMode !== "wnba" ? (
+          <window.CardCatalogPanel key={trackerMode} mode={trackerMode} cards={ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id);}).concat(isOwner ? loadCustomCards().filter(function(card){return card.archived;}) : [])} statuses={statuses} isOwner={isOwner} initialEditId={catalogEditId} onClearEdit={function(){setCatalogEditId(null);}} onSave={saveCatalogCard} onArchive={archiveCatalogCard} onRestore={restoreCatalogCard} onOpen={function(card){setDetailedCardId(card.id);setActiveTab("detailed");}} onStatusChange={setCardStatus} revision={customEditVer}/>
         ) : activeTab === "summary" ? (
-          <SummaryPanel statuses={summaryStatuses} setActiveTab={setActiveTab} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} />
+          <SummaryPanel statuses={summaryStatuses} copySummaries={copySummaries} cardDetails={cardDetails} setActiveTab={setActiveTab} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} />
         ) : activeTab === "lookup" ? (
-          <CardLookupPanel statuses={statuses} copySummaries={copySummaries} openCardCopies={openCardCopies} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} setCardQty={setCardQty} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} needsSync={needsSync} setActiveTab={setActiveTab} setDetailedProductFilter={setDetailedProductFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} setPricesSearchFilter={setPricesSearchFilter} superSearchMode={superSearchMode} targetByCardId={targetByCardId} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
+          <CardLookupPanel copyStorage={copyStorage} copyInventory={copyInventory} quickSaveHand={quickSaveHand} setDetailedCardId={setDetailedCardId} statuses={statuses} copySummaries={copySummaries} openCardCopies={openCardCopies} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} setCardQty={setCardQty} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} needsSync={needsSync} setActiveTab={setActiveTab} setDetailedProductFilter={setDetailedProductFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} setPricesSearchFilter={setPricesSearchFilter} superSearchMode={superSearchMode} targetByCardId={targetByCardId} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
         ) : null}
         </div>
         )}
@@ -2316,8 +2352,29 @@ function TylerBlackTracker() {
     </div>
   );
 }
+function panelCardSubject(card) {
+  var roster = window.MODE === "wnba" ? window.TEMPO_ROSTER || {} : {};
+  var name = window.CollectionProfile ? window.CollectionProfile.subject(card, roster) : window.CollectionScanner.subject(card, roster);
+  return name || (window.MODE === "tb" ? "Tyler Black" : "");
+}
+function panelRoster() {
+  var existing = window.MODE === "wnba" ? window.TEMPO_ROSTER || {} : {};
+  return window.CollectionProfile ? window.CollectionProfile.roster(ALL_CARDS, existing) : existing;
+}
+function panelCardIsRookie(card) {
+  if (window.MODE === "tb") return card.product.startsWith("2021") || card.product.startsWith("2024");
+  return card.isRookie === true || card.isRC === true || /^(yes|rc|true)$/i.test(String(card.isRC || "")) || /\bRC\b/.test(String(card.attributes || ""));
+}
+function panelSetSearch(card, source) {
+  if (window.MODE === "tb") {
+    if (source === "comc") return "https://www.comc.com/Players/Baseball/Tyler_Black/c389004,+" + (card.product.replace(/'/g, "").replace(/\s*\([^)]*\)/g, "") + " " + card.cardNumber).replace(/[&\/]/g, " ").replace(/\s+/g, " ").trim().replace(/ /g, "+");
+    return "https://www.ebay.com/sch/i.html?_nkw=" + encodeURIComponent("Tyler Black " + cardYear(card) + " " + card.cardNumber + " " + stripBrand(card.product.replace(/^\d{4}\s*/, "").replace(/\s*\([^)]*\)/g, ""))) + "&_sacat=212";
+  }
+  var query = [panelCardSubject(card),cardYear(card),String(card.product || "").replace(/^\d{4}\s*/, ""),card.cardNumber].filter(Boolean).join(" ");
+  return source === "comc" ? "https://www.comc.com/Cards,=" + encodeURIComponent(query) : "https://www.ebay.com/sch/i.html?_nkw=" + encodeURIComponent(query) + "&_sacat=212";
+}
 function getBrand(product) {
-  var p = product.slice(5);
+  var p = String(product || "").replace(/^\d{4}\s+/, "");
   if (p.startsWith("Bowman")) return "Bowman";
   if (p.startsWith("Topps")) return "Topps";
   if (p.startsWith("Panini") || p.startsWith("Donruss")) return "Panini";
@@ -2325,15 +2382,16 @@ function getBrand(product) {
   if (p.startsWith("Stadium")) return "Topps";
   return "Other";
 }
-function ProgressBar({ label, owned, transit, total, sub }) {
+function ProgressBar({ label, owned, transit, acquired, total, sub }) {
+  acquired = acquired == null ? owned + transit : acquired;
   if (total === 0) return null;
   var pO = (owned / total * 100).toFixed(1);
-  var pT = ((owned + transit) / total * 100).toFixed(1);
+  var pT = (acquired / total * 100).toFixed(1);
   return (
     <div className={"py-0.5" + (sub ? "" : " border-b border-gray-800")}>
       <div className="flex justify-between items-center">
         <span className={"truncate " + (sub ? "text-gray-400 pl-3" : "text-white font-medium")} style={{fontSize:sub?"clamp(8px,1vw,11px)":"clamp(9px,1.2vw,12px)"}}>{label}</span>
-        <span className="text-gray-500 flex-shrink-0 ml-2" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>{owned + transit}/{total} ({pT}%)</span>
+        <span className="text-gray-500 flex-shrink-0 ml-2" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>{owned} owned · {transit} transit · {acquired}/{total} acquired ({pT}%)</span>
       </div>
       <div className={"bg-gray-700 rounded-full overflow-hidden " + (sub ? "h-1 ml-3" : "h-1.5")}>
         <div className="h-full flex">
@@ -2344,7 +2402,7 @@ function ProgressBar({ label, owned, transit, total, sub }) {
     </div>
   );
 }
-function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDetailedSnFilter }) {
+function SummaryPanel({ statuses, cardDetails = {}, copySummaries, setActiveTab, setDetailedStatusFilter, setDetailedSnFilter }) {
   var trackerMode = useTrackerMode();
   var catalogRevision = useCatalogRevision();
   var [view, setView] = useState("dashboard"); // dashboard, heatmap, breakdown
@@ -2361,8 +2419,8 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
   // least one card appears (including waived / inactive / non-roster players).
   // TEMPO_ROSTER is consulted only to look up display names.
   var playerList = useMemo(function() {
-    if (trackerMode !== "wnba") return [];
-    var roster = (typeof window !== "undefined" && window.TEMPO_ROSTER) ? window.TEMPO_ROSTER : {};
+    if (trackerMode === "tb") return [];
+    var roster = panelRoster();
     var keysSeen = {};
     ALL_CARDS.forEach(function(card) {
       cardPlayers(card).forEach(function(player){keysSeen[player]=true;});
@@ -2374,7 +2432,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
       var la = a.name.split(" ").pop(); var lb = b.name.split(" ").pop();
       return la.localeCompare(lb);
     });
-  }, [trackerMode]);
+  }, [trackerMode, catalogRevision]);
 
   var PRESETS = [
     {label:"All",sn:1,blank:true,ex1:false},
@@ -2391,7 +2449,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
     if (HIDDEN_DUPES.has(card.id)) return false;
     if (card.product.startsWith("TEST")) return false;
     if (!inChecklist(card)) return false;
-    if (rookieOnly && !card.product.startsWith("2021") && !card.product.startsWith("2024")) return false;
+    if (rookieOnly && !panelCardIsRookie(card)) return false;
     if (spOnly) return !!SSP_TAGS[card.cardSet];
     var pr = parseInt(card.copies);
     var isNumbered = card.copies && !isNaN(pr);
@@ -2402,49 +2460,51 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
   }
 
   function calcStats(cards, sts, minSN, inclBlank, ex1of1, unnumOnly, spOnly) {
-    var owned=0,transit=0,total=0,sps=0,spsAcq=0,ssps=0,sspsAcq=0;
+    var owned=0,transit=0,acquired=0,total=0,sps=0,spsAcq=0,ssps=0,sspsAcq=0;
     var byYear={},byBrand={},byProduct={},byPlayer={},cardsByProduct={};
     cards.forEach(function(card) {
       // WNBA player filter — only include cards for the selected player when one is chosen
       if (selectedPlayer && !cardHasPlayer(card,selectedPlayer)) return;
       if (!passesFilter(card, minSN, inclBlank, ex1of1, unnumOnly, spOnly)) return;
-      var s = sts[card.id] || "not_owned";
-      var acq = s==="owned"||s==="in_transit" ? 1 : 0;
-      total++;
-      if (s==="owned") owned++;
-      if (s==="in_transit") transit++;
+      var copyState = collectionCardState(card.id, sts, cardDetails, copySummaries);
+      var isOwned = !!copyState.owned, isTransit = !!copyState.inTransit;
+      var acq = isOwned || isTransit ? 1 : 0;
+      total++; acquired += acq;
+      if (isOwned) owned++;
+      if (isTransit) transit++;
       var tag = SSP_TAGS[card.cardSet];
       if (tag === "SP") { sps++; spsAcq += acq; }
       if (tag === "SSP") { ssps++; sspsAcq += acq; }
       var year = cardYear(card) || card.product.slice(0,4); // cardYear handles WNBA (numeric year field) + TB (year-prefix product)
       var brand = getBrand(card.product);
-      var prod = card.product;
+      var prod = trackerMode !== "tb" && year && !card.product.startsWith(year) ? year + " " + card.product : card.product;
       function add(map, key) {
-        if (!map[key]) map[key] = {owned:0,transit:0,total:0,year:year};
+        if (!map[key]) map[key] = {owned:0,transit:0,acquired:0,total:0,year:year};
         map[key].total++;
-        if (s==="owned") map[key].owned++;
-        if (s==="in_transit") map[key].transit++;
+        if (isOwned) map[key].owned++;
+        if (isTransit) map[key].transit++;
+        map[key].acquired += acq;
       }
       add(byYear, year); add(byBrand, brand); add(byProduct, prod);
       cardPlayers(card).forEach(function(player){add(byPlayer,player);});
       if (!cardsByProduct[prod]) cardsByProduct[prod] = [];
       cardsByProduct[prod].push(card);
     });
-    return {owned:owned,transit:transit,total:total,sps:sps,spsAcq:spsAcq,ssps:ssps,sspsAcq:sspsAcq,byYear:byYear,byBrand:byBrand,byProduct:byProduct,byPlayer:byPlayer,cardsByProduct:cardsByProduct};
+    return {owned:owned,transit:transit,acquired:acquired,total:total,sps:sps,spsAcq:spsAcq,ssps:ssps,sspsAcq:sspsAcq,byYear:byYear,byBrand:byBrand,byProduct:byProduct,byPlayer:byPlayer,cardsByProduct:cardsByProduct};
   }
 
   var stats = useMemo(function() {
     return calcStats(ALL_CARDS, statuses, snMin, includeBlankSN, exclude1of1, false, false);
-  }, [statuses, snMin, includeBlankSN, exclude1of1, rookieOnly, selectedPlayer, catalogRevision]);
+  }, [statuses, cardDetails, copySummaries, snMin, includeBlankSN, exclude1of1, rookieOnly, selectedPlayer, catalogRevision]);
 
   var presetStats = useMemo(function() {
     return PRESETS.map(function(p) {
       var s = calcStats(ALL_CARDS, statuses, p.sn, p.blank, p.ex1, p.unnumOnly, p.spOnly);
-      return {label:p.label, pct: s.total ? ((s.owned+s.transit)/s.total*100) : 0, owned:s.owned, transit:s.transit, total:s.total, sn:p.sn, blank:p.blank, ex1:p.ex1, unnumOnly:p.unnumOnly, spOnly:p.spOnly, snKey:p.snKey};
+      return {label:p.label, pct: s.total ? (s.acquired/s.total*100) : 0, owned:s.owned, transit:s.transit, acquired:s.acquired, total:s.total, sn:p.sn, blank:p.blank, ex1:p.ex1, unnumOnly:p.unnumOnly, spOnly:p.spOnly, snKey:p.snKey};
     });
-  }, [statuses, rookieOnly, selectedPlayer, catalogRevision]);
+  }, [statuses, cardDetails, copySummaries, rookieOnly, selectedPlayer, catalogRevision]);
 
-  var pct = stats.total ? (stats.owned+stats.transit)/stats.total*100 : 0;
+  var pct = stats.total ? (stats.acquired)/stats.total*100 : 0;
   var pctOwned = stats.total ? stats.owned/stats.total*100 : 0;
 
   // Rarest acquired — numbered cards + SP/SSP cards
@@ -2452,21 +2512,23 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
     var numbered = ALL_CARDS.filter(function(c) {
       if (HIDDEN_DUPES.has(c.id) || !inChecklist(c)) return false;
       if (c.product.startsWith("TEST")) return false;
-      if (rookieOnly && !c.product.startsWith("2021") && !c.product.startsWith("2024")) return false;
-      var s = statuses[c.id] || "not_owned";
-      if (s !== "owned" && s !== "in_transit") return false;
+      if (rookieOnly && !panelCardIsRookie(c)) return false;
+      if (selectedPlayer && !cardHasPlayer(c, selectedPlayer)) return false;
+      var copyState = collectionCardState(c.id, statuses, cardDetails, copySummaries);
+      if (!copyState.owned && !copyState.inTransit) return false;
       return c.copies && parseInt(c.copies) > 0;
     }).sort(function(a,b) { return parseInt(a.copies) - parseInt(b.copies); }).slice(0,12);
     var spCards = ALL_CARDS.filter(function(c) {
       if (HIDDEN_DUPES.has(c.id) || !inChecklist(c)) return false;
       if (c.product.startsWith("TEST")) return false;
-      if (rookieOnly && !c.product.startsWith("2021") && !c.product.startsWith("2024")) return false;
-      var s = statuses[c.id] || "not_owned";
-      if (s !== "owned" && s !== "in_transit") return false;
+      if (rookieOnly && !panelCardIsRookie(c)) return false;
+      if (selectedPlayer && !cardHasPlayer(c, selectedPlayer)) return false;
+      var copyState = collectionCardState(c.id, statuses, cardDetails, copySummaries);
+      if (!copyState.owned && !copyState.inTransit) return false;
       return SSP_TAGS[c.cardSet] === "SSP" && !c.copies; // unnumbered SSP only
     });
     return { numbered: numbered, sp: spCards };
-  }, [statuses, rookieOnly, catalogRevision]);
+  }, [statuses, cardDetails, copySummaries, rookieOnly, selectedPlayer, catalogRevision]);
 
   function pctColor(owned, transit, total) {
     if (total === 0) return "bg-gray-800";
@@ -2489,7 +2551,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
       React.createElement("path", {d:"M 6 "+((size||100)/2+4)+" A "+r+" "+r+" 0 0 1 "+((size||100)-6)+" "+((size||100)/2+4), fill:"none", stroke:"#1a2d4a", strokeWidth:8, strokeLinecap:"round"}),
       React.createElement("path", {d:"M 6 "+((size||100)/2+4)+" A "+r+" "+r+" 0 0 1 "+((size||100)-6)+" "+((size||100)/2+4), fill:"none", stroke:color, strokeWidth:8, strokeLinecap:"round", strokeDasharray:circ/2, strokeDashoffset:circ/2*(1-dashPct)}),
       React.createElement("text", {x:(size||100)/2, y:(size||100)/2-2, textAnchor:"middle", fill:"white", fontSize:size?size/4.5:22, fontWeight:"bold"}, pct.toFixed(1)+"%"),
-      React.createElement("text", {x:(size||100)/2, y:(size||100)/2+14, textAnchor:"middle", fill:"#22c55e", fontSize:size?size/9:11, fontWeight:"700"}, (stats.owned+stats.transit)+"/"+stats.total)
+      React.createElement("text", {x:(size||100)/2, y:(size||100)/2+14, textAnchor:"middle", fill:"#22c55e", fontSize:size?size/9:11, fontWeight:"700"}, (stats.acquired)+"/"+stats.total)
     );
   }
 
@@ -2498,13 +2560,14 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
     return (
       <div className="ml-4 mt-0.5 mb-1 space-y-0">
         {cards.map(function(card) {
-          var s = statuses[card.id] || "not_owned";
+          var copyState = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+          var s = copyState.owned ? "owned" : copyState.inTransit ? "in_transit" : "not_owned";
           var cfg = STATUS_CONFIG[s];
           return (
             <div key={card.id} className={"flex items-center gap-1 px-1.5 py-0 rounded " + cfg.bg} style={{fontSize:"clamp(8px,1vw,11px)"}}>
               <div className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + cfg.dot} />
-              <span className="flex-1 truncate">#{card.cardNumber} | {card.cardSet}{card.copies ? " /" + card.copies : ""} {sspBadge(card.cardSet)}{catalogBadge(card)}</span>
-              <span className={"flex-shrink-0 " + (s === "owned" ? "text-green-300" : s === "in_transit" ? "text-emerald-300" : "text-gray-500")}>{cfg.label}</span>
+              <span className="flex-1 truncate">{trackerMode !== "tb" ? panelCardSubject(card) + " · " : ""}#{card.cardNumber} | {card.cardSet}{card.copies ? " /" + card.copies : ""} {sspBadge(card.cardSet)}{catalogBadge(card)}</span>
+              <span className={"flex-shrink-0 " + (s === "owned" ? "text-green-300" : s === "in_transit" ? "text-emerald-300" : "text-gray-500")}>{[copyState.owned && "Owned",copyState.inTransit && "In Transit"].filter(Boolean).join(" + ") || cfg.label}</span>
             </div>
           );
         })}
@@ -2527,18 +2590,15 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
           return <button key={v.k} onClick={function(){setView(v.k);}} className={"px-2 py-0.5 rounded font-bold " + (view===v.k ? "text-white" : "hover:text-white")} style={view===v.k ? {background:"#22c55e"} : {background:"#111a2e",color:"#8ba3c4"}}>{v.l}</button>;
         })}
         <div className="flex-1"/>
-        <label className="flex items-center gap-1 cursor-pointer" style={{color:"#8ba3c4"}}><input type="checkbox" checked={rookieOnly} onChange={function(){setRookieOnly(!rookieOnly);}} className="accent-yellow-500"/>Rookie Years</label>
+        <label className="flex items-center gap-1 cursor-pointer" style={{color:"#8ba3c4"}}><input type="checkbox" checked={rookieOnly} onChange={function(){setRookieOnly(!rookieOnly);}} className="accent-yellow-500"/>{trackerMode === "tb" ? "Rookie Years" : "Rookie Cards"}</label>
         <label className="flex items-center gap-1 cursor-pointer" style={{color:"#8ba3c4"}}><input type="checkbox" checked={exclude1of1} onChange={function(){setExclude1of1(!exclude1of1);}} className="accent-yellow-500"/>Excl 1/1s</label>
       </div>
 
 
-      {/* ============ DASHBOARD VIEW ============ */}
-      {view === "dashboard" && (
-        <div className="space-y-1">
           {/* WNBA-only: player filter chips. Hidden in TB mode. */}
-          {trackerMode === "wnba" && playerList.length > 0 && (
+          {trackerMode !== "tb" && playerList.length > 0 && (
             <div className="flex flex-wrap gap-1 items-center px-1 pb-0.5" style={{borderBottom:"1px solid #1a2d4a"}}>
-              <span className="font-bold mr-1" style={{color:"#a855f7",fontSize:"clamp(8px,0.9vw,10px)"}}>Player:</span>
+              <span className="font-bold mr-1" style={{color:"#a855f7",fontSize:"clamp(8px,0.9vw,10px)"}}>{trackerMode === "racing" ? "Driver:" : "Player:"}</span>
               <button onClick={function(){ setSelectedPlayer(null); }}
                 className={"px-1.5 py-0.5 rounded font-semibold transition-colors "+
                   (selectedPlayer===null ? "bg-purple-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700")}
@@ -2548,34 +2608,38 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
                   className={"px-1.5 py-0.5 rounded font-semibold transition-colors "+
                     (selectedPlayer===p.key ? "bg-purple-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700")}
                   style={{fontSize:"clamp(8px,0.9vw,10px)"}}
-                  title={p.name}>{p.name.split(" ").pop()}</button>);
+                  title={p.name}>{trackerMode === "wnba" ? p.name.split(" ").pop() : p.name}</button>);
               })}
             </div>
           )}
+
+      {/* ============ DASHBOARD VIEW ============ */}
+      {view === "dashboard" && (
+        <div className="space-y-1">
           {trackerMode === "tb" && <div className="flex flex-wrap items-center justify-between gap-1 mb-1 text-[11px] text-gray-400"><span>Checklist completion</span><button onClick={function(){setActiveTab("catalog");}} className="text-violet-300 hover:text-violet-100">Proofs & other cards · {ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id) && !inChecklist(card);}).length} recorded →</button></div>}
           {/* TOP ROW: Gauge+stats LEFT, By Year RIGHT */}
           <div className="flex gap-1.5 items-stretch">
             {/* Gauge + legend */}
             <div className="rounded-lg p-2 flex flex-col items-center justify-center flex-shrink-0" style={{background:"#111a2e",minWidth:"155px"}}>
-              <Gauge pct={pct} size={95}/>
+              <div className="text-[9px] text-gray-400 font-semibold">Acquired / collection</div><Gauge pct={pct} size={95}/>
               <div className="grid grid-cols-2 gap-x-3 gap-y-0 mt-0.5" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
                 <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{background:"#22c55e"}}/><span style={{color:"#22c55e"}}>Own</span><span className="text-white font-bold ml-auto">{stats.owned}</span></div>
                 <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{background:"#86efac"}}/><span style={{color:"#86efac"}}>Transit</span><span className="text-white font-bold ml-auto">{stats.transit}</span></div>
-                <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{background:"#f87171"}}/><span style={{color:"#e88"}}>Need</span><span className="text-white font-bold ml-auto">{stats.total-stats.owned-stats.transit}</span></div>
+                <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{background:"#f87171"}}/><span style={{color:"#e88"}}>Need</span><span className="text-white font-bold ml-auto">{stats.total-stats.acquired}</span></div>
                 <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-yellow-500 inline-block"/><span className="text-amber-300">Total</span><span className="text-white font-bold ml-auto">{stats.total}</span></div>
               </div>
               {stats.ssps > 0 && <div className="flex items-center gap-1 mt-0.5" style={{fontSize:"clamp(7px,0.8vw,9px)"}}><span className="text-red-400 font-bold text-[8px] bg-red-900/60 px-1 rounded">SSP</span><span className="text-amber-200">{stats.sspsAcq}/{stats.ssps}</span></div>}
             </div>
             {/* By Year (TB mode) / By Player (WNBA mode) */}
             <div className="rounded-lg px-2 py-1.5 flex-1 min-w-0" style={{background:"#111a2e"}}>
-              <div className="font-bold mb-0.5" style={{color:"#FFC52F",fontSize:"clamp(7px,0.8vw,9px)"}}>{trackerMode === "wnba" ? "By Player" : "By Year"}</div>
+              <div className="font-bold mb-0.5" style={{color:"#FFC52F",fontSize:"clamp(7px,0.8vw,9px)"}}>{trackerMode !== "tb" ? (trackerMode === "racing" ? "By Driver" : "By Player") : "By Year"}</div>
               <div className="space-y-px">
-                {trackerMode === "wnba" ? (
+                {trackerMode !== "tb" ? (
                   // By Player breakdown for WNBA mode. Rows are sorted by last name and
                   // clickable — tapping a row toggles the selectedPlayer filter (same
                   // state used by the player chips above).
                   (function() {
-                    var roster = (typeof window !== "undefined" && window.TEMPO_ROSTER) ? window.TEMPO_ROSTER : {};
+                    var roster = panelRoster();
                     var rows = Object.keys(stats.byPlayer).map(function(pkey) {
                       var name = (roster[pkey] && roster[pkey].name) ? roster[pkey].name : (pkey.charAt(0).toUpperCase() + pkey.slice(1));
                       return { key: pkey, name: name, last: name.split(" ").pop(), d: stats.byPlayer[pkey] };
@@ -2585,22 +2649,22 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
                     }
                     return rows.map(function(p) {
                       var d = p.d;
-                      var yp = d.total ? (d.owned+d.transit)/d.total*100 : 0;
+                      var yp = d.total ? (d.acquired)/d.total*100 : 0;
                       var isSelected = selectedPlayer === p.key;
                       return (
                         <div key={p.key} onClick={function(){ setSelectedPlayer(isSelected ? null : p.key); }}
                           className="flex items-center gap-1 cursor-pointer hover:bg-gray-800/50 rounded px-0.5 transition-colors"
                           style={{fontSize:"clamp(9px,1vw,11px)"}}
                           title={isSelected ? "Click to clear filter" : ("Click to filter to " + p.name)}>
-                          <span className={"font-bold w-14 text-right truncate flex-shrink-0 " + (isSelected ? "text-purple-300" : "")} style={!isSelected ? {color:"#FFC52F"} : {}}>{p.last}</span>
+                          <span className={"font-bold text-right truncate flex-shrink-0 " + (isSelected ? "text-purple-300" : "")} style={{width:trackerMode === "wnba" ? "3.5rem" : "8rem",color:isSelected ? undefined : "#FFC52F"}}>{trackerMode === "wnba" ? p.last : p.name}</span>
                           <div className="flex-1 rounded-full h-2 overflow-hidden" style={{background:"#1a2d4a"}}>
                             <div className="h-full flex">
                               <div className="transition-all" style={{width:(d.total?d.owned/d.total*100:0)+"%",background:"#22c55e"}}/>
-                              <div className="transition-all" style={{width:(d.total?d.transit/d.total*100:0)+"%",background:"#86efac"}}/>
+                              <div className="transition-all" style={{width:(d.total?(d.acquired-d.owned)/d.total*100:0)+"%",background:"#86efac"}}/>
                             </div>
                           </div>
                           <span className={"w-9 text-right font-bold flex-shrink-0 " + (yp>=75?"text-yellow-300":yp>=50?"text-yellow-500":yp>0?"text-orange-300":"text-red-400")}>{yp.toFixed(0)}%</span>
-                          <span className="w-14 text-right flex-shrink-0" style={{color:"#8ba3c4",fontSize:"clamp(7px,0.8vw,9px)"}}>{d.owned+d.transit}/{d.total}</span>
+                          <span className="w-14 text-right flex-shrink-0" style={{color:"#8ba3c4",fontSize:"clamp(7px,0.8vw,9px)"}} title={d.owned + " owned · " + d.transit + " in transit · " + d.acquired + " acquired"}>{d.acquired}/{d.total}</span>
                         </div>
                       );
                     });
@@ -2608,19 +2672,19 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
                 ) : (
                   Object.keys(stats.byYear).sort().map(function(year) {
                     var d = stats.byYear[year];
-                    var yp = d.total ? (d.owned+d.transit)/d.total*100 : 0;
-                    var needPct = d.total ? (d.total-d.owned-d.transit)/d.total*100 : 0;
+                    var yp = d.total ? (d.acquired)/d.total*100 : 0;
+                    var needPct = d.total ? (d.total-d.acquired)/d.total*100 : 0;
                     return (
                       <div key={year} className="flex items-center gap-1" style={{fontSize:"clamp(9px,1vw,11px)"}}>
                         <span className="font-bold w-8 text-right" style={{color:"#FFC52F"}}>{year}</span>
                         <div className="flex-1 rounded-full h-2 overflow-hidden" style={{background:"#1a2d4a"}}>
                           <div className="h-full flex">
                             <div className="transition-all" style={{width:(d.total?d.owned/d.total*100:0)+"%",background:"#22c55e"}}/>
-                            <div className="transition-all" style={{width:(d.total?d.transit/d.total*100:0)+"%",background:"#86efac"}}/>
+                            <div className="transition-all" style={{width:(d.total?(d.acquired-d.owned)/d.total*100:0)+"%",background:"#86efac"}}/>
                           </div>
                         </div>
                         <span className={"w-9 text-right font-bold flex-shrink-0 " + (yp>=75?"text-yellow-300":yp>=50?"text-yellow-500":yp>0?"text-orange-300":"text-red-400")}>{yp.toFixed(0)}%</span>
-                        <span className="w-14 text-right flex-shrink-0" style={{color:"#8ba3c4",fontSize:"clamp(7px,0.8vw,9px)"}}>{d.owned+d.transit}/{d.total}</span>
+                        <span className="w-14 text-right flex-shrink-0" style={{color:"#8ba3c4",fontSize:"clamp(7px,0.8vw,9px)"}} title={d.owned + " owned · " + d.transit + " in transit · " + d.acquired + " acquired"}>{d.acquired}/{d.total}</span>
                       </div>
                     );
                   })
@@ -2643,7 +2707,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
                       <div className="h-full rounded-full" style={{width: Math.max(p.pct, 1) + "%", background: bg}} />
                     </div>
                     <span className={"font-bold w-10 text-right " + col} style={{fontSize:"clamp(8px,1vw,10px)"}}>{p.pct.toFixed(1)}%</span>
-                    <span className="w-10 text-right" style={{color:"#7a8ba8",fontSize:"clamp(6px,0.7vw,8px)"}}>{p.owned+p.transit}/{p.total}</span>
+                    <span className="w-10 text-right" style={{color:"#7a8ba8",fontSize:"clamp(6px,0.7vw,8px)"}}>{p.acquired}/{p.total}</span>
                   </button>
                 );
               })}
@@ -2657,16 +2721,17 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
               {rarestOwned.numbered.length > 0 && (
                 <div className="space-y-0">
                   {rarestOwned.numbered.map(function(card) {
-                    var s = statuses[card.id] || "not_owned";
+                    var copyState = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+          var s = copyState.owned ? "owned" : copyState.inTransit ? "in_transit" : "not_owned";
                     var copies = parseInt(card.copies);
                     return (
                       <div key={card.id} className="flex items-center gap-1.5 px-1 py-0 rounded hover:bg-gray-800/40" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
                         <span className={"font-black w-7 text-right flex-shrink-0 " + (copies <= 5 ? "text-red-400" : copies <= 25 ? "text-orange-400" : "text-yellow-400")}>/{card.copies}</span>
                         <span className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + (s==="owned"?"bg-green-500":"bg-emerald-400")}/>
-                        <span className="font-bold flex-shrink-0 text-cyan-300">#{card.cardNumber}</span>
-                        <span className="text-white truncate flex-1">{card.cardSet}</span>
+                        <span className="font-bold flex-shrink-0 text-cyan-300">#{card.cardNumber}</span><span className="text-[8px] text-gray-400">{[copyState.owned && "Owned",copyState.inTransit && "Transit"].filter(Boolean).join(" + ")}</span>
+                        <span className="text-white truncate flex-1">{trackerMode !== "tb" && <span className="text-purple-300 mr-1">{panelCardSubject(card)} · {cardYear(card)}</span>}{card.cardSet}</span>
                         {sspBadge(card.cardSet)}{catalogBadge(card)}
-                        <span className="truncate flex-shrink-0 max-w-[100px]" style={{color:"#7a8ba8",fontSize:"clamp(7px,0.8vw,9px)"}}>{card.product.slice(5)}</span>
+                        <span className="truncate flex-shrink-0 max-w-[100px]" style={{color:"#7a8ba8",fontSize:"clamp(7px,0.8vw,9px)"}}>{card.product.replace(/^\d{4}\s+/, "")}</span>
                       </div>
                     );
                   })}
@@ -2676,14 +2741,15 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
                 <div className="mt-0.5 pt-0.5 border-t border-gray-800">
                   <div className="text-[7px] font-bold mb-0" style={{color:"#8ba3c4"}}>UNNUMBERED SSP</div>
                   {rarestOwned.sp.map(function(card) {
-                    var s = statuses[card.id] || "not_owned";
+                    var copyState = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+          var s = copyState.owned ? "owned" : copyState.inTransit ? "in_transit" : "not_owned";
                     return (
                       <div key={card.id} className="flex items-center gap-1.5 px-1 py-0 rounded hover:bg-gray-800/40" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
                         {sspBadge(card.cardSet)}{catalogBadge(card)}
                         <span className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + (s==="owned"?"bg-green-500":"bg-emerald-400")}/>
-                        <span className="font-bold flex-shrink-0 text-cyan-300">#{card.cardNumber}</span>
-                        <span className="text-white truncate flex-1">{card.cardSet}</span>
-                        <span className="truncate flex-shrink-0 max-w-[100px]" style={{color:"#7a8ba8",fontSize:"clamp(7px,0.8vw,9px)"}}>{card.product.slice(5)}</span>
+                        <span className="font-bold flex-shrink-0 text-cyan-300">#{card.cardNumber}</span><span className="text-[8px] text-gray-400">{[copyState.owned && "Owned",copyState.inTransit && "Transit"].filter(Boolean).join(" + ")}</span>
+                        <span className="text-white truncate flex-1">{trackerMode !== "tb" && <span className="text-purple-300 mr-1">{panelCardSubject(card)} · {cardYear(card)}</span>}{card.cardSet}</span>
+                        <span className="truncate flex-shrink-0 max-w-[100px]" style={{color:"#7a8ba8",fontSize:"clamp(7px,0.8vw,9px)"}}>{card.product.replace(/^\d{4}\s+/, "")}</span>
                       </div>
                     );
                   })}
@@ -2700,7 +2766,7 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
               <label className="flex items-center gap-0.5 text-slate-400 cursor-pointer"><input type="checkbox" checked={includeBlankSN} onChange={function(){setIncludeBlankSN(!includeBlankSN);}} className="accent-cyan-500" style={{width:"12px",height:"12px"}}/>Unnum</label>
               <input type="range" min="1" max="500" value={snMin} onChange={function(e){setSnMin(parseInt(e.target.value));}} className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500" />
               <div className={"font-bold " + (pct >= 75 ? "text-yellow-300" : pct >= 50 ? "text-yellow-500" : pct >= 25 ? "text-orange-300" : "text-red-400")}>{pct.toFixed(1)}%</div>
-              <span className="text-slate-400" style={{fontSize:"clamp(7px,0.8vw,9px)"}}>{stats.owned+stats.transit}/{stats.total}</span>
+              <span className="text-slate-400" style={{fontSize:"clamp(7px,0.8vw,9px)"}}>{stats.acquired}/{stats.total}</span>
               <button onClick={function(){ goDetailed(snMin > 1 ? "sn_gte_" + snMin : "all"); }} className="text-cyan-400 hover:text-cyan-200 text-[8px]">{"→"}</button>
             </div>
           </div>
@@ -2736,12 +2802,12 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
             <div className="flex gap-1.5 mb-3 flex-wrap">
               {years.map(function(year) {
                 var d = stats.byYear[year];
-                var yp = d.total ? Math.round((d.owned+d.transit)/d.total*100) : 0;
+                var yp = d.total ? Math.round((d.acquired)/d.total*100) : 0;
                 return (
-                  <div key={year} className={"rounded-lg border border-gray-700 px-3 py-2 text-center " + pctColor(d.owned,d.transit,d.total)}>
+                  <div key={year} className={"rounded-lg border border-gray-700 px-3 py-2 text-center " + pctColor(d.owned,d.acquired-d.owned,d.total)}>
                     <div className="text-white font-bold" style={{fontSize:"clamp(11px,1.4vw,14px)"}}>{year}</div>
                     <div className="text-gray-200 font-bold" style={{fontSize:"clamp(13px,1.6vw,16px)"}}>{yp}%</div>
-                    <div className="text-gray-300" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>{d.owned+d.transit}/{d.total}</div>
+                    <div className="text-gray-300" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>{d.owned} owned · {d.transit} transit · {d.acquired}/{d.total} acquired</div>
                   </div>
                 );
               })}
@@ -2749,23 +2815,23 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
             <div className="space-y-0.5">
               {products.map(function(entry) {
                 var prod = entry[0], d = entry[1];
-                var pp = d.total ? (d.owned+d.transit)/d.total : 0;
+                var pp = d.total ? (d.acquired)/d.total : 0;
                 var showYearHeader = d.year !== currentYear;
                 currentYear = d.year;
                 return (
                   <div key={prod}>
                     {showYearHeader && <div className="text-gray-500 font-bold mt-3 mb-1 border-b border-gray-800 pb-0.5" style={{fontSize:"clamp(10px,1.2vw,12px)"}}>{d.year}</div>}
                     <div className="flex items-center gap-1 hover:bg-gray-800/40 rounded px-1 py-0.5">
-                      <div className={"w-2 h-2 rounded-sm flex-shrink-0 " + pctColor(d.owned,d.transit,d.total)}/>
-                      <div className="flex-1 min-w-0 truncate text-gray-400" style={{fontSize:"clamp(9px,1.1vw,11px)"}}>{prod.slice(5)}</div>
+                      <div className={"w-2 h-2 rounded-sm flex-shrink-0 " + pctColor(d.owned,d.acquired-d.owned,d.total)}/>
+                      <div className="flex-1 min-w-0 truncate text-gray-400" style={{fontSize:"clamp(9px,1.1vw,11px)"}}>{prod.replace(/^\d{4}\s+/, "")}</div>
                       <div className="w-28 flex-shrink-0 bg-gray-900 rounded-full h-2 overflow-hidden">
                         <div className="h-full flex">
                           <div className="transition-all" style={{background:"#22c55e",width:(d.total?d.owned/d.total*100:0)+"%"}}/>
-                          <div className="bg-blue-500 transition-all" style={{width:(d.total?d.transit/d.total*100:0)+"%"}}/>
+                          <div className="bg-blue-500 transition-all" style={{width:(d.total?(d.acquired-d.owned)/d.total*100:0)+"%"}}/>
                         </div>
                       </div>
                       <div className={"w-8 text-right font-bold " + (pp>=1?"text-yellow-300":pp>=0.5?"text-yellow-500":pp>0?"text-orange-400":"text-gray-700")} style={{fontSize:"clamp(9px,1.1vw,11px)"}}>{Math.round(pp*100)}%</div>
-                      <div className="w-12 text-right text-gray-600" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>{d.owned+d.transit}/{d.total}</div>
+                      <div className="min-w-[12rem] text-right text-gray-500" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>{d.owned} owned · {d.transit} transit · {d.acquired}/{d.total} acquired</div>
                     </div>
                   </div>
                 );
@@ -2800,26 +2866,26 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
                   var isProdExp = expandedProd === k;
                   return (
                     <div key={k}>
-                      <div className="cursor-pointer" onClick={function(){setExpandedProd(isProdExp?null:k);}}><ProgressBar label={k} owned={d.owned} transit={d.transit} total={d.total}/></div>
+                      <div className="cursor-pointer" onClick={function(){setExpandedProd(isProdExp?null:k);}}><ProgressBar label={k} owned={d.owned} transit={d.transit} acquired={d.acquired} total={d.total}/></div>
                       {isProdExp && renderCards(k)}
                     </div>
                   );
                 }
                 var isExp = expanded === k;
                 var prods = Object.keys(stats.byProduct).filter(function(p) {
-                  if (splitBy==="year") return p.startsWith(k);
+                  if (splitBy==="year") return stats.byProduct[p].year === k;
                   return getBrand(p) === k;
                 }).sort();
                 return (
                   <div key={k}>
-                    <div className="cursor-pointer" onClick={function(){setExpanded(isExp?null:k);setExpandedProd(null);}}><ProgressBar label={k} owned={d.owned} transit={d.transit} total={d.total}/></div>
+                    <div className="cursor-pointer" onClick={function(){setExpanded(isExp?null:k);setExpandedProd(null);}}><ProgressBar label={k} owned={d.owned} transit={d.transit} acquired={d.acquired} total={d.total}/></div>
                     {isExp && prods.map(function(p) {
                       var pd = stats.byProduct[p];
                       if (!pd) return null;
                       var isPE = expandedProd === p;
                       return (
                         <div key={p}>
-                          <div className="cursor-pointer" onClick={function(){setExpandedProd(isPE?null:p);}}><ProgressBar label={p.slice(5)} owned={pd.owned} transit={pd.transit} total={pd.total} sub={true}/></div>
+                          <div className="cursor-pointer" onClick={function(){setExpandedProd(isPE?null:p);}}><ProgressBar label={p.replace(/^\d{4}\s+/, "")} owned={pd.owned} transit={pd.transit} acquired={pd.acquired} total={pd.total} sub={true}/></div>
                           {isPE && renderCards(p)}
                         </div>
                       );
@@ -2834,17 +2900,17 @@ function SummaryPanel({ statuses, setActiveTab, setDetailedStatusFilter, setDeta
     </div>
   );
 }
-function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, setCardQty, forSaleFlags, toggleForSale, needsSync, setActiveTab, setDetailedProductFilter, setDetailedCardNumFilter, setDetailedStatusFilter, setDetailedSnFilter, setPricesSearchFilter, superSearchMode, targetByCardId, setTargetCardFilter, hidePrices }) {
+function CardLookupPanel({ statuses, copyStorage = {ready:false}, copyInventory = null, quickSaveHand, copySummaries, openCardCopies, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, setCardQty, forSaleFlags, toggleForSale, needsSync, setActiveTab, setDetailedCardId, setDetailedProductFilter, setDetailedCardNumFilter, setDetailedStatusFilter, setDetailedSnFilter, setPricesSearchFilter, superSearchMode, targetByCardId, setTargetCardFilter, hidePrices }) {
   var trackerMode = useTrackerMode();
   var catalogRevision = useCatalogRevision();
   var [lookupScope, setLookupScope] = useState("checklist");
   // Build a quick player-key → display name map. Empty in TB mode.
   var playerNameByKey = useMemo(function() {
-    if (typeof window === "undefined" || !window.TEMPO_ROSTER) return {};
-    var m = {};
-    Object.keys(window.TEMPO_ROSTER).forEach(function(k) { m[k] = window.TEMPO_ROSTER[k].name; });
+    var roster=panelRoster(),m = {};
+    Object.keys(roster).forEach(function(k) { m[k] = roster[k].name; });
     return m;
-  }, []);
+  }, [trackerMode, catalogRevision]);
+  var [lookupPlayer, setLookupPlayer] = useState("all");
   var [numSearch, setNumSearch] = useState("");
   var [selectedNum, setSelectedNum] = useState(null);
   var [selectedCard, setSelectedCard] = useState(null);
@@ -2858,19 +2924,20 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
   var allNumbers = useMemo(function() {
     var nums = {};
     ALL_CARDS.forEach(function(c) {
-      if (HIDDEN_DUPES.has(c.id) || !matchesCatalogScope(c, lookupScope)) return;
-      if (!nums[c.cardNumber]) nums[c.cardNumber] = { count: 0, owned: 0, transit: 0 };
+      if (HIDDEN_DUPES.has(c.id) || !matchesCatalogScope(c, lookupScope) || (lookupPlayer !== "all" && !cardHasPlayer(c, lookupPlayer))) return;
+      if (!nums[c.cardNumber]) nums[c.cardNumber] = { count: 0, owned: 0, transit: 0, acquired: 0 };
       nums[c.cardNumber].count++;
-      var s = statuses[c.id] || "not_owned";
-      if (s === "owned") nums[c.cardNumber].owned++;
-      if (s === "in_transit") nums[c.cardNumber].transit++;
+      var state = collectionCardState(c.id, statuses, cardDetails, copySummaries);
+      if (state.owned) nums[c.cardNumber].owned++;
+      if (state.inTransit) nums[c.cardNumber].transit++;
+      if (state.owned || state.inTransit) nums[c.cardNumber].acquired++;
     });
     return Object.entries(nums).sort(function(a, b) {
       var an = parseInt(a[0]), bn = parseInt(b[0]);
       if (!isNaN(an) && !isNaN(bn)) return an - bn;
       return a[0].localeCompare(b[0]);
     });
-  }, [statuses, lookupScope, catalogRevision]);
+  }, [statuses, cardDetails, copySummaries, lookupPlayer, lookupScope, catalogRevision]);
   var filteredNums = useMemo(function() {
     if (!numSearch) return allNumbers;
     var q = numSearch.toLowerCase();
@@ -2878,21 +2945,23 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
   }, [allNumbers, numSearch]);
   var cardsForNum = useMemo(function() {
     if (!selectedNum) return [];
-    return ALL_CARDS.filter(function(c) { return c.cardNumber === selectedNum && !HIDDEN_DUPES.has(c.id) && matchesCatalogScope(c, lookupScope); });
-  }, [selectedNum, lookupScope, catalogRevision]);
+    return ALL_CARDS.filter(function(c) { return c.cardNumber === selectedNum && !HIDDEN_DUPES.has(c.id) && matchesCatalogScope(c, lookupScope) && (lookupPlayer === "all" || cardHasPlayer(c, lookupPlayer)); });
+  }, [selectedNum, lookupPlayer, lookupScope, catalogRevision]);
   // Group by product, then list variants
   var productGroups = useMemo(function() {
     var map = {};
     cardsForNum.forEach(function(c) {
-      if (!map[c.product]) map[c.product] = { cards: [], owned: 0, transit: 0, total: 0 };
-      map[c.product].cards.push(c);
-      map[c.product].total++;
-      var s = statuses[c.id] || "not_owned";
-      if (s === "owned") map[c.product].owned++;
-      if (s === "in_transit") map[c.product].transit++;
+      var key = trackerMode !== "tb" && cardYear(c) && !c.product.startsWith(cardYear(c)) ? cardYear(c) + " " + c.product : c.product;
+      if (!map[key]) map[key] = { cards: [], owned: 0, transit: 0, acquired: 0, total: 0 };
+      map[key].cards.push(c);
+      map[key].total++;
+      var state = collectionCardState(c.id, statuses, cardDetails, copySummaries);
+      if (state.owned) map[key].owned++;
+      if (state.inTransit) map[key].transit++;
+      if (state.owned || state.inTransit) map[key].acquired++;
     });
     return Object.entries(map).sort(function(a, b) { return a[0].localeCompare(b[0]); });
-  }, [cardsForNum, statuses]);
+  }, [cardsForNum, statuses, cardDetails, copySummaries]);
   // Auto-expand all products when card number changes
   useEffect(function() {
     if (selectedNum) {
@@ -2900,7 +2969,7 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
       productGroups.forEach(function(g) { exp[g[0]] = true; });
       setExpandedProducts(exp);
     }
-  }, [selectedNum, lookupScope, catalogRevision]);
+  }, [selectedNum, lookupPlayer, lookupScope, catalogRevision]);
   function toggleProduct(prod) {
     setExpandedProducts(function(prev) { var n = Object.assign({}, prev); n[prod] = !n[prod]; return n; });
   }
@@ -2963,9 +3032,14 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
   var fcfg = STATUS_CONFIG[fs];
   // Stats for selected number
   var numStats = selectedNum ? (function() {
-    var total = cardsForNum.length, own = 0, tr = 0;
-    cardsForNum.forEach(function(c) { var s = statuses[c.id] || "not_owned"; if (s === "owned") own++; if (s === "in_transit") tr++; });
-    return { total: total, owned: own, transit: tr, needed: total - own - tr };
+    var total = cardsForNum.length, own = 0, tr = 0, acquired = 0;
+    cardsForNum.forEach(function(c) {
+      var state = collectionCardState(c.id, statuses, cardDetails, copySummaries);
+      if (state.owned) own++;
+      if (state.inTransit) tr++;
+      if (state.owned || state.inTransit) acquired++;
+    });
+    return { total: total, owned: own, transit: tr, acquired: acquired, needed: total - acquired };
   })() : null;
   return (
     <div className="flex flex-col h-full">
@@ -2976,11 +3050,11 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
           <input type="text" placeholder="Filter #..." value={numSearch} onChange={function(e) { setNumSearch(e.target.value); }} className="bg-gray-900 border border-gray-700 rounded px-1.5 py-0 outline-none text-white w-20 text-[11px]" />
           {selectedNum && numStats && (
             <span className="text-[10px] ml-auto">
-              <span style={{color:"#22c55e"}}>{numStats.owned}</span>
-              <span className="text-gray-600">/</span>
-              <span style={{color:"#86efac"}}>{numStats.transit}</span>
-              <span className="text-gray-600">/</span>
-              <span className="text-red-400">{numStats.needed}</span>
+              <span style={{color:"#22c55e"}}>{numStats.owned} owned</span>
+              <span className="text-gray-600"> · </span>
+              <span style={{color:"#86efac"}}>{numStats.transit} in transit</span>
+              <span className="text-gray-600"> · </span>
+              <span className="text-red-400">{numStats.needed} needed</span>
               <span className="text-gray-600"> of {numStats.total}</span>
             </span>
           )}
@@ -2989,7 +3063,7 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
           {filteredNums.map(function(entry) {
             var num = entry[0], info = entry[1];
             var active = num === selectedNum;
-            var pct = info.count > 0 ? (info.owned + info.transit) / info.count : 0;
+            var pct = info.count > 0 ? info.acquired / info.count : 0;
             // Smooth gradient: dark red (0%) → orange (50%) → green (100%)
             var r = pct < 0.5 ? 180 : Math.round(180 - (pct - 0.5) * 2 * 150);
             var g = pct < 0.5 ? Math.round(40 + pct * 2 * 140) : 180;
@@ -3003,7 +3077,7 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
           })}
         </div>
       </div>
-      <div className="flex items-center justify-between gap-2 mb-1"><CatalogScopeSelect value={lookupScope} onChange={function(scope){setLookupScope(scope);setSelectedCard(null);}}/>{lookupScope !== "checklist" && trackerMode === "tb" && <span className="text-[10px] text-gray-500">Recorded entries; not a complete proof checklist</span>}</div>
+      <div className="flex items-center justify-between gap-2 mb-1"><select aria-label="Filter player" value={lookupPlayer} onChange={function(e){setLookupPlayer(e.target.value);setSelectedCard(null);}} className={"bg-gray-900 border border-gray-700 rounded px-1 text-[10px] " + (trackerMode === "tb" ? "hidden" : "")}><option value="all">{trackerMode === "racing" ? "All drivers" : "All players"}</option>{Object.keys(playerNameByKey).map(function(key){return <option key={key} value={key}>{playerNameByKey[key]}</option>;})}</select><CatalogScopeSelect value={lookupScope} onChange={function(scope){setLookupScope(scope);setSelectedCard(null);}}/>{lookupScope !== "checklist" && trackerMode === "tb" && <span className="text-[10px] text-gray-500">Recorded entries; not a complete proof checklist</span>}</div>
       {/* Product groups with variants */}
       {selectedNum && (
         <div className="flex-1 overflow-y-auto min-h-0">
@@ -3018,14 +3092,14 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
           {productGroups.map(function(entry) {
             var prod = entry[0], info = entry[1];
             var isOpen = expandedProducts[prod];
-            var pct = info.total > 0 ? Math.round((info.owned + info.transit) / info.total * 100) : 0;
+            var pct = info.total > 0 ? Math.round(info.acquired / info.total * 100) : 0;
             var barColor = pct >= 100 ? "bg-green-500" : pct > 0 ? "bg-green-700" : "bg-gray-700";
             // Filter cards by status + variant search
             var visibleCards = info.cards;
-            if (statusOnly !== "all") visibleCards = visibleCards.filter(function(c) { return (statuses[c.id] || "not_owned") === statusOnly; });
+            if (statusOnly !== "all") visibleCards = visibleCards.filter(function(c) { return window.CopyInventory.matchesStatus(collectionCardState(c.id, statuses, cardDetails, copySummaries), statusOnly); });
             if (varSearch) {
               var vs = varSearch.toLowerCase();
-              visibleCards = visibleCards.filter(function(c) { return (c.cardSet || "").toLowerCase().indexOf(vs) !== -1; });
+              visibleCards = visibleCards.filter(function(c) { return (panelCardSubject(c) + " " + c.cardSet).toLowerCase().indexOf(vs) !== -1; });
             }
             if (filterAuto) visibleCards = visibleCards.filter(function(c) { return cardHasAutograph(c); });
             if (filterSN) visibleCards = visibleCards.filter(function(c) { return c.copies && c.copies !== ""; });
@@ -3052,7 +3126,7 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
                 <button onClick={function(){toggleProduct(prod);}} className="w-full flex items-center gap-1.5 px-2 py-1 bg-gray-900 rounded hover:bg-gray-800 text-left">
                   <span className="text-gray-500 text-[10px]">{showOpen ? "▼" : "▶"}</span>
                   <span className="text-white font-bold text-[11px] flex-1 truncate">{prod}</span>
-                  <span className="text-[9px] text-gray-500">{info.owned + info.transit}/{info.total}</span>
+                  <span className="text-[9px] text-gray-500">{info.owned} owned · {info.transit} transit · {info.acquired}/{info.total} acquired</span>
                   <div className="w-12 h-1 bg-gray-800 rounded-full overflow-hidden flex-shrink-0">
                     <div className={"h-full rounded-full " + barColor} style={{width: pct + "%"}} />
                   </div>
@@ -3081,7 +3155,7 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
                           {/* Year badge */}
                           {yr && <span className="text-gray-400 font-mono text-[9px] flex-shrink-0">{yr}</span>}
                           {/* Player name pill — WNBA only */}
-                          {trackerMode === "wnba" && card.player && playerNameByKey[card.player] && (
+                          {trackerMode !== "tb" && cardPlayers(card).length && (
                             <span className="font-bold px-1 py-0 rounded bg-purple-900/50 border border-purple-700 text-purple-200 whitespace-nowrap flex-shrink-0 text-[9px]"
                               title={cardPlayers(card).map(player=>playerNameByKey[player] || player).join(" / ")}>{cardPlayers(card).map(player=>(playerNameByKey[player] || player).split(" ").pop()).join(" / ")}</span>
                           )}
@@ -3158,7 +3232,7 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
               </button>; })()}
             </div>
           </div>
-          <div className="text-white font-bold text-[12px]">{selectedCard.product}</div>
+          <div className="text-white font-bold text-[12px]">{trackerMode !== "tb" && <span className="text-purple-300 mr-2">{panelCardSubject(selectedCard)}</span>}{selectedCard.product}</div>
           <div className="text-gray-400 text-[10px]">#{selectedCard.cardNumber} -- {selectedCard.cardSet}{selectedCard.copies ? <span className="text-yellow-400 font-black ml-1" style={{fontSize:"12px"}}>{" /" + selectedCard.copies}</span> : ""} {sspBadge(selectedCard.cardSet)}{catalogBadge(selectedCard)}</div>
           {cardHasAutograph(selectedCard) && <span className="text-yellow-500 text-[8px] font-bold bg-yellow-950/40 px-1 rounded">AUTO</span>}
           {selectedCard.isMem === "Yes" && <span className="text-purple-500 text-[8px] font-bold bg-purple-950/40 px-1 rounded ml-0.5">MEM</span>}
@@ -3190,7 +3264,7 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
                 <input type="number" min="0" value={curQty} onChange={function(e){ setCardQty(selectedCard.id, e.target.value); }} className="w-10 text-center bg-gray-950 border border-gray-700 rounded px-1 py-0 text-white outline-none" />
                 <button onClick={function(){ adjustCardQty(selectedCard.id, 1); }} className="bg-gray-800 border border-gray-700 rounded w-5 h-5 text-gray-400 hover:text-white hover:bg-gray-700 font-bold text-[10px] flex items-center justify-center" title={curQty === 0 ? "Add 1 copy (sets status to in-transit)" : "Increment quantity"}>+</button>
                 {curQty > 1 && <span className="text-green-400 font-black text-[10px] bg-green-950/40 border border-green-800 rounded px-1">{"+" + (curQty - 1) + " extra"}</span>}
-                {copyStorage.ready && curQty > 1 && (function(){
+                {copyStorage.ready && quickSaveHand && curQty > 1 && (function(){
                   var rows = window.CopyInventory.getCopiesForCard(copyInventory, selectedCard.id, statuses, cardDetails).filter(window.CopyInventory.isCountedCopy);
                   var legacy = rows.filter(function(c){return c.origin === "legacy";});
                   var confirmedHand = rows.filter(function(c){return c.origin !== "legacy" && c.location === "in_hand";}).length;
@@ -3198,7 +3272,7 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
                   return <React.Fragment><span className="text-gray-500 ml-1">Hand</span><input aria-label="Copies in hand" type="number" min={confirmedHand} max={confirmedHand+legacy.length} value={hand} onChange={function(e){quickSaveHand(selectedCard.id,Number(e.target.value));}} className="w-9 rounded border border-green-800 bg-gray-950 text-center text-green-300" /><span className="text-gray-500">Transit {curQty-hand}</span></React.Fragment>;
                 })()}
                 {copySummaries && copySummaries[selectedCard.id] && copySummaries[selectedCard.id].managed && <button className="ml-auto text-cyan-300 underline" onClick={function(){openCardCopies(selectedCard.id);}}>Details</button>}
-                {curQty === 0 && fs !== "not_owned"} && <span className="text-orange-400 text-[8px]">(0 — click + to acquire)</span>}
+                {curQty === 0 && fs !== "not_owned" && <span className="text-orange-400 text-[8px]">(0 — click + to acquire)</span>}
               </div>;
             })()}
           </div>
@@ -3207,10 +3281,10 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
             <div className="text-gray-600 text-[8px] font-bold mb-0.5 tracking-wider">SEARCH MARKETPLACES</div>
             <div className="flex gap-1 flex-wrap text-[10px]">
               <a href={ebayUrl(selectedCard)} target="_blank" rel="noopener noreferrer" className="py-0.5 px-1.5 rounded bg-yellow-950/40 border border-yellow-800 text-yellow-400 hover:bg-yellow-900/40 font-bold" title="eBay: search for this exact variant">eBay Card</a>
-              <a href={"https://www.ebay.com/sch/i.html?_nkw=" + encodeURIComponent("Tyler Black " + ((selectedCard.product.match(/^(\d{4})\s/) || ["",""])[1]) + " " + selectedCard.cardNumber + " " + stripBrand(selectedCard.product.replace(/^\d{4}\s*/, "").replace(/\s*\([^)]*\)/g, ""))) + "&_sacat=212"} target="_blank" rel="noopener noreferrer" className="py-0.5 px-1.5 rounded bg-yellow-950/30 border border-yellow-900 text-yellow-500 hover:bg-yellow-900/40 font-bold" title="eBay: search for all variants of this card # in this set">eBay Set</a>
+              <a href={panelSetSearch(selectedCard, "ebay")} target="_blank" rel="noopener noreferrer" className="py-0.5 px-1.5 rounded bg-yellow-950/30 border border-yellow-900 text-yellow-500 hover:bg-yellow-900/40 font-bold" title="eBay: search for all variants of this card # in this set">eBay Set</a>
               {superSearchMode && <button onClick={function(e) { e.preventDefault(); var urls = ebayUrlsSuper(selectedCard); urls.forEach(function(url) { window.open(url, "_blank"); }); }} className="py-0.5 px-1.5 rounded bg-yellow-800/50 border border-yellow-600 text-yellow-200 hover:bg-yellow-700/50 font-bold" title="Open multiple eBay search variations">eBay Super</button>}
               {comcUrl(selectedCard) && <a href={comcUrl(selectedCard)} target="_blank" rel="noopener noreferrer" className="py-0.5 px-1.5 rounded bg-orange-950/40 border border-orange-800 text-orange-400 hover:bg-orange-900/40 font-bold" title="COMC: search for this specific card">COMC Card</a>}
-              <a href={"https://www.comc.com/Players/Baseball/Tyler_Black/c389004,+" + (selectedCard.product.replace(/'/g, "").replace(/\s*\([^)]*\)/g, "") + " " + selectedCard.cardNumber).replace(/[&\/]/g, " ").replace(/\s+/g, " ").trim().replace(/ /g, "+")} target="_blank" rel="noopener noreferrer" className="py-0.5 px-1.5 rounded bg-orange-950/30 border border-orange-900 text-orange-500 hover:bg-orange-900/40 font-bold" title="COMC: search for all variants of this card # in this set">COMC Set</a>
+              <a href={panelSetSearch(selectedCard, "comc")} target="_blank" rel="noopener noreferrer" className="py-0.5 px-1.5 rounded bg-orange-950/30 border border-orange-900 text-orange-500 hover:bg-orange-900/40 font-bold" title="COMC: search for all variants of this card # in this set">COMC Set</a>
             </div>
           </div>
           {/* === REFERENCE LINKS === */}
@@ -3219,8 +3293,8 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
             <div className="flex gap-1 flex-wrap text-[10px]">
               <a href={tcdbUrl(selectedCard)} target="_blank" rel="noopener noreferrer" className="py-0.5 px-1.5 rounded bg-cyan-950/40 border border-cyan-800 text-cyan-400 hover:bg-cyan-900/40 font-bold">TCDB</a>
               <a href={pt130Url(selectedCard)} target="_blank" rel="noopener noreferrer" className="py-0.5 px-1.5 rounded bg-teal-950/40 border border-teal-800 text-teal-400 hover:bg-teal-900/40 font-bold" title="130point: check sold prices">130point</a>
-              <button onClick={function() { var prodShort = selectedCard.product.replace(/^\d{4}\s*/, ""); setPricesSearchFilter(prodShort + " " + selectedCard.cardNumber); setActiveTab("prices"); }} className="py-0.5 px-1.5 rounded bg-indigo-950/40 border border-indigo-700 text-indigo-400 hover:bg-indigo-900/40 font-bold" title="View price history for this card">Prices</button>
-              <button onClick={function() { setDetailedProductFilter(selectedCard.product); setDetailedCardNumFilter(selectedCard.cardNumber); setDetailedStatusFilter("all"); setDetailedSnFilter("all"); setActiveTab("detailed"); }} className="py-0.5 px-1.5 rounded bg-purple-950/40 border border-purple-700 text-purple-400 hover:bg-purple-900/40 font-bold" title="View all variants of this card # in Detailed tab">{"View #" + selectedCard.cardNumber}</button>
+              {!hidePrices && <button onClick={function() { var prodShort = selectedCard.product.replace(/^\d{4}\s*/, ""); setPricesSearchFilter(prodShort + " " + selectedCard.cardNumber); setActiveTab("prices"); }} className="py-0.5 px-1.5 rounded bg-indigo-950/40 border border-indigo-700 text-indigo-400 hover:bg-indigo-900/40 font-bold" title="View price history for this card">Prices</button>}
+              <button onClick={function() { if (trackerMode !== "tb" && setDetailedCardId) { setDetailedCardId(selectedCard.id); } else { setDetailedProductFilter(selectedCard.product); setDetailedCardNumFilter(selectedCard.cardNumber); } setDetailedStatusFilter("all"); setDetailedSnFilter("all"); setActiveTab("detailed"); }} className="py-0.5 px-1.5 rounded bg-purple-950/40 border border-purple-700 text-purple-400 hover:bg-purple-900/40 font-bold" title="View all variants of this card # in Detailed tab">{"View #" + selectedCard.cardNumber}</button>
               <button onClick={function() { setDetailedProductFilter(selectedCard.product); setDetailedCardNumFilter(null); setDetailedStatusFilter("all"); setDetailedSnFilter("all"); setActiveTab("detailed"); }} className="py-0.5 px-1.5 rounded bg-gray-800/60 border border-gray-700 text-gray-400 hover:bg-gray-700/50 font-bold" title="View full set in Detailed tab">Full Set</button>
             </div>
           </div>
@@ -3230,6 +3304,8 @@ function CardLookupPanel({ statuses, copySummaries, openCardCopies, cardDetails,
   );
 }
 function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, needsSync, initialSnFilter, initialStatusFilter, initialCardId = null, setDetailedCardId, initialProductFilter = null, setDetailedProductFilter, initialCardNumFilter = null, setDetailedCardNumFilter, editCustomCardById, customEditVer, targetByCardId, setActiveTab, setTargetCardFilter, hidePrices }) {
+  var trackerMode = useTrackerMode();
+  var [dPlayer, setDPlayer] = useState("all");
   var [dFilter, setDFilter] = useState(initialStatusFilter || "all");
   var [dYear, setDYear] = useState("all");
   var [dProduct, setDProduct] = useState(initialProductFilter || "all");
@@ -3244,22 +3320,22 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
   var [batchMode, setBatchMode] = useState(false);
   var [batchSelected, setBatchSelected] = useState(new Set());
   var [batchBusy, setBatchBusy] = useState(false);
-  
+
   // Reset filters when initial props change
   useEffect(function() {
     if (initialSnFilter) setDSnFilter(initialSnFilter);
   }, [initialSnFilter]);
-  
+
   useEffect(function() {
     if (initialStatusFilter) { setDFilter(initialStatusFilter); setDScope("checklist"); }
   }, [initialStatusFilter]);
-  
+
   useEffect(function() {
     if (initialCardId) {
       var targetCard = CARD_BY_ID[initialCardId];
       if (targetCard) {
         setDScope(inChecklist(targetCard) ? "checklist" : "all");
-        setDFilter("all"); setDYear("all"); setDSearch(""); setDSnFilter("all");
+        setDFilter("all"); setDYear(cardYear(targetCard) || "all"); setDPlayer(cardPlayers(targetCard)[0] || "all"); setDSearch(""); setDSnFilter("all");
         setDProduct(targetCard.product);
         setDCardNum(targetCard.cardNumber);
       } else {
@@ -3269,11 +3345,11 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
       if (setDetailedCardId) setDetailedCardId(null);
     }
   }, [initialCardId]);
-  
+
   useEffect(function() {
     if (initialProductFilter) {
       setDProduct(initialProductFilter);
-      setDYear(initialProductFilter.slice(0, 4));
+      setDYear((String(initialProductFilter).match(/^(\d{4})\s/) || [null,"all"])[1]);
       setDFilter("all"); setDSearch(""); setDSnFilter("all"); setDPage(0);
       if (initialCardNumFilter) { setDCardNum(initialCardNumFilter); }
       else { setDCardNum(""); }
@@ -3281,38 +3357,38 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
       if (setDetailedCardNumFilter) setDetailedCardNumFilter(null);
     }
   }, [initialProductFilter, initialCardNumFilter]);
-  
+
   var PAGE_SIZE = 50;
   var years = useMemo(function() { return [...new Set(ALL_CARDS.map(function(c) { return cardYear(c) || c.product.slice(0,4); }))].sort(); }, [catalogRevision]);
   var filteredProducts = useMemo(function() {
-    var cards = dYear === "all" ? ALL_CARDS : ALL_CARDS.filter(function(c) { return c.product.startsWith(dYear); });
+    var cards = dYear === "all" ? ALL_CARDS : ALL_CARDS.filter(function(c) { return cardYear(c) === dYear; });
     return [...new Set(cards.map(function(c) { return c.product; }))].sort();
   }, [dYear, catalogRevision]);
   var filtered = useMemo(function() {
     var s = dSearch.toLowerCase();
     return ALL_CARDS.filter(function(card) {
-      if (HIDDEN_DUPES.has(card.id) || !matchesCatalogScope(card, dScope)) return false;
+      if (HIDDEN_DUPES.has(card.id) || !matchesCatalogScope(card, dScope) || (dPlayer !== "all" && !cardHasPlayer(card,dPlayer))) return false;
       var cs = statuses[card.id] || "not_owned";
       var cardDetail = cardDetails[card.id] || {};
-      
+
       // Status filter
       if (!window.CopyInventory.matchesStatus(collectionCardState(card.id, statuses, cardDetails, copySummaries), dFilter)) return false;
-      
+
       // Year filter
-      if (dYear !== "all" && !card.product.startsWith(dYear)) return false;
-      
+      if (dYear !== "all" && cardYear(card) !== dYear) return false;
+
       // Product filter
       if (dProduct !== "all" && card.product !== dProduct) return false;
-      
+
       // Universal search — matches product, variant, card number, serial, notes
       if (s) {
-        var haystack = (card.product + " " + card.cardSet + " " + card.cardNumber + " " + (cardDetail.serial || "") + " " + (cardDetail.notes || "")).toLowerCase();
+        var haystack = (panelCardSubject(card) + " " + cardYear(card) + " " + card.product + " " + card.cardSet + " " + card.cardNumber + " " + (cardDetail.serial || "") + " " + (cardDetail.notes || "")).toLowerCase();
         if (!haystack.includes(s)) return false;
       }
-      
+
       // Card number filter (exact, from external navigation)
       if (dCardNum && card.cardNumber !== dCardNum) return false;
-      
+
       // SN filter (print run) — extended with range and SP/SSP support
       if (dSnFilter === "1of1" && card.copies !== "1") return false;
       else if (dSnFilter === "numbered" && !card.copies) return false;
@@ -3331,16 +3407,17 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
         if (card.copies && !isNaN(pr)) { if (pr < minSN) return false; }
         else return false; // exclude unnumbered in range mode
       }
-      
+
       return true;
     });
-  }, [statuses, cardDetails, copySummaries, dFilter, dYear, dProduct, dSearch, dCardNum, dSnFilter, customEditVer, dScope, catalogRevision]);
+  }, [statuses, cardDetails, copySummaries, dFilter, dYear, dPlayer, dProduct, dSearch, dCardNum, dSnFilter, customEditVer, dScope, catalogRevision]);
   var sorted = useMemo(function() {
     if (!sortCol) return filtered;
     return [...filtered].sort(function(a, b) {
       var av, bv;
       var da = cardDetails[a.id] || {}, db = cardDetails[b.id] || {};
       if (sortCol === "status") { av = statuses[a.id] || "not_owned"; bv = statuses[b.id] || "not_owned"; }
+      else if (sortCol === "subject") { av = panelCardSubject(a); bv = panelCardSubject(b); }
       else if (sortCol === "product") { av = a.product; bv = b.product; }
       else if (sortCol === "number") { av = a.cardNumber; bv = b.cardNumber; }
       else if (sortCol === "variant") { av = a.cardSet; bv = b.cardSet; }
@@ -3370,7 +3447,7 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
   }, [filtered, sortCol, sortDir, statuses, cardDetails, copySummaries]);
   var totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   var pageCards = sorted.slice(dPage * PAGE_SIZE, (dPage + 1) * PAGE_SIZE);
-  useEffect(function() { setDPage(0); }, [dFilter, dYear, dProduct, dSearch, dCardNum, dSnFilter, sortCol, sortDir, dScope, catalogRevision]);
+  useEffect(function() { setDPage(0); }, [dFilter, dYear, dPlayer, dProduct, dSearch, dCardNum, dSnFilter, sortCol, sortDir, dScope, catalogRevision]);
   useEffect(function() { if (dProduct !== "all" && !filteredProducts.includes(dProduct)) setDProduct("all"); }, [dYear, catalogRevision]);
   function toggleSort(col) {
     if (sortCol === col) { setSortDir(sortDir === "asc" ? "desc" : "asc"); }
@@ -3424,6 +3501,7 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
     <div>
       <div className="flex gap-1 mb-1 flex-wrap items-center" style={{fontSize:"clamp(9px,1.1vw,11px)"}}>
         <CatalogScopeSelect value={dScope} onChange={setDScope}/>
+        {trackerMode !== "tb" && <select aria-label="Filter player" value={dPlayer} onChange={function(e){setDPlayer(e.target.value);}} className="bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5"><option value="all">{trackerMode === "racing" ? "All drivers" : "All players"}</option>{Object.entries(panelRoster()).map(function(entry){return <option key={entry[0]} value={entry[0]}>{entry[1].name}</option>;})}</select>}
         <select value={dFilter} onChange={function(e) { setDFilter(e.target.value); }} className="bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5">
           <option value="all">Status</option>
           <option value="acquired">Owned+Transit</option>
@@ -3504,6 +3582,7 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
             <tr>
               {batchMode && <th className="px-0.5 py-0.5 w-5"><input type="checkbox" checked={pageCards.length > 0 && pageCards.every(function(c) { return batchSelected.has(c.id); })} onChange={function(e) { if (e.target.checked) selectAllPage(); else { setBatchSelected(function(prev) { var next = new Set(prev); pageCards.forEach(function(c) { next.delete(c.id); }); return next; }); } }} className="accent-purple-500" /></th>}
               {colHeader("status", "St")}
+              {trackerMode !== "tb" && colHeader("subject", trackerMode === "racing" ? "Driver" : "Player")}
               {colHeader("product", "Product")}
               {colHeader("number", "#")}
               {colHeader("variant", "Variant")}
@@ -3530,6 +3609,7 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
                     </select>}
                     {copySummary.managed && <span className="block text-[8px] text-cyan-300">{[copySummary.owned && "Owned", copySummary.inTransit && "In Transit"].filter(Boolean).join(" + ")}</span>}
                   </td>
+                  {trackerMode !== "tb" && <td className="px-1 py-0.5 text-purple-300 font-semibold" style={{maxWidth:"12rem"}}>{panelCardSubject(card)}<span className="block text-[8px] text-gray-500">{cardYear(card)}</span></td>}
                   <td className="px-0.5 py-0.5 text-gray-300 truncate" style={{maxWidth:"clamp(80px,11vw,180px)", fontSize:"9px"}} title={card.product}>{card.product}</td>
                   <td className="px-0.5 py-0.5 text-white font-medium whitespace-nowrap">{card.cardNumber}</td>
                   <td className="px-0.5 py-0.5 text-gray-400 truncate" style={{fontSize: "9px", maxWidth:"clamp(90px,13vw,220px)"}} title={card.cardSet}>{card.cardSet}{sspBadge(card.cardSet) ? <span className="ml-0.5">{sspBadge(card.cardSet)}{catalogBadge(card)}</span> : null}</td>
@@ -3556,7 +3636,7 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
                   <td className="dt-date px-0.5 py-0.5"><input type="date" value={d.date || ""} onChange={function(e) { updateCardDetail(card.id, "date", e.target.value); }} className="bg-transparent border-b border-gray-700 focus:border-gray-400 w-24 text-gray-400 outline-none" style={{fontSize: "9px"}} /></td>
                   <td className="dt-notes px-0.5 py-0.5"><input type="text" value={d.notes || ""} onChange={function(e) { updateCardDetail(card.id, "notes", e.target.value); }} placeholder="-" className="bg-transparent border-b border-gray-700 focus:border-gray-400 text-gray-500 outline-none" style={{fontSize: "9px", width:"clamp(40px,8vw,120px)"}} /></td>
                   {!hidePrices && <td className="dt-trend px-0 py-0.5"><Sparkline card={card} width={30} height={12} /></td>}
-                  <td className="px-0.5 py-0.5 whitespace-nowrap">{needsSync.has(card.id) && <span className="text-pink-400 mr-0.5" title="Needs TCDB sync">!</span>}<a href={tcdbUrl(card)} target="_blank" rel="noopener noreferrer" className={"font-bold hover:text-cyan-200 " + (TCDB_FLAGS[card.id] ? "text-red-400" : TCDB_USER_FIXES[card.id] ? "text-green-400" : "text-cyan-400")}>T</a>{" "}<a href="#" onClick={function(e) { handleEbayClick(card, e); }} className="font-bold text-yellow-400 hover:text-yellow-200">E</a>{" "}{comcUrl(card) && <a href={comcUrl(card)} target="_blank" rel="noopener noreferrer" className="font-bold text-orange-400 hover:text-orange-200">C</a>}{card.id >= 10000 && editCustomCardById ? <span>{" "}<button onClick={function(){editCustomCardById(card.id);}} className="text-yellow-500 hover:text-yellow-300" title="Edit custom card">✏</button></span> : null}</td>
+                  <td className="px-0.5 py-0.5 whitespace-nowrap">{needsSync.has(card.id) && <span className="text-pink-400 mr-0.5" title="Needs TCDB sync">!</span>}<a href={tcdbUrl(card)} target="_blank" rel="noopener noreferrer" className={"font-bold hover:text-cyan-200 " + (TCDB_FLAGS[card.id] ? "text-red-400" : TCDB_USER_FIXES[card.id] ? "text-green-400" : "text-cyan-400")}>T</a>{" "}<a href="#" onClick={function(e) { handleEbayClick(card, e); }} className="font-bold text-yellow-400 hover:text-yellow-200">E</a>{" "}{comcUrl(card) && <a href={comcUrl(card)} target="_blank" rel="noopener noreferrer" className="font-bold text-orange-400 hover:text-orange-200">C</a>}{trackerMode === "tb" && card.id >= 10000 && editCustomCardById ? <span>{" "}<button onClick={function(){editCustomCardById(card.id);}} className="text-yellow-500 hover:text-yellow-300" title="Edit custom card">✏</button></span> : null}</td>
                 </tr>
               );
             })}
@@ -3574,10 +3654,10 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
   );
 }
 function googleImgUrl(card) {
-  return "https://www.google.com/search?tbm=isch&q=" + encodeURIComponent(card.product + " " + card.cardNumber + " " + card.cardSet);
+  return "https://www.google.com/search?tbm=isch&q=" + encodeURIComponent((window.MODE !== "tb" ? panelCardSubject(card) + " " + cardYear(card) + " " : "") + card.product + " " + card.cardNumber + " " + card.cardSet);
 }
 function variantOnlyUrl(card) {
-  var q = card.product + " " + card.cardNumber + " " + card.cardSet;
+  var q = (window.MODE !== "tb" ? panelCardSubject(card) + " " + cardYear(card) + " " : "") + card.product + " " + card.cardNumber + " " + card.cardSet;
   return "https://www.ebay.com/sch/i.html?_nkw=" + encodeURIComponent(q);
 }
 function CleanupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, forSaleFlags, toggleForSale, hidePrices }) {
@@ -3600,7 +3680,7 @@ function CleanupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, 
     if (MISSING_FROM_TCDB.has(card.id)) { issues.push("missing_from_tcdb"); return issues; }
     if (EXTRA_DUPES.has(card.id)) { issues.push("extra_duplicate"); return issues; }
     if (isAcquired && (card.copies || isMissingSN(card, cardDetails)) && !d.serial) issues.push("missing_serial");
-    if (isAcquired && !d.price) issues.push("missing_price");
+    if (!hidePrices && isAcquired && !d.price) issues.push("missing_price");
     if (isAcquired && !d.date) issues.push("missing_date");
     if (isAcquired && d.notes && /\?|check|verify|confirm|wrong|fix|unsure/i.test(d.notes)) issues.push("flagged_notes");
     if (EBAY_IDS.has(card.id)) {
@@ -3616,7 +3696,7 @@ function CleanupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, 
 
   var years = useMemo(function() { return [...new Set(ALL_CARDS.map(function(c) { return cardYear(c) || c.product.slice(0,4); }))].sort(); }, []);
   var filteredProducts = useMemo(function() {
-    var cards = cYear === "all" ? ALL_CARDS : ALL_CARDS.filter(function(c) { return c.product.startsWith(cYear); });
+    var cards = cYear === "all" ? ALL_CARDS : ALL_CARDS.filter(function(c) { return cardYear(c) === cYear; });
     return [...new Set(cards.map(function(c) { return c.product; }))].sort();
   }, [cYear]);
 
@@ -3631,9 +3711,9 @@ function CleanupPanel({ statuses, cardDetails, updateCardDetail, setCardStatus, 
         if (!isAcquired && !issues.includes("ebay_mislog") && !issues.includes("not_on_tcdb") && !issues.includes("extra_duplicate") && !issues.includes("missing_from_tcdb")) return false;
         if (issueType !== "all" && !issues.includes(issueType)) return false;
       }
-      if (cYear !== "all" && !card.product.startsWith(cYear)) return false;
+      if (cYear !== "all" && cardYear(card) !== cYear) return false;
       if (cProduct !== "all" && card.product !== cProduct) return false;
-      if (s && !card.product.toLowerCase().includes(s) && !card.cardSet.toLowerCase().includes(s) && !card.cardNumber.toLowerCase().includes(s)) return false;
+      if (s && !panelCardSubject(card).toLowerCase().includes(s) && !card.product.toLowerCase().includes(s) && !card.cardSet.toLowerCase().includes(s) && !card.cardNumber.toLowerCase().includes(s)) return false;
       return true;
     }).sort(function(a, b) {
       return getIssues(b).length - getIssues(a).length;
@@ -3900,7 +3980,11 @@ function SyncPanel({ cards, touchupCards, cardDetails, syncIndex, setSyncIndex, 
       var candidates = ALL_CARDS.filter(function(c) {
         if (matchedIds.has(c.id)) return false;
         if (vnorm(c.cardNumber) !== vnorm(entry.cardNo)) return false;
-        if (entry.year && String(c.year) !== entry.year) return false;
+        if (entry.year && cardYear(c) !== entry.year) return false;
+        if (window.MODE !== "tb") {
+          var names = window.CollectionScanner.subjects(entry.nameInfo, ALL_CARDS, panelRoster());
+          if (!names.length || names.indexOf(panelCardSubject(c)) < 0) return false;
+        }
         if (entry.set) {
           var setN = vnorm(entry.set);
           var prodN = vnorm(c.product);
@@ -3912,7 +3996,11 @@ function SyncPanel({ cards, touchupCards, cardDetails, syncIndex, setSyncIndex, 
         }
         return true;
       });
-      if (candidates.length === 0) { unmatched.push(entry); return; }
+      if (window.MODE !== "tb" && candidates.length > 1) {
+        var exactVariant = vnorm(entry.variant || "base");
+        candidates = candidates.filter(function(c){return vnorm(c.cardSet || "base") === exactVariant;});
+      }
+      if (candidates.length === 0 || (window.MODE !== "tb" && candidates.length !== 1)) { unmatched.push(entry); return; }
       var entryVarN = vnorm(entry.variant || "base");
       candidates.sort(function(a, b) {
         var va = vnorm(a.cardSet);
@@ -4071,7 +4159,7 @@ function SyncPanel({ cards, touchupCards, cardDetails, syncIndex, setSyncIndex, 
           </div>
           <div className="bg-gray-800 rounded-lg p-4 mb-3">
             <div className={(mode === "sync" ? "text-orange-400" : "text-purple-400") + " font-bold text-lg"}>{card.product}</div>
-            <div className="text-gray-300 text-sm">#{card.cardNumber} - Tyler Black{card.copies ? " SN " + card.copies : ""} - Milwaukee Brewers</div>
+            <div className="text-gray-300 text-sm">#{card.cardNumber} - {panelCardSubject(card)}{card.copies ? " SN " + card.copies : ""}{window.MODE === "tb" ? " - Milwaukee Brewers" : card.team ? " - " + card.team : ""}</div>
             <div className="flex items-center justify-between mt-1">
               <span className="text-gray-500 text-xs">{card.cardSet} {sspBadge(card.cardSet)}{catalogBadge(card)}</span>
               <div className="flex gap-3">
@@ -4134,9 +4222,10 @@ function SyncPanel({ cards, touchupCards, cardDetails, syncIndex, setSyncIndex, 
 }
 
 function COMCScannerPanel(props) {
+  var pricingEnabled = window.MODE === "tb";
   var cards = props.cards, statuses = props.statuses, cardDetails = props.cardDetails;
   var multiSubject = cards.some(function(c) { return !!(c.player || c.subject || c.playerName); });
-  var scanRoster = multiSubject ? (window.TEMPO_ROSTER || {}) : {};
+  var scanRoster = multiSubject ? panelRoster() : {};
   function subjectNames(text) { return multiSubject ? window.CollectionScanner.subjects(text, cards, scanRoster) : (/\btyler\s+black\b/i.test(text) ? ["Tyler Black"] : []); }
   function acceptsSubject(text) { return subjectNames(text).length === 1; }
   function scanEvidence(p) { return window.ScanCurrency.infer(p, {text:rawInput, fallbackCurrency:scanCurrency}); }
@@ -4222,7 +4311,7 @@ function COMCScannerPanel(props) {
   // in the copy inventory, never in this public market-history key.
   function recordPrice(cardId, price, source, title, batchPH, evidence) {
     var p = evidence || {};
-    if (!cardId || !price || p.recordType === "purchase") return;
+    if (!pricingEnabled || !cardId || !price || p.recordType === "purchase") return;
     var card = CARD_BY_ID[cardId];
     var pk = card ? priceKey(card) : String(cardId);
     if (source === "eBay" || source === "Whatnot") {
@@ -4255,8 +4344,9 @@ function COMCScannerPanel(props) {
   var ebayBids = _ebi[0], setEbayBids = _ebi[1];
   var _sdp = useState({}), seenDrops = _sdp[0], setSeenDrops = _sdp[1]; // acknowledged price drop listings
   var _tgt = useState(function(){ return loadTargets(); });
-  var targets = _tgt[0], setTargets = _tgt[1];
+  var targets = pricingEnabled ? _tgt[0] : {}, setTargets = _tgt[1];
   function addTarget(p, m, status) {
+    if (!pricingEnabled) return;
     if (p.recordType === "purchase") { setImportMessage("Purchase receipts belong in your private copy inventory. Use Import matched purchases to save this receipt."); return; }
     var tgt = loadTargets();
     var key = "tgt_" + Date.now() + "_" + Math.random().toString(36).slice(2,6);
@@ -4279,9 +4369,11 @@ function COMCScannerPanel(props) {
     saveTargets(tgt); setTargets(Object.assign({}, tgt));
   }
   function removeTarget(key) {
+    if (!pricingEnabled) return;
     var tgt = loadTargets(); delete tgt[key]; saveTargets(tgt); setTargets(Object.assign({}, tgt));
   }
   function toggleTargetStatus(key) {
+    if (!pricingEnabled) return;
     var tgt = loadTargets();
     if (tgt[key]) { tgt[key].status = tgt[key].status === "active" ? "watching" : "active"; }
     saveTargets(tgt); setTargets(Object.assign({}, tgt));
@@ -4330,7 +4422,7 @@ function COMCScannerPanel(props) {
       var scored = [];
       for (var ci = 0; ci < cards.length; ci++) {
         var card = cards[ci];
-        var cYear = String((card.product.match(/^\d{4}/) || [""])[0]);
+        var cYear = cardYear(card);
         if (cYear !== p.year) continue;
         var fullDesc = (card.product + " " + card.cardSet + " " + card.cardNumber).toLowerCase().replace(/[^a-z0-9 ]/g, " ");
         var descWords = fullDesc.split(" ").filter(function(w) { return w.length > 2; });
@@ -4363,7 +4455,7 @@ function COMCScannerPanel(props) {
       var mappedProd = PRODUCT_MAP[prodLower] || prodLower;
       for (var ci2 = 0; ci2 < cards.length; ci2++) {
         var card2 = cards[ci2];
-        var cYear2 = String((card2.product.match(/^\d{4}/) || [""])[0]);
+        var cYear2 = cardYear(card2);
         if (cYear2 !== p.year) continue;
         var cProd = card2.product.toLowerCase();
         var prodWords = mappedProd.split(" ").filter(function(w) { return w.length > 2; });
@@ -4389,7 +4481,7 @@ function COMCScannerPanel(props) {
     var candSeen = {};
     var candDeduped = [];
     for (var cdi = 0; cdi < candidates.length; cdi++) {
-      var cdKey = candidates[cdi].cardNumber + "|" + (candidates[cdi].cardSet || "") + "|" + (candidates[cdi].copies || "");
+      var cdKey = (multiSubject ? String(candidates[cdi].id) + "|" : "") + candidates[cdi].cardNumber + "|" + (candidates[cdi].cardSet || "") + "|" + (candidates[cdi].copies || "");
       if (!candSeen[cdKey]) { candSeen[cdKey] = true; candDeduped.push(candidates[cdi]); }
     }
     candidates = candDeduped;
@@ -4423,7 +4515,7 @@ function COMCScannerPanel(props) {
       setComcOverrides(Object.assign({}, overrides));
 
       // Move today's price entries from old match to new match (preserve older entries on old key)
-      if (item.match && item.match.card) {
+      if (pricingEnabled && item.match && item.match.card) {
         var oldPK = priceKey(item.match.card);
         var newPK = priceKey(candidateCard);
         if (oldPK && newPK && oldPK !== newPK) {
@@ -4446,7 +4538,7 @@ function COMCScannerPanel(props) {
             });
             if (keep.length === 0) { delete ph[oldPK]; }
             else { ph[oldPK] = keep; }
-            savePriceHistory(ph, {removals:[{cardKey:oldPK,entries:moved}],restores:[{cardKey:newPK,entries:moved}]});
+            if (pricingEnabled) savePriceHistory(ph, {removals:[{cardKey:oldPK,entries:moved}],restores:[{cardKey:newPK,entries:moved}]});
           }
         }
       }
@@ -4513,6 +4605,7 @@ function COMCScannerPanel(props) {
   }
 
   async function handleAddToDb(idx) {
+    if (window.CollectionProfile?.isSport(window.MODE)) { setImportMessage("Choose an existing wantlist card for this scan. Catalogue expansion is paused for this collection."); return; }
     if (!window.trackerAuth || !window.trackerAuth.isOwner()) return;
     var item = parsed[idx];
     if (!item) return;
@@ -4963,32 +5056,32 @@ function COMCScannerPanel(props) {
     // Strategy: find lines with a year + card-like info, grab price from nearby lines.
     var lines = text.split("\n").map(function(l) { return l.trim(); });
     var results = [];
-    
+
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
       if (!line) continue;
-      
+
       // Skip obvious non-card lines
       if (/^(sort by|recently added|in stock|out of stock|nm or better|view cart|sign in|baseball|cards|listings)/i.test(line)) continue;
       if (line.length < 8) continue;
-      
+
       // Check if this line looks like a card listing
       var yearMatch = line.match(/\b(20[12]\d)\b/);
       if (!yearMatch) continue;
-      
+
       // Must have some card-related content
       var hasProduct = /topps|bowman|panini|donruss|leaf|prizm|select|chrome|heritage|stadium|inception|mosaic|optic|sapphire|trilogy|sterling|finest|gypsy|allen|tier|ultra|flux|illusions|revolution|obsidian|spectra|immaculate|national|absolute|certified|contenders|prestige|score|zenith|classic|elite|archives|transcendent|gilded|triple|flawless|impeccable|crusade|prospect|valiant|trinity|platinum|pro set/i.test(line);
       var hasPlayer = /tyler\s*black/i.test(line);
       var hasCardNum = /#[A-Za-z0-9][-A-Za-z0-9.]*/i.test(line);
-      
+
       if (!hasProduct && !hasPlayer && !hasCardNum) continue;
-      
+
       var year = yearMatch[1];
-      
+
       // Extract card number
       var cnm = line.match(/#([A-Za-z0-9][-A-Za-z0-9.]*)/)
       var cardNo = cnm ? cnm[1] : "";
-      
+
       // Parse set structure: "YYYY Product - Variant - SubVariant #NUM Player"
       // First strip everything after the card number or player name to get the set portion
       var setPortions = line;
@@ -5010,7 +5103,7 @@ function COMCScannerPanel(props) {
       setPortions = setPortions.replace(/\s*-\s*\[Base\]\s*-\s*/g, " - ").replace(/\s*-\s*\[Base\]\s*/g, " ").replace(/\[Base\]\s*/g, "").trim();
       // Clean double dashes and trailing/leading dashes
       setPortions = setPortions.replace(/\s*-\s*-\s*/g, " - ").replace(/\s*-\s*$/, "").replace(/^\s*-\s*/, "").trim();
-      
+
       var setParts = setPortions.split(/\s+-\s+/);
       var product = (setParts[0] || "").trim().replace(/\s*\.\d+$/, "");
       var variantParts = [];
@@ -5022,7 +5115,7 @@ function COMCScannerPanel(props) {
       var variant = variantParts.join(" ").trim();
       if (!variant && isBase) variant = "Base";
       if (!variant) variant = "Base";
-      
+
       // Extract price - check inline first, then next lines
       var price = "", rawPrice = "";
       var priceInline = window.ScanCurrency.parseMoney(line);
@@ -5039,11 +5132,11 @@ function COMCScannerPanel(props) {
           if (pm && pm.amount != null && !pm.conflict && (/[$£€¥]|\b(?:USD|CAD|GBP|EUR|AUD)\b/i.test(nextLine) || /^\d+[.,]\d{2}$/.test(nextLine))) { price = String(pm.amount); rawPrice = nextLine; break; }
         }
       }
-      
+
       // Extract print run "/50" etc
       var snm = line.match(/\/(\d+)(?:\s|$|[^0-9])/);
       var printRun = snm ? snm[1] : "";
-      
+
       results.push({
         year: year, product: product, variant: variant,
         cardNo: cardNo, cardNoClean: cardNo.replace(/\.\d+$/, ""),
@@ -5369,7 +5462,7 @@ function COMCScannerPanel(props) {
     "mummy foil": "holiday mummies", "mummies foil": "holiday mummies",
     "witch hat foil": "holiday witches hats", "witches hat foil": "holiday witches hats",
     "black cat foil": "holiday black cats", "black cats foil": "holiday black cats",
-    // Heritage High Number sub-variants 
+    // Heritage High Number sub-variants
     "chrome black border": "chrome black refractor",
     "hot box chrome purple refractor": "chrome purple refractors",
     "dark blue border": "dark blue border",
@@ -5392,7 +5485,7 @@ function COMCScannerPanel(props) {
     "chrome asia mojo refractor": "chrome asia refractor",
     // Panini Prospect Edition: strip "Prizm" / "Prizms" (COMC adds, DB omits)
     // Handled in normVariant function below
-    // Heritage "Flip Stock" 
+    // Heritage "Flip Stock"
     "flip stock": "flip stock"
   };
 
@@ -5526,7 +5619,7 @@ function COMCScannerPanel(props) {
 
     for (var ci = 0; ci < cards.length; ci++) {
       var card = cards[ci];
-      var cYear = String((card.product.match(/^\d{4}/) || [""])[0]);
+      var cYear = cardYear(card);
       if (cYear !== p.year) continue;
 
       // === PRODUCT MATCH (35 pts) ===
@@ -5904,7 +5997,7 @@ function COMCScannerPanel(props) {
     var candidates = [];
     for (var ci = 0; ci < cards.length; ci++) {
       var card = cards[ci];
-      var cYear = String((card.product.match(/^\d{4}/) || [""])[0]);
+      var cYear = cardYear(card);
       if (cYear !== p.year) continue;
 
       // Card number matching (exact, clean, or .1/.2 suffix)
@@ -6045,7 +6138,7 @@ function COMCScannerPanel(props) {
       if (best && bestScore >= 90) return best;
     }
 
-    // eBay Phase 2.5: title-scan matching when variant extraction failed  
+    // eBay Phase 2.5: title-scan matching when variant extraction failed
     if ((p.source === "eBay" || p.source === "Whatnot" || p.source === "130point") && candidates.length > 0 && bestScore < 90) {
       var rawLow = (p.rawSet || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ");
       var ebayBestScore = 0, ebayBest = null;
@@ -6293,18 +6386,22 @@ function COMCScannerPanel(props) {
      Auto-detects which list was copied from the header.
      Returns { status, items[] } where each item has year/product/variant/cardNumber/price/attrs. */
   function parseTcdbCollection(text) {
-    // Detect status from header text
+    // A page can include every navigation tab. Only explicit source filters or
+    // an unambiguous collection heading identify the imported list.
     var status = "unknown";
-    if (/Collection Summary[\s\S]{0,40}?\bHave\b/.test(text)) status = "owned";
-    else if (/Collection Summary[\s\S]{0,40}?\bIn-Transit\s*\(Inbound\)/i.test(text)) status = "in_transit";
-    else if (/Collection Summary[\s\S]{0,40}?\bWant\b/.test(text)) status = "not_owned";
-    else if (/Collection Summary[\s\S]{0,40}?\bAll\b/.test(text)) status = "all";
-    // Also try simpler detection from tab labels
-    if (status === "unknown") {
-      var headerBlock = text.substring(0, Math.min(text.length, 500));
-      if (/\bHave\b/.test(headerBlock) && /Cards\s*\|\s*Filters/.test(headerBlock)) status = "owned";
-      else if (/In-Transit/i.test(headerBlock)) status = "in_transit";
-      else if (/\bWant\b/.test(headerBlock) && /Cards\s*\|\s*Filters/.test(headerBlock)) status = "not_owned";
+    var sourceFilters = Array.from(new Set((String(text).match(/[?&]Filter=[^&#\s]*/gi) || []).map(function(value){return value.split("=")[1].toUpperCase();})));
+    var summaryIndex = String(text).indexOf("Collection Summary");
+    var headerBlock = String(text).slice(summaryIndex >= 0 ? summaryIndex + 18 : 0, summaryIndex >= 0 ? summaryIndex + 518 : 500).split(/\n(?=(?:19|20)\d{2}\s)/)[0];
+    var headerStatus = "unknown";
+    if (/\bIn[- ]Transit\s*\(Inbound\)/i.test(headerBlock)) headerStatus = "in_transit";
+    else {
+      var headings = Array.from(new Set(headerBlock.split(/\r?\n/).map(function(line){return line.trim();}).filter(function(line){return /^(Have|Want|All|In[- ]Transit)$/i.test(line);}).map(function(line){return /^have$/i.test(line) ? "owned" : /^want$/i.test(line) ? "not_owned" : /^all$/i.test(line) ? "all" : "in_transit";})));
+      if (headings.length === 1 && (summaryIndex >= 0 || /Cards\s*\|\s*Filters/.test(headerBlock))) headerStatus = headings[0];
+    }
+    if (!sourceFilters.length) status = headerStatus;
+    else if (sourceFilters.length === 1 && /^[GWI]$/.test(sourceFilters[0])) {
+      var filterStatus = {G:"owned",W:"not_owned",I:"in_transit"}[sourceFilters[0]];
+      if (headerStatus === "unknown" || headerStatus === filterStatus) status = filterStatus;
     }
 
     var lines = text.split(/\n/);
@@ -6405,7 +6502,7 @@ function COMCScannerPanel(props) {
       var ptResults2 = ptItems2.map(function(p) { var match = matchToCards(p); return { parsed: p, match: match, raw: p.rawSet }; });
       var ptBatch2 = loadPriceHistory();
       for (var pt2i = 0; pt2i < ptResults2.length; pt2i++) { var pt2 = ptResults2[pt2i]; if (pt2.match && pt2.match.score >= 90 && pt2.parsed.price && !pt2.parsed._130pt.forSale) recordPrice(pt2.match.card.id, pt2.parsed.price, "130point", pt2.parsed.rawSet || "", ptBatch2, pt2.parsed); }
-      savePriceHistory(ptBatch2);
+      if (pricingEnabled) savePriceHistory(ptBatch2);
       ptResults2.sort(function(a, b) { var dA = (a.parsed._130pt && a.parsed._130pt.date) || ""; var dB = (b.parsed._130pt && b.parsed._130pt.date) || ""; return dB.localeCompare(dA); });
       setParsed(ptResults2);
       try { localStorage.setItem(tbk("last-130pt-paste-v1"), rawInput); } catch(e) {}
@@ -6448,7 +6545,7 @@ function COMCScannerPanel(props) {
           recordPrice(prItem2.match.card.id, prItem2.parsed.price, "eBay", prItem2.parsed.rawSet || "", batchPH2, prItem2.parsed);
         }
       }
-      savePriceHistory(batchPH2);
+      if (pricingEnabled) savePriceHistory(batchPH2);
       setParsed(results2);
       setShowInput(false);
       return;
@@ -6467,7 +6564,7 @@ function COMCScannerPanel(props) {
           recordPrice(prItem.match.card.id, prItem.parsed.price, "COMC", prItem.parsed.rawSet || prItem.raw || "", batchPH, prItem.parsed);
         }
       }
-      savePriceHistory(batchPH);
+      if (pricingEnabled) savePriceHistory(batchPH);
       // Dedup: same card listed in multiple conditions (NM, EX, PSA 10, etc.)
       // Keep only the lowest price listing per matched card ID
       var seen = {};
@@ -6544,7 +6641,7 @@ function COMCScannerPanel(props) {
             recordPrice(erItem.match.card.id, erItem.parsed.price, "eBay", erItem.parsed.rawSet || erItem.raw || "", ebayBatchPH, erItem.parsed);
           }
         }
-        savePriceHistory(ebayBatchPH);
+        if (pricingEnabled) savePriceHistory(ebayBatchPH);
       }
       setParsed(results2);
       try { if (isSearchPage) localStorage.setItem(tbk("last-ebay-paste-v1"), rawInput); else localStorage.removeItem(tbk("last-ebay-paste-v1")); } catch(e) {}
@@ -6562,7 +6659,7 @@ function COMCScannerPanel(props) {
           recordPrice(slItem.match.card.id, slItem.parsed.price, "SportLots", slItem.parsed.rawSet || slItem.raw || "", slBatchPH, slItem.parsed);
         }
       }
-      savePriceHistory(slBatchPH);
+      if (pricingEnabled) savePriceHistory(slBatchPH);
       // Dedup: same card matched from multiple conditions - keep lowest price
       var slSeen = {};
       var slDeduped = [];
@@ -6596,7 +6693,7 @@ function COMCScannerPanel(props) {
           recordPrice(wnItem.match.card.id, wnItem.parsed.price, "Whatnot", wnItem.parsed.rawSet || wnItem.raw || "", wnBatchPH, wnItem.parsed);
         }
       }
-      savePriceHistory(wnBatchPH);
+      if (pricingEnabled) savePriceHistory(wnBatchPH);
       // Dedup: same card matched from multiple listings - keep lowest price
       var wnSeen = {};
       var wnDeduped = [];
@@ -6631,7 +6728,7 @@ function COMCScannerPanel(props) {
           recordPrice(ptItem.match.card.id, ptItem.parsed.price, "130point", ptItem.parsed.rawSet || ptItem.raw || "", ptBatchPH, ptItem.parsed);
         }
       }
-      savePriceHistory(ptBatchPH);
+      if (pricingEnabled) savePriceHistory(ptBatchPH);
       // Sort by date descending
       ptResults.sort(function(a, b) {
         var dA = (a.parsed._130pt && a.parsed._130pt.date) || "";
@@ -6674,7 +6771,7 @@ function COMCScannerPanel(props) {
     }
     // Existing in-hand markings survive a repeat purchase import. A public
     // listing never supplies a personal paid price, receipt date or serial.
-    if (setCardStatus(card.id, window.TrackerMarket.importStatus(statuses[card.id], requestedStatus)) === false) return false;
+    if (setCardStatus(card.id, requestedStatus) === false) return false;
     if (requestedStatus === "owned") updateCardDetail(card.id, "inHandConfirmedAt", new Date().toISOString());
     setApplied(function(prev) { return Object.assign({}, prev, {[idx]: true}); });
     return true;
@@ -6704,16 +6801,16 @@ function COMCScannerPanel(props) {
   // Score >= 90 = exact/near-exact variant match; < 90 = not in our DB
   var shopNeed = parsed.filter(function(r) {
     if (!r.match || r.match.score < 90) return false;
-    var s = statuses[r.match.card.id] || "not_owned";
-    return s === "not_owned";
+    var state = collectionCardState(r.match.card.id,statuses,cardDetails,props.copySummaries);
+    return !state.owned && !state.inTransit;
   });
   var shopOwn = parsed.filter(function(r) {
     if (!r.match || r.match.score < 90) return false;
-    var s = statuses[r.match.card.id] || "not_owned";
-    return s !== "not_owned";
+    return collectionCardState(r.match.card.id,statuses,cardDetails,props.copySummaries).owned;
   });
+  var shopTransit = parsed.filter(function(r) {return r.match && r.match.score >= 90 && collectionCardState(r.match.card.id,statuses,cardDetails,props.copySummaries).inTransit;});
   var shopNoMatch = parsed.filter(function(r) { return !r.match || r.match.score < 90; });
-  var shopBaseFiltered = shopFilter === "need" ? shopNeed : shopFilter === "own" ? shopOwn : shopFilter === "nomatch" ? shopNoMatch : parsed;
+  var shopBaseFiltered = shopFilter === "need" ? shopNeed : shopFilter === "own" ? shopOwn : shopFilter === "transit" ? shopTransit : shopFilter === "nomatch" ? shopNoMatch : parsed;
   // Filter out blocked listings
   var shopUnblocked = shopBaseFiltered.filter(function(r) {
     var key = (r.parsed.rawSet || "").trim();
@@ -7001,7 +7098,8 @@ function COMCScannerPanel(props) {
         <div className="space-y-1">
           <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-1.5 flex-wrap">
             <button onClick={function(){setShopFilter("need");}} className={"text-[10px] px-1.5 py-0.5 rounded font-bold " + (shopFilter === "need" ? "bg-green-600 text-white" : "bg-gray-700 text-gray-300")}>Need ({shopNeed.length})</button>
-            <button onClick={function(){setShopFilter("own");}} className={"text-[10px] px-1.5 py-0.5 rounded font-bold " + (shopFilter === "own" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300")}>Own ({shopOwn.length})</button>
+            <button onClick={function(){setShopFilter("own");}} className={"text-[10px] px-1.5 py-0.5 rounded font-bold " + (shopFilter === "own" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300")}>Owned ({shopOwn.length})</button>
+            <button onClick={function(){setShopFilter("transit");}} className={"text-[10px] px-1.5 py-0.5 rounded font-bold " + (shopFilter === "transit" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300")}>In Transit ({shopTransit.length})</button>
             <button onClick={function(){setShopFilter("nomatch");}} className={"text-[10px] px-1.5 py-0.5 rounded font-bold " + (shopFilter === "nomatch" ? "bg-red-600 text-white" : "bg-gray-700 text-gray-300")}>No DB ({shopNoMatch.length})</button>
             <button onClick={function(){setShopFilter("all");}} className={"text-[10px] px-1.5 py-0.5 rounded font-bold " + (shopFilter === "all" ? "bg-gray-500 text-white" : "bg-gray-700 text-gray-300")}>All ({parsed.length})</button>
             {mode === "130pt" && pt130FSCount > 0 && <React.Fragment>
@@ -7096,7 +7194,7 @@ function COMCScannerPanel(props) {
                           <div key={entry.key} className="flex items-center gap-1.5 bg-gray-800/50 rounded px-2 py-1 text-[10px]">
                             <span className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + statusDot}></span>
                             <span className="text-gray-500 font-mono flex-shrink-0">#{entry.card.cardNumber}</span>
-                            <span className="text-gray-400 flex-shrink-0 max-w-[100px] truncate" title={entry.card.product}>{String(entry.card.product).slice(5)}</span>
+                            <span className="text-gray-400 flex-shrink-0 max-w-[100px] truncate" title={entry.card.product}>{String(entry.card.product).replace(/^\d{4}\s+/, "")}</span>
                             <span className="text-gray-200 flex-1 truncate">{entry.card.cardSet || "Base"} {sspBadge(entry.card.cardSet)}</span>
                             {entry.card.copies && <span className="text-purple-400 font-bold flex-shrink-0">{"/" + entry.card.copies}</span>}
                             {candIsAuto && <span className="text-yellow-400 text-[8px] font-bold bg-yellow-900/50 px-0.5 rounded flex-shrink-0">AU</span>}
@@ -7156,7 +7254,7 @@ function COMCScannerPanel(props) {
           )}
 
           {shopSorted.length === 0 && (
-            <div className="text-center text-gray-500 text-[10px] py-2">{shopFilter === "need" ? "You own everything listed!" : "No results."}</div>
+            <div className="text-center text-gray-500 text-[10px] py-2">{shopFilter === "need" ? "No unacquired matches in this scan." : "No results."}</div>
           )}
 
           {shopSorted.length > 0 && (
@@ -7180,7 +7278,8 @@ function COMCScannerPanel(props) {
                     var p = item.parsed;
                     var m = item.match;
                     var isExact = m && m.score >= 80;
-                    var cardStatus = isExact ? (statuses[m.card.id] || "not_owned") : null;
+                    var matchedState = isExact ? collectionCardState(m.card.id,statuses,cardDetails,props.copySummaries) : null;
+                    var cardStatus = matchedState ? (matchedState.owned ? "owned" : matchedState.inTransit ? "in_transit" : "not_owned") : null;
                     var isNeed = cardStatus === "not_owned";
                     var isApplied = isExact && applied[parsed.indexOf(item)];
                     var origIdx = parsed.indexOf(item);
@@ -7223,6 +7322,7 @@ function COMCScannerPanel(props) {
                       : hasBid ? { text: "BID", color: "bg-orange-800 text-orange-200" }
                       : isApplied ? { text: "\u2713", color: "bg-green-800 text-green-300" }
                       : isNeed ? { text: "NEED", color: "bg-green-600 text-white" }
+                      : matchedState && matchedState.owned && matchedState.inTransit ? { text: "OWN + TRNS", color: "bg-green-800 text-green-200" }
                       : cardStatus === "owned" ? { text: "OWN", color: "bg-green-800 text-green-200" }
                       : { text: "TRNS", color: "bg-emerald-800 text-emerald-200" };
 
@@ -7250,10 +7350,10 @@ function COMCScannerPanel(props) {
                               {isExact && <a href={whatnotUrl(m.card)} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-200 font-bold" title="Whatnot">W</a>}
                               {isExact && <a href={pt130Url(m.card)} target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-200 font-bold" title="130point">P</a>}
                               {/* Inline target toggle: cycles not targeted → active → watching → untargeted */}
-                              {p.recordType !== "purchase" && isExact && isNeed && !isApplied && !hasBid && <button title="Watch this listing; ownership stays unchanged" onClick={function(){ addTarget(p, item.match, "watching"); }} className="ml-0.5 px-1 py-0 bg-yellow-700 hover:bg-yellow-600 text-white rounded font-bold" style={{fontSize:"8px"}}>+</button>}
+                              {pricingEnabled && p.recordType !== "purchase" && isExact && isNeed && !isApplied && !hasBid && <button title="Watch this listing; ownership stays unchanged" onClick={function(){ addTarget(p, item.match, "watching"); }} className="ml-0.5 px-1 py-0 bg-yellow-700 hover:bg-yellow-600 text-white rounded font-bold" style={{fontSize:"8px"}}>+</button>}
                               {isApplied && <span className="text-green-400 font-bold" style={{fontSize:"8px"}}>✓</span>}
                               {!isExact && <button onClick={function(){ openAddForm(origIdx); }} className="px-1 py-0 bg-yellow-700 hover:bg-yellow-600 text-white rounded font-bold" style={{fontSize:"8px"}}>Pick</button>}
-                              {p.recordType !== "purchase" && (isNeed || !isExact) && !isTargeted && <button onClick={function(e){ e.stopPropagation(); addTarget(p, m, "active"); }} className="text-pink-400/40 hover:text-pink-300 font-bold" style={{fontSize:"9px"}} title="Pin as target">{"\uD83C\uDFAF"}</button>}
+                              {pricingEnabled && p.recordType !== "purchase" && (isNeed || !isExact) && !isTargeted && <button onClick={function(e){ e.stopPropagation(); addTarget(p, m, "active"); }} className="text-pink-400/40 hover:text-pink-300 font-bold" style={{fontSize:"9px"}} title="Pin as target">{"\uD83C\uDFAF"}</button>}
                               {isActiveTarget && <button onClick={function(e){ e.stopPropagation(); toggleTargetStatus(targetMatch.id); }} className="text-pink-400 font-bold" style={{fontSize:"9px"}} title="Click: switch to watching">{"\uD83C\uDFAF"}</button>}
                               {isWatching && <button onClick={function(e){ e.stopPropagation(); removeTarget(targetMatch.id); }} className="text-gray-400 font-bold" style={{fontSize:"9px"}} title="Click: unpin target">{"\uD83D\uDC41"}</button>}
                               {p.source === "eBay" && isExact && isNeed && (p.listingType === "auction" || p.listingType === "best_offer") && <button onClick={function(e){ e.stopPropagation(); var bk = (p.rawSet || "").trim(); if (!bk) return; var b = loadEbayBids(); if (b[bk]) { delete b[bk]; } else { b[bk] = { date: new Date().toISOString().slice(0,10) }; } saveEbayBids(b); setEbayBids(Object.assign({}, b)); }} className={"px-1 py-0 rounded font-bold " + (hasBid ? "bg-orange-700 text-orange-100" : "bg-gray-700 text-orange-400 hover:bg-orange-800")} style={{fontSize:"7px"}} title={hasBid ? "Click to un-bid" : "Mark as bid placed"}>{hasBid ? "BID" : "Bid"}</button>}
@@ -7386,13 +7486,13 @@ function COMCScannerPanel(props) {
                                   )}
                                   {/* Target actions */}
                                   <span style={{color:"#2a3f5f"}}>|</span>
-                                  {p.recordType !== "purchase" && !isTargeted && (isNeed || !isExact) && (
+                                  {pricingEnabled && p.recordType !== "purchase" && !isTargeted && (isNeed || !isExact) && (
                                     <React.Fragment>
                                       <button onClick={function(e){ e.stopPropagation(); addTarget(p, m, "active"); }} className="text-[9px] px-1 py-0 bg-pink-900/40 border border-pink-600 text-pink-300 rounded hover:bg-pink-800/40 font-bold" title="Save as active target - want to buy">{"\uD83C\uDFAF Target"}</button>
                                       <button onClick={function(e){ e.stopPropagation(); addTarget(p, m, "watching"); }} className="text-[9px] px-1 py-0 bg-gray-800/40 border border-gray-600 text-gray-400 rounded hover:bg-gray-700/40" title="Save as watching - too expensive for now">{"\uD83D\uDC41 Watch"}</button>
                                     </React.Fragment>
                                   )}
-                                  {isTargeted && (
+                                  {pricingEnabled && isTargeted && (
                                     <React.Fragment>
                                       <button onClick={function(e){ e.stopPropagation(); toggleTargetStatus(targetMatch.id); }} className={"text-[9px] px-1 py-0 rounded font-bold " + (isWatching ? "bg-pink-900/40 border border-pink-600 text-pink-300 hover:bg-pink-800/40" : "bg-gray-800/40 border border-gray-600 text-gray-400 hover:bg-gray-700/40")} title={isWatching ? "Make active target" : "Move to watching"}>{isWatching ? "\uD83C\uDFAF Active" : "\uD83D\uDC41 Watch"}</button>
                                       <button onClick={function(e){ e.stopPropagation(); removeTarget(targetMatch.id); }} className="text-[9px] px-1 py-0 bg-red-900/30 border border-red-700 text-red-400 rounded hover:bg-red-800/30" title="Remove from targets">{"\u2715 Untarget"}</button>
@@ -7475,8 +7575,8 @@ function COMCScannerPanel(props) {
                                             <div key={cand.id} className="flex items-center gap-1.5 bg-gray-800/60 rounded px-2 py-1 hover:bg-gray-700/60">
                                               {statusLabel ? <span className={"text-[8px] font-bold px-1 rounded " + (cStatus === "owned" ? "bg-green-900/60 text-green-300" : cStatus === "in_transit" ? "bg-emerald-900/60 text-emerald-300" : "bg-red-900/60 text-red-400")}>{statusLabel}</span> : <span className="text-[8px] text-gray-600 w-5"></span>}
                                               <span className="text-gray-500 font-mono text-[10px] w-12 flex-shrink-0">#{cand.cardNumber}</span>
-                                              {addForm.textSearch && <span className="text-gray-500 text-[10px] w-10 flex-shrink-0">{String(cand.product).slice(0,4)}</span>}
-                                              {addForm.textSearch && <span className="text-gray-600 text-[10px] max-w-[80px] truncate flex-shrink-0" title={cand.product}>{String(cand.product).slice(5)}</span>}
+                                              {addForm.textSearch && <span className="text-gray-500 text-[10px] w-10 flex-shrink-0">{cardYear(cand)}</span>}
+                                              {addForm.textSearch && <span className="text-gray-600 text-[10px] max-w-[80px] truncate flex-shrink-0" title={cand.product}>{String(cand.product).replace(/^\d{4}\s*/, "")}</span>}
                                               <span className="text-gray-200 flex-1 truncate">{cand.cardSet || "Base"}</span>
                                               {cand.copies && <span className="text-purple-400 font-bold text-[10px] flex-shrink-0">{"/" + cand.copies}</span>}
                                               {candIsAuto && <span className="text-yellow-400 text-[8px] font-bold bg-yellow-900/50 px-0.5 rounded flex-shrink-0">AU</span>}
@@ -7599,7 +7699,7 @@ function COMCScannerPanel(props) {
       )}
 
       {parsed.length === 0 && (mode === "ebay" || mode === "sportlots" || mode === "whatnot" || mode === "130pt" || mode === "shop") && rawInput.trim().length > 0 && (
-        <div className="text-center text-gray-500 text-xs py-4">No Tyler Black baseball cards found in the pasted text. Try a different source or check that the full page was copied (Ctrl+A, Ctrl+C).</div>
+        <div className="text-center text-gray-500 text-xs py-4">No matching collection subjects found in the pasted text. Try a different source or check that the full page was copied (Ctrl+A, Ctrl+C).</div>
       )}
     </div>
   );
@@ -7628,6 +7728,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
   // deleting their evidence. Missing currency/type remains explicitly unknown.
   useEffect(function() {
     if (migrated) return;
+    if (window.MODE !== "tb") { setMigrated(true); return; }
     var raw = loadPriceHistory(), changed = false, next = {}, removals=[], restores=[];
     Object.keys(raw).forEach(function(k) {
       var pk = k;
@@ -7731,7 +7832,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
       // Search
       if (search) {
         var sl = search.toLowerCase();
-        var hay = (card.product + " " + card.cardSet + " " + card.cardNumber).toLowerCase();
+        var hay = (panelCardSubject(card) + " " + cardYear(card) + " " + card.product + " " + card.cardSet + " " + card.cardNumber).toLowerCase();
         if (hay.indexOf(sl) === -1) return;
       }
 
@@ -8005,7 +8106,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
                   if (pickSearch) {
                     var terms = pickSearch.toLowerCase().split(/\s+/).filter(function(t) { return t.length > 0; });
                     filtered = ALL_CARDS.filter(function(fc) {
-                      var hay = (fc.product + " " + fc.cardSet + " " + fc.cardNumber).toLowerCase();
+                      var hay = (panelCardSubject(fc) + " " + cardYear(fc) + " " + fc.product + " " + fc.cardSet + " " + fc.cardNumber).toLowerCase();
                       for (var ti = 0; ti < terms.length; ti++) { if (hay.indexOf(terms[ti]) === -1) return false; }
                       return true;
                     }).slice(0, 80);
@@ -8044,8 +8145,8 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
                               <div key={cand.id} className="flex items-center gap-1.5 bg-gray-800/60 rounded px-2 py-1 hover:bg-gray-700/60">
                                 {statusLabel ? <span className={"text-[8px] font-bold px-1 rounded " + (cStatus === "owned" ? "bg-green-900/60 text-green-300" : cStatus === "in_transit" ? "bg-emerald-900/60 text-emerald-300" : "bg-red-900/60 text-red-400")}>{statusLabel}</span> : <span className="w-5"></span>}
                                 <span className="text-gray-500 font-mono text-[10px] w-14 flex-shrink-0">#{cand.cardNumber}</span>
-                                {pickSearch && <span className="text-gray-500 text-[10px] w-10 flex-shrink-0">{String(cand.product).slice(0,4)}</span>}
-                                {pickSearch && <span className="text-gray-600 text-[10px] max-w-[80px] truncate flex-shrink-0" title={cand.product}>{String(cand.product).slice(5)}</span>}
+                                {pickSearch && <span className="text-gray-500 text-[10px] w-10 flex-shrink-0">{cardYear(cand)}</span>}
+                                {pickSearch && <span className="text-gray-600 text-[10px] max-w-[80px] truncate flex-shrink-0" title={cand.product}>{String(cand.product).replace(/^\d{4}\s*/, "")}</span>}
                                 <span className="text-gray-200 flex-1 truncate">{cand.cardSet || "Base"}</span>
                                 {cand.copies && <span className="text-purple-400 font-bold text-[10px] flex-shrink-0">{"/" + cand.copies}</span>}
                                 {candIsAuto && <span className="text-yellow-400 text-[8px] font-bold bg-yellow-900/50 px-0.5 rounded flex-shrink-0">AU</span>}
@@ -8628,7 +8729,7 @@ function TaskBoardPanel() {
       { id: "t13", title: "Streamlined changelog panel", desc: "More compact and functional design", priority: "low", input: "minimal" }
     ]
   });
-  
+
   function moveTaskToDone(taskId, fromColumn) {
     setTasks(prev => {
       var task = prev[fromColumn].find(t => t.id === taskId);
@@ -8640,7 +8741,7 @@ function TaskBoardPanel() {
       };
     });
   }
-  
+
   function moveTaskToBacklog(taskId) {
     setTasks(prev => {
       var task = prev.done.find(t => t.id === taskId);
@@ -8688,14 +8789,14 @@ function TaskBoardPanel() {
     var iLabel = inputLabels[task.input] || "Med";
     var canComplete = column === "backlog" || column === "in_progress";
     var canReopen = column === "done";
-    
+
     return (
       <div key={task.id} className={"border rounded p-2 mb-2 " + pColor}>
         <div className="flex items-start justify-between gap-2 mb-1">
           <div className="text-xs font-bold text-gray-200">{task.title}</div>
           <div className="flex gap-1 shrink-0">
             {canComplete && (
-              <button 
+              <button
                 onClick={() => moveTaskToDone(task.id, column)}
                 className="text-[9px] px-1 py-0.5 bg-green-900/40 text-green-400 hover:bg-green-800/60 rounded"
                 title="Mark as done"
@@ -8704,7 +8805,7 @@ function TaskBoardPanel() {
               </button>
             )}
             {canReopen && (
-              <button 
+              <button
                 onClick={() => moveTaskToBacklog(task.id)}
                 className="text-[9px] px-1 py-0.5 bg-gray-800 text-gray-400 hover:bg-gray-700 rounded"
                 title="Move back to backlog"
@@ -8791,7 +8892,7 @@ function TaskBoardPanel() {
 
       {/* DONE - Collapsible */}
       <div className="mt-6 pt-3 border-t border-gray-800">
-        <button 
+        <button
           onClick={function() { setShowDone(!showDone); }}
           className="text-xs text-gray-500 hover:text-gray-400 mb-2 flex items-center gap-1"
         >
@@ -8906,7 +9007,7 @@ function VersionLogPanel() {
       <div className="text-xs text-gray-500 mb-3">
         File: tyler_black_tracker.jsx (permanent) | Storage: tb-statuses-v2, tb-details-v2, tb-forsale-v2, tb-synced-v2, tb-dirty-v2, tb-checkpoint-v2, tb-changelog-v1
       </div>
-      
+
       <div className="space-y-1">
         {VERSION_HISTORY.map(function(v, idx) {
           return (
@@ -9151,7 +9252,7 @@ function ChangelogPanel({ changelog, onOpenCard }) {
   </section>;
 }
 
-function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheckpoint, setLastCheckpoint, isSavingCheckpoint, setIsSavingCheckpoint, saveCount, flashSave, saveToast, exportCsvRef, persistField, setStatuses, setCardDetails, setForSaleFlags, allDataRef }) {
+function ExportPanel({ statuses, copySummaries, cardDetails, forSaleFlags, needsSync, lastCheckpoint, setLastCheckpoint, isSavingCheckpoint, setIsSavingCheckpoint, saveCount, flashSave, saveToast, exportCsvRef, persistField, setStatuses, setCardDetails, setForSaleFlags, allDataRef }) {
   var [exportMsg, setExportMsg] = useState("");
   var [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -9162,11 +9263,12 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
       if (HIDDEN_DUPES.has(card.id)) return;
       visibleTotal++;
       var s = statuses[card.id] || "not_owned";
-      if (s === "owned") owned++;
-      else if (s === "in_transit") intransit++;
-      else notOwned++;
+      var copyState = collectionCardState(card.id,statuses,cardDetails,copySummaries);
+      if (copyState.owned) owned++;
+      if (copyState.inTransit) intransit++;
+      if (!copyState.owned && !copyState.inTransit) notOwned++;
       var d = cardDetails[card.id] || {};
-      var qtyVal = parseInt(d.qty) || 1;
+      var qtyVal = getCardQty(cardDetails,statuses,card.id,copySummaries);
       if (forSaleFlags[card.id] || qtyVal > 1) forSale++;
       if (d.serial) withSerial++;
       if (d.price) withPrice++;
@@ -9175,7 +9277,7 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
     });
     var dupeCount = DUPES.length;
     return { owned: owned, intransit: intransit, notOwned: notOwned, withSerial: withSerial, withPrice: withPrice, withDate: withDate, withNotes: withNotes, forSale: forSale, dupeCount: dupeCount, total: visibleTotal };
-  }, [statuses, cardDetails, forSaleFlags]);
+  }, [statuses, cardDetails, copySummaries, forSaleFlags]);
 
   function escCsv(val) {
     var s = String(val == null ? "" : val);
@@ -9186,7 +9288,7 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
   }
 
   function buildFullName(card) {
-    var base = card.product + " ";
+    var base = (window.MODE !== "tb" ? panelCardSubject(card) + " " : "") + card.product + " ";
     if (card.cardSet && card.cardSet !== "Base") base += "- " + card.cardSet + " ";
     base += "#" + card.cardNumber;
     return base;
@@ -9209,15 +9311,17 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
   }
 
   function generateCsv() {
-    var header = "full_name,year,product,variant,card_number,serial_numbered,print_run,is_auto,is_mem,is_rc,attributes,status,quantity,my_serial_number,price_paid,purchase_date,notes,is_duplicate,dupe_type,source,duplicate_type,synced_to_tcdb,ebay_url,ebay_order_url,card_id,catalog_type,verification,source_url,proof_color,proof_finish,signature,proof_serial,certification,parent_card_id";
+    var header = "full_name,year,product,variant,card_number,serial_numbered,print_run,is_auto,is_mem,is_rc,attributes,status,quantity,my_serial_number,price_paid,purchase_date,notes,is_duplicate,dupe_type,source,duplicate_type,synced_to_tcdb,ebay_url,ebay_order_url,card_id,catalog_type,verification,source_url,proof_color,proof_finish,signature,proof_serial,certification,parent_card_id,collection_scope,subject,owned_quantity,in_transit_quantity,wanted_quantity,purchase_currency";
     var rows = [header];
 
     ALL_CARDS.forEach(function(card) {
       var s = statuses[card.id] || "not_owned";
       var d = cardDetails[card.id] || {};
-      var cardQty = parseInt(d.qty) || 1;
-      var qty = (s === "owned" || s === "in_transit") ? cardQty : 0;
-      var year = extractYear(card.product);
+      var cardQty = getCardQty(cardDetails,statuses,card.id,copySummaries);
+      var qty = cardQty;
+      var copyState = collectionCardState(card.id,statuses,cardDetails,copySummaries);
+      var exportStatus = [copyState.owned && "Owned",copyState.inTransit && "In Transit"].filter(Boolean).join(" + ") || statusLabel(s);
+      var year = cardYear(card);
       var prodName = extractProductName(card.product);
       var fullName = buildFullName(card);
       var catalogInfo = window.CardCatalog.getInfo(card);
@@ -9235,10 +9339,10 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
       var row = [
         fullName, year, prodName, card.cardSet, card.cardNumber,
         effectiveRun || isMissingSN(card, cardDetails) ? "Yes" : "", effectiveRun || "", isAuto, isMem, isRc, fsFlag,
-        statusLabel(s), qty, d.serial || "", d.price || "",
+        exportStatus, qty, d.serial || "", d.price || "",
         d.date || "", d.notes || "", "No", "",
         TCDB_LINKS[card.id] ? "TCDB" : catalogInfo.verification === "checklist" ? "Checklist" : "Recorded card", "", synced, ebayLink, ebayOrderUrl,
-        card.id, catalogInfo.issueType, catalogInfo.verification, catalogInfo.sourceUrl, catalogInfo.proofColor, catalogInfo.proofFinish, catalogInfo.signature, catalogInfo.serialMark, catalogInfo.certification, catalogInfo.parentCardId
+        card.id, catalogInfo.issueType, catalogInfo.verification, catalogInfo.sourceUrl, catalogInfo.proofColor, catalogInfo.proofFinish, catalogInfo.signature, catalogInfo.serialMark, catalogInfo.certification, catalogInfo.parentCardId, window.CollectionProfile?.scope(window.MODE) || window.MODE, panelCardSubject(card), copyState.ownedQty ?? (copyState.owned ? qty : 0), copyState.transitQty ?? (copyState.inTransit ? qty : 0), card.wantedQty ?? "", d.currency || ""
       ].map(escCsv).join(",");
       rows.push(row);
     });
@@ -9246,7 +9350,7 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
     DUPES.forEach(function(dupe) {
       var parentCard = CARD_BY_ID[dupe.parent_id];
       if (!parentCard) return;
-      var year = extractYear(parentCard.product);
+      var year = cardYear(parentCard);
       var prodName = extractProductName(parentCard.product);
       var fullName = buildFullName(parentCard);
       var parentRun = getEffCopies(parentCard, cardDetails);
@@ -9257,7 +9361,7 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
         fullName, year, prodName, parentCard.cardSet, parentCard.cardNumber,
         parentRun || isMissingSN(parentCard, cardDetails) ? "Yes" : "", parentRun || "", "", "", "", "",
         dupeStatus, 1, "", "", "", "",
-        "Yes", "", "TCDB", dupeTypeLabel, "", "", "", parentCard.id, window.CardCatalog.getInfo(parentCard).issueType, "", "", "", "", "", "", "", ""
+        "Yes", "", "TCDB", dupeTypeLabel, "", "", "", parentCard.id, window.CardCatalog.getInfo(parentCard).issueType, "", "", "", "", "", "", "", "", window.CollectionProfile?.scope(window.MODE) || window.MODE, panelCardSubject(parentCard), dupeStatus === "Owned" ? 1 : 0, dupeStatus === "In Transit" ? 1 : 0, "", ""
       ].map(escCsv).join(",");
       rows.push(row);
     });
@@ -9266,7 +9370,9 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
   }
 
   function generateStateJson() {
+    if(isSportMode())return JSON.stringify({exportDate:new Date().toISOString(),version:"v3",collectionScope:window.MODE,collectionState:allDataRef.current},null,2);
     return JSON.stringify({
+      collectionScope:window.MODE,
       exportDate: new Date().toISOString(),
       version: "v2",
       totalCards: ALL_CARDS.length,
@@ -9311,7 +9417,7 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
     var a = document.createElement("a");
     var ts = new Date().toISOString().slice(0,10);
     a.href = url;
-    a.download = "tyler_black_master_updated_" + ts + ".csv";
+    a.download = (window.MODE === "tb" ? "tyler_black_master_updated_" : (window.CollectionProfile?.scope(window.MODE) || window.MODE) + "_collection_") + ts + ".csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -9331,7 +9437,7 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
     var a = document.createElement("a");
     var ts = new Date().toISOString().slice(0,10);
     a.href = url;
-    a.download = "tyler_black_state_" + ts + ".json";
+    a.download = (window.MODE === "tb" ? "tyler_black_state_" : (window.CollectionProfile?.scope(window.MODE) || window.MODE) + "_state_") + ts + ".json";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -9342,10 +9448,33 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
 
   function restoreFromJson(file) {
     if (!file) return;
+    const sourceMode=window.MODE,sourceOwner=window.trackerAuth.userId();
     var reader = new FileReader();
     reader.onload = async function(e) {
       try {
         var data = JSON.parse(e.target.result);
+        if(window.MODE!==sourceMode || window.trackerAuth.userId()!==sourceOwner || !window.trackerAuth.isOwner())throw Error("Your collection or account changed. Choose the backup again.");
+        if(data.collectionScope && data.collectionScope!==sourceMode)throw Error("This backup belongs to another collection.");
+        if(isSportMode(sourceMode)) {
+          if(data.collectionScope!==sourceMode || !data.collectionState?.cards || typeof data.collectionState.cards!=="object" || Array.isArray(data.collectionState.cards))throw Error("Choose a full backup from this sport collection with cards keyed by ID.");
+          var incoming=data.collectionState,api=window.trackerCollections.forMode(sourceMode);
+          window.CollectionProfile.cards(sourceMode,incoming);
+          if(api.hasPending())throw Error("Save your current edits before restoring missing records.");
+          var current=await api.read();
+          if(window.MODE!==sourceMode || window.trackerAuth.userId()!==sourceOwner || !window.trackerAuth.isOwner())throw Error("Your collection or account changed.");
+          if(api.hasPending())throw Error("Save your current edits before restoring missing records.");
+          var next=JSON.parse(JSON.stringify(current)),added=0;
+          for(var [id,card] of Object.entries(incoming.cards)){
+            if(Object.hasOwn(current.cards || {},id))continue;
+            if(!next.cards)next.cards={};next.cards[id]=card;added++;
+            for(var field of ["statuses","details","forsale"]){if(!Object.hasOwn(current[field] || {},id) && Object.hasOwn(incoming[field] || {},id)){if(!next[field])next[field]={};next[field][id]=incoming[field][id];}}
+          }
+          if(!added){setExportMsg("All backup cards already exist. Current ownership and quantities were preserved.");return;}
+          next.changelog=[{ts:new Date().toISOString(),field:"restore",source:"Manual backup restore",before:0,after:added,note:"Missing cards restored; existing ownership, copies and records preserved"},...(current.changelog || [])];
+          api.begin(current);api.stage(next);var result=await api.sync();
+          if(!result.cloudSaved)throw Error(result.error || "Restore is pending. Review the sync notice.");
+          setExportMsg("Restored "+added+" missing cards. Existing ownership, quantities and purchase evidence were preserved.");return;
+        }
         if (data.statuses && typeof data.statuses === "object") {
           if (Array.isArray(data.customCards)) {
             var restoredCustoms = window.CardCatalog.normalizeCustomCards(data.customCards);
@@ -9360,7 +9489,7 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
             var catalogRestore = await saveCustomCards(restoredCustoms);
             if (!catalogRestore.cloudSaved || (catalogRestore.conflicts && catalogRestore.conflicts.length)) throw new Error("Catalogue sync could not finish; ownership was not replaced. " + (catalogRestore.error || "Try again when connected."));
           }
-          if (data.catalogMetadata && window.MODE !== "wnba") {
+          if (data.catalogMetadata && window.MODE === "tb") {
             var metadataRestore = await window.storage.set("tb-catalog-meta-v1", JSON.stringify(data.catalogMetadata));
             applyCatalogMeta(); window.dispatchEvent(new CustomEvent("catalogchange"));
             if (!metadataRestore.cloudSaved) throw new Error("Catalogue details are saved on this device but cloud sync is pending; ownership was not replaced.");
@@ -9399,9 +9528,14 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
 
   function restoreSecondaryData(file) {
     if (!file) return;
+    if(window.MODE!=="tb"){setExportMsg("Secondary price tracking is Tyler Black-only.");return;}
+    const sourceOwner=window.trackerAuth.userId();
+    const stillCurrent=()=>window.MODE==="tb" && window.trackerAuth.userId()===sourceOwner && window.trackerAuth.isOwner();
+    if(!stillCurrent()){setExportMsg("Sign in before restoring secondary data.");return;}
     var reader = new FileReader();
     reader.onload = async function(e) {
       try {
+        if(!stillCurrent())throw Error("Your collection or account changed. Choose the backup again.");
         var raw = e.target.result;
         var data = JSON.parse(raw);
         var fileKeys = Object.keys(data);
@@ -9415,8 +9549,10 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
           if (val === undefined || val === null) continue;
           var strVal = typeof val === "string" ? val : JSON.stringify(val);
           if (strVal === "{}" || strVal === "[]" || strVal === "null" || strVal === "") continue;
+          if(!stillCurrent())throw Error("Your collection or account changed. Remaining backup records were not restored.");
           try { localStorage.setItem(key, strVal); } catch(e2) {}
           try { await window.storage.set(key, strVal); } catch(e2) {}
+          if(!stillCurrent())throw Error("Your collection or account changed. Remaining backup records were not restored.");
           restored++;
           details.push(key.replace("tb-","").replace("-v1","") + "(" + (strVal.length/1024).toFixed(0) + "KB)");
         }
@@ -9546,14 +9682,14 @@ function ExportPanel({ statuses, cardDetails, forSaleFlags, needsSync, lastCheck
           </button>
 
           <label className="w-full py-2 px-3 bg-amber-700 hover:bg-amber-600 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer">
-            Restore from JSON Backup
+            {isSportMode() ? "Restore missing records (JSON)" : "Restore from JSON Backup"}
             <input type="file" accept=".json" className="hidden" onChange={function(e) { if (e.target.files[0]) restoreFromJson(e.target.files[0]); e.target.value = ""; }} />
           </label>
 
-          <label className="w-full py-2 px-3 bg-teal-700 hover:bg-teal-600 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer">
+          {window.MODE === "tb" && <label className="w-full py-2 px-3 bg-teal-700 hover:bg-teal-600 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer">
             Restore Secondary Data (prices, targets, scans)
             <input type="file" accept=".json" className="hidden" onChange={function(e) { if (e.target.files[0]) restoreSecondaryData(e.target.files[0]); e.target.value = ""; }} />
-          </label>
+          </label>}
 
           <button onClick={copyRawData} className="w-full py-2 px-3 bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors">
             Copy State to Clipboard
@@ -9596,54 +9732,39 @@ window.addEventListener("error", function(e) {
     // so all useState / useMemo / useEffect re-initialize and data reloads from the
     // correct mode-prefixed storage key. State loss across mode switch is intentional.
     function TrackerRoot() {
-      var mode = useTrackerMode();
-      var owner = useIsOwner();
-      function collectionRoute() {
-        var match = /^#collections(?:\/([^/]+))?$/.exec(location.hash);
-        return match ? (window.CollectionsUtils.SPORTS.includes(match[1]) ? match[1] : "racing") : null;
-      }
-      var [collections, setCollections] = useState(function() { return !!collectionRoute(); });
-      var [collectionSport, setCollectionSport] = useState(function() { return collectionRoute() || "racing"; });
-      var [navigationError, setNavigationError] = useState("");
-      var navigationBusy = useRef(false), showingCollections = useRef(collections);
-      showingCollections.current = collections;
-      function updateSport(sport) {
-        if (!window.CollectionsUtils.SPORTS.includes(sport)) return;
-        setCollectionSport(sport); history.replaceState(null,"","#collections/"+sport);
-      }
-      useEffect(function() {
-        async function open(event) {
-          if (!window.trackerAuth.isOwner() || navigationBusy.current) return;
-          if (privatePanelHasEdits()) { setNavigationError("Save or cancel the open autograph / receipt edit before switching collections."); if (!showingCollections.current) history.replaceState(null,"",location.pathname+location.search); return; }
-          var sport = event && event.detail && event.detail.sport || collectionRoute() || "racing";
-          if (!window.CollectionsUtils.SPORTS.includes(sport)) sport = "racing";
-          if (showingCollections.current) { updateSport(sport); return; }
-          navigationBusy.current = true;
-          var sourceMode = window.MODE, sourceOwner = window.trackerAuth.userId && window.trackerAuth.userId();
-          try {
-            var result = await window.trackerCollections.forMode(sourceMode).sync();
-            if (!result.cloudSaved) throw Error(result.error || "Save your pending edits before switching collections.");
-            if (!window.trackerAuth.isOwner() || window.MODE !== sourceMode || sourceOwner !== (window.trackerAuth.userId && window.trackerAuth.userId())) throw Error("Your session changed. Open Collections again after it reloads.");
-            setNavigationError(""); setCollections(true); updateSport(sport);
-          } catch(error) { setNavigationError(error.message); }
-          finally { navigationBusy.current = false; }
+      var mode=useTrackerMode(),owner=useIsOwner();
+      var [navigationError,setNavigationError]=useState(""),[navigating,setNavigating]=useState(false);
+      var busy=useRef(false);
+      function routeMode(){var match=/^#collections\/([^/]+)$/.exec(location.hash);return match && window.CollectionProfile.isSport(match[1]) ? match[1] : location.hash==="#tempo" ? "wnba" : null;}
+      useEffect(function(){
+        var active=true;
+        async function open(event){
+          var next=event?.detail?.mode || event?.detail?.sport || routeMode();
+          if(!next || next===window.MODE || busy.current)return;
+          if(!["tb","wnba"].includes(next) && !window.CollectionProfile.isSport(next))return;
+          if(!window.trackerAuth.isOwner()){setNavigationError("Sign in to open your private collections.");return;}
+          if(privatePanelHasEdits()){setNavigationError("Save or cancel the open edit before switching collections.");return;}
+          busy.current=true;setNavigating(true);var sourceMode=window.MODE,sourceOwner=window.trackerAuth.userId();
+          try{
+            var saved=await window.trackerCollections.forMode(sourceMode).sync();
+            if(!saved.cloudSaved)throw Error(saved.error || "Your current edits must save before switching collections.");
+            var prepared=await window.trackerModes.prepare(next);
+            if(!prepared.ok)throw Error(prepared.error || "This collection could not be loaded.");
+            if(!active || sourceMode!==window.MODE || sourceOwner!==window.trackerAuth.userId() || !window.trackerAuth.isOwner())throw Error("Your collection or account changed. Try again.");
+            if(privatePanelHasEdits() || window.trackerCollections.forMode(sourceMode).hasPending())throw Error("Finish the current edit before switching collections.");
+            if(window.CollectionProfile.isSport(next))SPORT_CATALOG_STATE[next]=prepared.value;
+            if(!window.setMode(next))throw Error("Unable to open this collection.");
+            history.replaceState(null,"",location.pathname+location.search+(window.CollectionProfile.isSport(next)?"#collections/"+next:next==="wnba"?"#tempo":""));
+            setNavigationError("");
+          }catch(error){if(active)setNavigationError(error.message);}
+          finally{busy.current=false;if(active)setNavigating(false);}
         }
-        function route() {
-          var sport = collectionRoute();
-          if (sport) open({detail:{sport:sport}});
-          else if (showingCollections.current) window.dispatchEvent(new CustomEvent("close-collections"));
-        }
-        window.addEventListener("open-collections",open); window.addEventListener("hashchange",route);
-        return function() { window.removeEventListener("open-collections",open); window.removeEventListener("hashchange",route); };
-      }, []);
-      function close() { setNavigationError(""); setCollections(false); history.replaceState(null,"",location.pathname+location.search); }
-      function openTracker(nextMode) {
-        if (nextMode!=="tb" && nextMode!=="wnba") return false;
-        if (privatePanelHasEdits()) { setNavigationError("Save or cancel the open edit before switching collections."); return false; }
-        if (!window.setMode(nextMode)) { setNavigationError("Sign in to open this collection."); return false; }
-        close();return true;
-      }
-      return <>{navigationError && <div role="alert" className="text-xs p-2 text-amber-200 bg-amber-950">{navigationError}</div>}{owner && collections ? <window.SportCollectionsPanel onClose={close} onOpenTracker={openTracker} initialSport={collectionSport} onSportChange={updateSport} /> : <TylerBlackTracker key={mode} />}</>;
+        function route(){var next=routeMode();if(next)open({detail:{mode:next}});}
+        window.addEventListener("open-tracker-collection",open);window.addEventListener("open-collections",open);window.addEventListener("hashchange",route);window.addEventListener("authchange",route);
+        route();
+        return ()=>{active=false;window.removeEventListener("open-tracker-collection",open);window.removeEventListener("open-collections",open);window.removeEventListener("hashchange",route);window.removeEventListener("authchange",route);};
+      },[]);
+      return <>{navigationError && <div role="alert" className="text-xs p-2 text-amber-200 bg-amber-950">{navigationError}</div>}{navigating && <div role="status" className="fixed bottom-2 right-2 z-50 bg-slate-900 border border-slate-700 rounded px-3 py-1 text-xs text-slate-300">Opening collection…</div>}<TylerBlackTracker key={mode}/></>;
     }
     ReactDOM.createRoot(root).render(React.createElement(TrackerRoot));
   } catch(e) {

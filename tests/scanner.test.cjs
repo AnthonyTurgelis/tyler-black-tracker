@@ -183,15 +183,15 @@ test('COMC/SportLots amounts retain thousands and cents without borrowing the ne
 });
 
 test('Tempo source shortcuts use the actual player and ambiguous sparklines stay hidden', () => {
-  const ctx={window:{MODE:'wnba',TEMPO_ROSTER:roster,CollectionScanner:scan,TrackerMarket:market,PriceHistoryUtils:require('../price-history-utils.js')},
-    cardYear:c=>String(c.year),globalPriceKey:c=>'test',ALL_CARDS:cards,PRICE_HISTORY:{},React:{createElement:(...args)=>args},WHATNOT_SEARCH:'https://www.whatnot.com/search?q=tyler+black',COMC_PLAYER:'https://www.comc.com/Players/Baseball/Tyler_Black/c389004'};
+  const ctx={window:{MODE:'wnba',TEMPO_ROSTER:roster,CollectionScanner:scan,CollectionMarket:require('../collection-market-utils.js'),CollectionProfile:require('../collection-profile.js'),TrackerMarket:market,PriceHistoryUtils:require('../price-history-utils.js')},
+    isSportMode:()=>false,cardYear:c=>String(c.year),globalPriceKey:c=>'test',ALL_CARDS:cards,PRICE_HISTORY:{},React:{createElement:(...args)=>args},WHATNOT_SEARCH:'https://www.whatnot.com/search?q=tyler+black',COMC_PLAYER:'https://www.comc.com/Players/Baseball/Tyler_Black/c389004'};
   vm.createContext(ctx);
   for(const name of ['pt130Url','whatnotUrl','comcUrl','Sparkline']) {
     const start=source.indexOf('function '+name+'('),end=source.indexOf('\n}\n',start)+3;
     vm.runInContext(source.slice(start,end),ctx);
   }
   assert.match(decodeURIComponent(ctx.pt130Url(cards[0])),/Kiki Rice/);assert.doesNotMatch(ctx.pt130Url(cards[0]),/tyler/i);
-  assert.match(decodeURIComponent(ctx.whatnotUrl(cards[2])),/Nyara Sabally/);assert.equal(ctx.comcUrl(cards[0]),null);
+  assert.match(decodeURIComponent(ctx.whatnotUrl(cards[2])),/Nyara Sabally/);assert.match(decodeURIComponent(ctx.comcUrl(cards[0])),/Kiki Rice/);assert.doesNotMatch(ctx.comcUrl(cards[0]),/Tyler_Black/);
   const key=ctx.window.PriceHistoryUtils.cardKey(cards[0]);
   ctx.PRICE_HISTORY[key]=[{price:10,currency:'USD',kind:'asking',date:'2026-11-17'},{price:15,currency:'CAD',kind:'asking',date:'2026-11-18'}];
   assert.equal(ctx.Sparkline({card:cards[0]}),null);

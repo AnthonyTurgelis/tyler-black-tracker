@@ -147,6 +147,29 @@ test('additional copies require confirmation and a variant can have in-hand plus
   assert.equal(summary.hasInTransit,true);
   assert.equal(summary.legacyOwned,true);
 });
+test('new confirmed purchases default to incoming even when a receipt reports delivered',()=>{
+ const emptyContext={statuses:{},cardDetails:{},now:NOW};
+ for(const [source,location] of [['ebay','in_transit'],['comc','comc'],['other','in_transit']]){
+  const staged=CI.upsertPurchase({}, {...purchase,source,deliveryStatus:'Delivered'},emptyContext);
+  const resolved=CI.resolveObservation(staged.inventory,staged.observationId,{confirmAdditional:true},emptyContext);
+  assert.equal(resolved.inventory.copies[resolved.copyId].location,location);
+  assert.equal(resolved.inventory.observations[staged.observationId].observedDeliveryStatus,'Delivered');
+  const summary=CI.summarizeCard(resolved.inventory,7,emptyContext.statuses,emptyContext.cardDetails);
+  assert.equal(summary.transitQty,1);assert.equal(summary.ownedQty,0);assert.equal(summary.unknownQty,0);
+ }
+ const staged=CI.upsertPurchase({},purchase,emptyContext);
+ const manual=CI.resolveObservation(staged.inventory,staged.observationId,{confirmAdditional:true,location:'in_hand'},emptyContext);
+ assert.equal(manual.inventory.copies[manual.copyId].location,'in_hand');
+});
+test('linking another purchase never applies an incoming default to an existing manually received copy',()=>{
+ const inventory=CI.editCopy({},7,'legacy:7:1',{location:'in_hand'},context);
+ for(const source of ['ebay','comc']){
+  const staged=CI.upsertPurchase(inventory,{...purchase,source,deliveryStatus:'Shipped'},context);
+  const resolved=CI.resolveObservation(staged.inventory,staged.observationId,{existingCopyId:'legacy:7:1'},context);
+  assert.equal(resolved.inventory.copies['legacy:7:1'].location,'in_hand');
+  assert.equal(CI.summarizeCard(resolved.inventory,7,context.statuses,context.cardDetails).total,2);
+ }
+});
 
 test('different serials cannot be linked into the same physical copy', () => {
   let inventory = CI.editCopy({},7,'legacy:7:1',{serial:'06/10'},context);

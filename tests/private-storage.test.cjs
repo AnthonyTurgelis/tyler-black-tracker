@@ -26,6 +26,10 @@ async function boot() {
         insert(value) { operation = 'insert'; payload = value; return this; },
         update(value) { operation = 'update'; payload = value; return this; },
         then(resolve,reject) { return Promise.resolve({data:[],error:null}).then(resolve,reject); },
+        async single() {
+          assert.notEqual(table,'collection_private_kv');
+          return {data:{value:{statuses:{},details:{},cards:{'tcdb:7':{id:'tcdb:7',subject:'Saved driver'}},imports:{proof:{cardId:'tcdb:7'}},changelog:[]},updated_at:'2026-11-19T00:00:00Z'}};
+        },
         async maybeSingle() {
           calls.push({table,operation,filters:clone(filters)});
           assert.equal(table,'collection_private_kv');
@@ -50,7 +54,7 @@ async function boot() {
       return query;
     }
   };
-  const window = {CollectionSync:require("../collection-sync.js"),SUPABASE_URL:'https://example.invalid',SUPABASE_ANON_KEY:'public-test-key',supabase:{createClient:()=>client},dispatchEvent(event){auth.events.push(event);}};
+  const window = {CollectionSync:require("../collection-sync.js"),PriceHistoryUtils:require('../price-history-utils'),TrackerMedia:require('../media-utils'),SUPABASE_URL:'https://example.invalid',SUPABASE_ANON_KEY:'public-test-key',supabase:{createClient:()=>client},dispatchEvent(event){auth.events.push(event);}};
   const localStorage = {get length(){return cache.size;},key:i=>[...cache.keys()][i],getItem:k=>cache.get(k)||null,setItem:(k,v)=>cache.set(k,v),removeItem:k=>cache.delete(k)};
   vm.runInNewContext(source,{window,localStorage,console:{log(){},warn(){},error(){}},CustomEvent:function(type,options){this.type=type;this.detail=options.detail;},setTimeout(fn,ms){if(ms===0)queueMicrotask(fn);}});
   await window.storageReady;
@@ -168,4 +172,81 @@ test('Tyler and Tempo private copy inventories isolate identical card and receip
   const update={...tempo,copies:{same:{cardId:7,serial:'9/25'}}};
   assert.equal((await h.window.trackerPrivateStore.save(tempoKey,update,loaded.revision,loaded.ownerId)).ok,true);
   assert.deepEqual(h.rows.get('owner-a:'+KEY).value,tyler);assert.equal(h.cache.size,0);
+});
+
+test('all sport modes use their existing keys, require owner access and reset on signout',async()=>{
+ const h=await boot();
+ for(const mode of ['racing','baseball','basketball','football','hockey','soccer','other']){
+  assert.equal(h.window.trackerModes.isSport(mode),true);
+  assert.equal(h.window.trackerModes.keyForMode('alldata-v1',mode),'collect-'+mode+'-alldata-v1');
+  assert.equal(h.window.setMode(mode),true);assert.equal(h.window.MODE,mode);
+ }
+ assert.equal(h.window.trackerModes.keyForMode('tb-price-history-v1','wnba'),'tempo-price-history-v1');
+ assert.equal(h.window.setMode('unrecognized'),false);
+ h.auth.switchUser(null);assert.equal(h.window.MODE,'tb');assert.equal(h.window.setMode('racing'),false);
+});
+
+test('preparing the shared sport tracker reads existing catalogue and auxiliary data without migration or local caches',async()=>{
+ const h=await boot(),key='collect-racing-price-history-v1';
+ h.rows.set('owner-a:'+key,{revision:1,value:{schemaVersion:1,history:{'tcdb:7':[{observationKey:'purchase:item7',price:4,currency:'USD'}]},targets:{'tcdb:7':5}}});
+ const prepared=await h.window.trackerModes.prepare('racing');
+ assert.equal(prepared.ok,true);assert.equal(prepared.value.cards['tcdb:7'].subject,'Saved driver');assert.equal(prepared.value.imports.proof.cardId,'tcdb:7');
+ assert.equal(h.window.storage.peek(key),null,'market prices are not preloaded for other sports');
+ assert.ok(!h.calls.some(c=>c.filters.key===key));
+ await h.window.storage.get(key);
+ assert.equal(JSON.parse(h.window.storage.peek(key))['tcdb:7'][0].price,4);
+ assert.equal(JSON.parse(h.window.storage.peek('collect-racing-targets-v1'))['tcdb:7'],5);
+ assert.equal(h.calls.filter(c=>c.operation!=='read').length,0);assert.equal(h.cache.size,0);
+});
+
+test('shared sport history and targets serialize against the same private revision and preserve imported prices',async()=>{
+ const h=await boot(),key='collect-racing-price-history-v1',targets='collect-racing-targets-v1';
+ h.rows.set('owner-a:'+key,{revision:1,value:{schemaVersion:1,history:{'tcdb:7':[{observationKey:'comc:7',price:4,currency:'USD'}]},targets:{old:3}}});
+ await Promise.all([h.window.storage.get(key),h.window.storage.get(targets)]);
+ assert.equal(h.calls.length,1,'both fields share the same private read');
+ const saved=await Promise.all([h.window.storage.set(key,{'tcdb:7':[{observationKey:'ebay:8',price:6,currency:'CAD'}]}),h.window.storage.set(targets,{old:3,new:5})]);
+ assert.ok(saved.every(r=>r.cloudSaved));
+ const row=h.rows.get('owner-a:'+key);assert.equal(row.revision,3);assert.equal(row.value.history['tcdb:7'].length,2);assert.deepEqual(row.value.targets,{old:3,new:5});
+ assert.equal(h.cache.size,0);assert.ok(h.calls.every(c=>c.table==='collection_private_kv'));
+});
+
+test('sport auxiliary edits reject uninitialized and stale snapshots without replacing newer cloud data',async()=>{
+ const h=await boot(),key='collect-racing-ebay-bids-v1';
+ assert.equal((await h.window.storage.set(key,{stale:1})).cloudSaved,false);assert.equal(h.calls.length,0);
+ h.rows.set('owner-a:'+key,{revision:1,value:{old:1}});await h.window.storage.get(key);
+ h.rows.set('owner-a:'+key,{revision:2,value:{old:1,newer:2}});
+ assert.equal((await h.window.storage.set(key,{old:3})).cloudSaved,false);
+ assert.deepEqual(h.rows.get('owner-a:'+key).value,{old:1,newer:2});assert.equal(h.window.storage.peek(key),null);
+ assert.equal(JSON.parse((await h.window.storage.get(key)).value).newer,2);
+ assert.equal(h.cache.size,0);
+});
+
+test('dedicated sport panels and shared tracker read the same newest private price revision',async()=>{
+ const h=await boot(),key='collect-racing-price-history-v1';
+ h.rows.set('owner-a:'+key,{revision:1,value:{schemaVersion:1,history:{},targets:{keep:9}}});
+ await h.window.storage.get(key);
+ const panel=await h.window.trackerPrivateStore.load(key);
+ assert.equal((await h.window.trackerPrivateStore.save(key,{...panel.value,history:{'tcdb:7':[{observationKey:'panel-purchase',price:7,currency:'USD'}]}},panel.revision,panel.ownerId)).ok,true);
+ assert.equal(JSON.parse(h.window.storage.peek(key))['tcdb:7'][0].price,7);
+ assert.equal((await h.window.storage.set('collect-racing-targets-v1',{keep:9,add:4})).cloudSaved,true);
+ assert.equal(h.rows.get('owner-a:'+key).value.history['tcdb:7'][0].price,7);
+ assert.ok(h.auth.events.some(e=>e.type==='price-history-saved'&&e.detail.key===key));
+});
+
+test('sport private auxiliary memory is cleared on owner change and never falls back to old local cache',async()=>{
+ const h=await boot(),key='collect-racing-ebay-blocked-v1';
+ h.rows.set('owner-a:'+key,{revision:1,value:{privateAccount:'A'}});await h.window.storage.get(key);assert.ok(h.window.storage.peek(key));
+ h.cache.set(key,JSON.stringify({privateAccount:'stale-local-A'}));
+ h.window.setMode('racing');h.auth.switchUser({id:'owner-b'});
+ assert.equal(h.window.MODE,'tb');assert.equal(h.window.storage.peek(key),null);
+ assert.deepEqual(JSON.parse((await h.window.storage.get(key)).value),{});
+ h.auth.switchUser(null);assert.equal(await h.window.storage.get(key),null);assert.equal(h.window.storage.peek(key),null);
+ assert.equal((await h.window.storage.delete(key)).deleted,false);
+});
+
+test('private auxiliary saves expose their pending state for shared tracker navigation guards',async()=>{
+ const h=await boot(),key='collect-racing-tcdb-flags-v1';await h.window.storage.get(key);
+ let release;const waiting=new Promise(resolve=>{release=resolve;});h.auth.beforeCheck=()=>waiting;
+ const saved=h.window.storage.set(key,{'tcdb:7':true});assert.equal(h.window.trackerModes.hasPending(),true);
+ release();assert.equal((await saved).cloudSaved,true);assert.equal(h.window.trackerModes.hasPending(),false);
 });

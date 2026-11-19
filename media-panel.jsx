@@ -1,4 +1,16 @@
 /* Shared photo previews and the image-led card gallery. */
+function mediaCardSubject(card) {
+  if (!card) return "";
+  if (window.CollectionProfile) return window.CollectionProfile.subject(card,window.TEMPO_ROSTER || {});
+  return String(card.subject || card.playerName || window.TEMPO_ROSTER?.[card.player]?.name || card.player || "");
+}
+function mediaCardProduct(card) {
+  const product=String(card?.product || ""),year=String(card?.year || "");
+  return year && !product.startsWith(year) ? year+" "+product : product;
+}
+function mediaCardLabel(card) {
+  return card ? [mediaCardSubject(card),mediaCardProduct(card),"#"+card.cardNumber,card.cardSet || "Base"].filter(Boolean).join(" · ") : "Choose a card";
+}
 function CardPhotoThumbnail({photos = [], title = "Card photo", onOpen, compact = false, emptyLabel = "No photo yet", emptyDetail = ""}) {
   const TM = window.TrackerMedia;
   const ordered = React.useMemo(() => TM.preferredPhotos(photos), [photos]);
@@ -132,7 +144,7 @@ function ReviewStateBadges({observation}) {
 function ObservationReferencePhotos({observation, cardById = {}, publicMedia, onPreview, onChooseCard}) {
   const TM=window.TrackerMedia,plan=TM.observationPhotoPlan(observation,cardById,publicMedia),facts=TM.observationFacts(observation);
   const [showAll,setShowAll]=React.useState(false);
-  const label=card=>[card.subject || card.playerName || "",card.product,"#"+card.cardNumber,card.cardSet || "Base"].filter(Boolean).join(" · ");
+  const label=mediaCardLabel;
   const title=observation.title || (plan.card ? label(plan.card) : "Unidentified purchase");
   return <section className="space-y-3" data-observation-identity={plan.identityConfirmed?"confirmed":"pending"}>
     <ReviewStateBadges observation={observation} />
@@ -156,11 +168,11 @@ function ComcDuplicateReview({inventory, cardById, publicMedia, query = "", canE
   const TM = window.TrackerMedia;
   const groups = TM.comcDuplicateGroups(inventory).filter(group=> {
     const card=cardById[group.cardId] || {};
-    return !query || [card.subject,card.playerName,card.product,card.cardNumber,card.cardSet,...group.observations.map(o=>[o.title,o.serial,o.sourceItemId].join(" "))].join(" ").toLowerCase().includes(query.toLowerCase());
+    return !query || [mediaCardSubject(card),mediaCardProduct(card),card.cardNumber,card.cardSet,...group.observations.map(o=>[o.title,o.serial,o.sourceItemId].join(" "))].join(" ").toLowerCase().includes(query.toLowerCase());
   });
   const money = observation => window.TrackerMarket.formatMoney(observation.askingPrice == null ? observation.listedPrice : observation.askingPrice,observation.currency);
   return <div className="space-y-4"><p className="text-xs text-slate-400">These groups come from confirmed current COMC inventory. A record awaiting a match is shown here without becoming another counted copy. Choose your keeper, then review the other copies for sale.</p>{groups.map(group=>{
-    const card=cardById[group.cardId],title=card ? card.product+" · #"+card.cardNumber+" · "+(card.cardSet || "Base") : "Catalogue card "+group.cardId;
+    const card=cardById[group.cardId],title=card ? mediaCardLabel(card) : "Catalogue card "+group.cardId;
     return <section key={group.cardId} data-comc-duplicate-card-id={group.cardId} className="overflow-hidden rounded-lg border border-amber-800/60 bg-slate-900"><header className="space-y-1 border-b border-slate-700 bg-amber-950/20 p-3"><h3 className="text-sm font-semibold text-amber-200">{title}</h3><p className="text-sm font-bold text-amber-300">At least {group.minimumExtras} extra at COMC—choose keeper</p><p className="text-xs text-slate-400">{group.count} confirmed copies at COMC · {group.observations.length} inventory records shown</p></header><div className="divide-y divide-slate-800">{group.observations.map(observation=><article key={observation.id} className="p-3"><div className="flex items-start gap-3"><CardPhotoThumbnail photos={TM.photosForCopy(observation,group.cardId,publicMedia)} compact emptyLabel="Exact reference unavailable" title={title+(observation.serial?" · Serial "+observation.serial:"")} onOpen={photos=>onPreview({photos,title})} /><div className="min-w-0 flex-1"><div className="flex flex-wrap gap-2 text-xs"><span className={"rounded px-2 py-1 "+(observation.saleState==="listed"?"bg-cyan-950 text-cyan-300":"bg-slate-800 text-slate-300")}>{observation.saleState==="listed"?"Already listed":observation.saleState==="not_for_sale"?"Not for sale":"Listing status unknown"}</span><span className="rounded bg-slate-800 px-2 py-1 text-slate-400">{observation.matchedCopyId?"Linked to counted copy":"Awaiting copy match"}</span><JerseyBadges mode={mode} primaryJerseyNumber={primaryJerseyNumber} record={observation} cardMedia={publicMedia && publicMedia.cards && publicMedia.cards[group.cardId]} /></div><p className="mt-2 text-xs text-slate-400">COMC item {observation.sourceItemId || observation.id}</p>{observation.saleState==="listed" && (observation.askingPrice != null || observation.listedPrice != null)?<p className="mt-1 text-xs text-cyan-300">Asking {money(observation)}</p>:null}<CopyObservationEvidence observation={observation} cardById={cardById} />{TM.safeImageUrl(observation.sourceUrl)?<a href={TM.safeImageUrl(observation.sourceUrl)} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs text-sky-300 underline">View COMC item</a>:null}<div className="mt-2"><button className="rounded border border-slate-600 px-3 py-1 text-xs disabled:opacity-40" disabled={!canEdit || busy} onClick={()=>observation.matchedCopyId?onEdit(observation):onReview(observation)}>{observation.matchedCopyId?"Review linked copy":"Match this copy"}</button></div></div></div></article>)}</div></section>;
   })}{!groups.length?<p className="rounded border border-slate-700 p-5 text-sm text-slate-400">No confirmed COMC duplicate groups match this view.</p>:null}</div>;
 }
@@ -204,7 +216,7 @@ function CardGalleryPanel({cards = [], statuses = {}, cardDetails = {}, inventor
       const secondary = Array.from(new Set([legacy].concat(matches).filter(match => match.secondary).map(match => match.secondaryNumber)));
       return { card, photos, summary:CI.summarizeCard(state, card.id, statuses, cardDetails), primary:primaryMatch, secondary,
         pending:observations.filter(observation => !observation.matchedCopyId && !["ignored","split"].includes(observation.disposition)).length,
-        text:[card.subject,card.playerName,card.player,card.product, card.cardNumber, card.cardSet, (cardDetails[card.id] || {}).serial, ...records.map(record => record.serial || "")].join(" ").toLowerCase() };
+        text:[mediaCardSubject(card),card.player,mediaCardProduct(card), card.cardNumber, card.cardSet, (cardDetails[card.id] || {}).serial, ...records.map(record => record.serial || "")].join(" ").toLowerCase() };
     });
   }, [cards, state, media, isOwner, statuses, cardDetails,currentMode,primary]);
   const filtered = entries.filter(entry => {
@@ -227,11 +239,11 @@ function CardGalleryPanel({cards = [], statuses = {}, cardDetails = {}, inventor
     {error || loadError ? <p role="alert" className="rounded border border-red-800 bg-red-950/40 p-3 text-sm text-red-200">{error || loadError}</p> : null}
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
       {filtered.slice(0,limit).map(entry=>{
-        const card=entry.card, title=[card.subject || card.playerName || "",card.product,"#"+card.cardNumber,card.cardSet||"Base"].filter(Boolean).join(" · "), info=window.CardCatalog.getInfo(card), sourceUrl=window.CardCatalog.safeUrl(info.sourceUrl), isProof=window.CardCatalog.isProof(card);
+        const card=entry.card, title=mediaCardLabel(card), info=window.CardCatalog.getInfo(card), sourceUrl=window.CardCatalog.safeUrl(info.sourceUrl), isProof=window.CardCatalog.isProof(card);
         const photos=sourceFilter === "all" || sourceFilter === "missing" ? entry.photos : entry.photos.filter(photo=>photo.kind===sourceFilter);
         return <article key={card.id} data-gallery-card-id={card.id} className="overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-lg">
           <CardPhotoThumbnail photos={photos} title={title} onOpen={items=>setPreview({photos:items,title})} emptyLabel="Exact reference unavailable" emptyDetail={"#"+card.cardNumber+" · "+(card.cardSet||"Base")} />
-          <div className="space-y-2 p-3">{card.subject || card.playerName ? <p className="text-sm font-semibold text-amber-200">{card.subject || card.playerName}</p> : null}<p className="text-[10px] uppercase tracking-wide text-slate-400">{card.product}</p><h3 className="text-sm font-semibold text-white">#{card.cardNumber} · {card.cardSet||"Base"}</h3><ProofClassificationBadge card={card}/><div className="flex flex-wrap gap-1 text-[10px]">{entry.summary.owned?<span className="rounded bg-green-950 px-2 py-1 text-green-300">Owned</span>:null}{entry.summary.inTransit?<span className="rounded bg-cyan-950 px-2 py-1 text-cyan-300">Awaiting receipt</span>:null}{entry.summary.notOwned?<span className="rounded bg-slate-800 px-2 py-1 text-slate-400">Needed</span>:null}{card.copies?<span className="rounded bg-slate-800 px-2 py-1 text-amber-300">{isProof && info.verification === "unverified" ? "Recorded /"+card.copies+" · unverified" : "/"+card.copies}</span>:isProof?<span className="rounded bg-slate-800 px-2 py-1 text-slate-400">Print run unknown</span>:null}{!photos.length?<span className="rounded bg-slate-800 px-2 py-1 text-slate-400">Reference photo needed</span>:null}{info.verification === "unverified"?<span className="rounded bg-amber-950/50 px-2 py-1 text-amber-300">Catalogue details unverified</span>:null}</div>
+          <div className="space-y-2 p-3">{mediaCardSubject(card) ? <p className="text-sm font-semibold text-amber-200">{mediaCardSubject(card)}</p> : null}<p className="text-[10px] uppercase tracking-wide text-slate-400">{mediaCardProduct(card)}</p><h3 className="text-sm font-semibold text-white">#{card.cardNumber} · {card.cardSet||"Base"}</h3><ProofClassificationBadge card={card}/><div className="flex flex-wrap gap-1 text-[10px]">{entry.summary.owned?<span className="rounded bg-green-950 px-2 py-1 text-green-300">Owned</span>:null}{entry.summary.inTransit?<span className="rounded bg-cyan-950 px-2 py-1 text-cyan-300">Awaiting receipt</span>:null}{entry.summary.notOwned?<span className="rounded bg-slate-800 px-2 py-1 text-slate-400">Needed</span>:null}{card.copies?<span className="rounded bg-slate-800 px-2 py-1 text-amber-300">{isProof && info.verification === "unverified" ? "Recorded /"+card.copies+" · unverified" : "/"+card.copies}</span>:isProof?<span className="rounded bg-slate-800 px-2 py-1 text-slate-400">Print run unknown</span>:null}{!photos.length?<span className="rounded bg-slate-800 px-2 py-1 text-slate-400">Reference photo needed</span>:null}{info.verification === "unverified"?<span className="rounded bg-amber-950/50 px-2 py-1 text-amber-300">Catalogue details unverified</span>:null}</div>
             {sourceUrl?<a href={sourceUrl} target="_blank" rel="noreferrer" className="inline-block text-[10px] text-sky-300 underline">Catalogue source</a>:null}
             {entry.primary || entry.secondary.length ? <div className="flex flex-wrap gap-1">{entry.primary?<span className="rounded border border-amber-600 bg-amber-950/50 px-2 py-1 text-[10px] font-bold text-amber-200" title={"A recorded serial for this card is "+primary+"; the displayed photo may be a reference"}>Recorded jersey #{primary}</span>:null}{entry.secondary.map(number=><span key={number} className="rounded border border-violet-700 bg-violet-950/40 px-2 py-1 text-[10px] text-violet-200">On-card jersey #{number}</span>)}</div>:null}
             {isOwner?<div className="flex flex-wrap items-center justify-between gap-1 border-t border-slate-800 pt-2 text-[10px] text-slate-400"><span>{entry.summary.total} counted{entry.pending ? " · "+entry.pending+" awaiting match" : ""}</span>{onOpenCopies?<button onClick={()=>onOpenCopies(card.id)} className="font-semibold text-sky-300 underline">Copies &amp; photos</button>:null}{onEditMedia?<button disabled={loading} onClick={()=>onEditMedia(card)} className="font-semibold text-sky-300 underline disabled:opacity-40">Edit references</button>:null}</div>:null}
@@ -274,7 +286,7 @@ function CollectionMediaEditor({card,media,onSave,onClose,mode,primaryJerseyNumb
     finally {if(epoch===guard.current.epoch){guard.current.busy=false;setBusy(false);}}
   }
   const control="w-full rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100";
-  const title=[card.subject || card.playerName,card.product,"#"+card.cardNumber,card.cardSet || "Base"].filter(Boolean).join(" · ");
+  const title=mediaCardLabel(card);
   return <form onSubmit={save} className="space-y-3 rounded border border-amber-700 bg-slate-900 p-4" aria-label="Edit exact card references">
     <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-amber-200">{title}</h3><p className="mt-1 text-xs text-slate-400">Private references for this exact card. Physical-copy photos stay in Copies.</p></div><button type="button" disabled={busy} onClick={onClose} className="rounded border border-slate-600 px-3 py-1 text-xs disabled:opacity-40">Cancel</button></div>
     {error && <p role="alert" className="text-sm text-red-200">{error}</p>}

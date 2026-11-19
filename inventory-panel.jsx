@@ -69,7 +69,7 @@ function CopyInventoryPanel({cards = [], statuses = {}, cardDetails = {}, invent
   function openPurchase(observation) {
     setShowMore(false);
     setError(""); setNotice(""); setCardQuery("");
-    setForm({mode:"purchase",observationId:observation.id,cardId:TM.reviewFlags(observation).identityConfirmed ? observation.cardId : "",existingCopyId:"",location:"unknown",confirmAdditional:false,confirmSingleUnit:false,lotQuantity:observation.reportedQuantity > 1 ? String(observation.reportedQuantity) : "",duplicateConfirmed:false});
+    setForm({mode:"purchase",observationId:observation.id,cardId:TM.reviewFlags(observation).identityConfirmed ? observation.cardId : "",existingCopyId:"",location:"",confirmAdditional:false,confirmSingleUnit:false,lotQuantity:observation.reportedQuantity > 1 ? String(observation.reportedQuantity) : "",duplicateConfirmed:false});
   }
   function openManual() {
     setShowMore(false);
@@ -149,7 +149,7 @@ function CopyInventoryPanel({cards = [], statuses = {}, cardDetails = {}, invent
         </div></label>
       </div>}
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="text-sm">Confirmed location<select className={controlClass + " mt-1"} value={form.location} onChange={e => change("location",e.target.value)}>{Object.entries(CI.LOCATIONS).map(([key,name]) => <option key={key} value={key}>{name}</option>)}</select></label>
+        <label className="text-sm">Confirmed location<select className={controlClass + " mt-1"} value={form.location} onChange={e => change("location",e.target.value)}>{form.mode === "purchase" ? <option value="">{form.existingCopyId === "__new__" ? `Default: ${String(formObservation?.source || "").toLowerCase() === "comc" ? "COMC" : "In transit"}` : "Keep existing location / new copies incoming"}</option> : null}{Object.entries(CI.LOCATIONS).map(([key,name]) => <option key={key} value={key}>{name}</option>)}</select></label>
         {form.mode !== "purchase" ? <label className="text-sm">Sale status<select className={controlClass + " mt-1"} value={form.saleStatus} onChange={e => change("saleStatus",e.target.value)}>{Object.entries(CI.SALE_STATUSES).map(([key,name]) => <option key={key} value={key}>{name}</option>)}</select></label> : null}
       </div>
 

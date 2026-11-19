@@ -99,6 +99,25 @@
     var transitQty=active.filter(function(c){return ["in_transit","comc","oklahoma_mailbox"].includes(c.location)||c.origin==="legacy"&&c.unallocated&&c.legacyStatus==="in_transit";}).length;
     return { total: active.length, ownedQty:ownedQty, transitQty:transitQty, unknownQty:active.length-ownedQty-transitQty, locations: locations, unallocated: active.filter(function (c) { return c.origin === "legacy" && c.unallocated; }).length, hasInHand: locations.in_hand > 0, hasInTransit: locations.in_transit > 0, hasComc: locations.comc > 0, legacyStatus: legacyStatus, legacyOwned: legacyOwned, owned: owned, inTransit: inTransit, acquired: owned || inTransit, notOwned: !owned && !inTransit, managed: hasStoredCopies(state, cardId), saleReview: active.filter(needsSaleReview).length, listed: active.filter(function (c) { return c.saleStatus === "listed"; }).length };
   }
+  function summarizeCards(input,cards,statuses,details) {
+    var state=normalizeState(input),index=new Map(),summaries=Object.create(null);
+    function include(cardId,key,copy){
+      var id=canonicalCardId(cardId);if(id===null)return;
+      if(!index.has(id))index.set(id,Object.create(null));index.get(id)[key]=copy;
+    }
+    Object.keys(state.copies).forEach(function(key){
+      var copy=state.copies[key];include(copy.cardId,key,copy);
+      // Existing legacy slots are addressed by their saved key as well as their
+      // cardId. Retaining both associations preserves summarizeCard exactly.
+      var anchor=key.match(/^legacy:(.+):([1-9]\d*)$/);if(anchor)include(anchor[1],key,copy);
+    });
+    (cards||[]).forEach(function(card){
+      var cardId=card&&typeof card==='object'?card.id:card,baselines=Object.create(null);
+      if(Object.prototype.hasOwnProperty.call(state.baselines,cardId))baselines[cardId]=state.baselines[cardId];
+      summaries[String(cardId)]=summarizeCard({version:state.version,baselines:baselines,copies:index.get(canonicalCardId(cardId))||{},observations:{},updatedAt:state.updatedAt},cardId,statuses,details);
+    });
+    return summaries;
+  }
   function matchesStatus(summary, filter, forSale) {
     if (filter === "all") return true;
     if (filter === "owned") return summary.owned;
@@ -291,7 +310,7 @@
     } else {
       if (decision.confirmAdditional !== true) throw new Error("Confirm this is an additional copy, not one already included in your count.");
       assertAdditionalAllowed(state,cardId,context,observation);
-      copy = { id: "purchase:" + observationId, cardId: cardId, origin: "purchase", source: observation.source || "", sourceUrl: observation.sourceUrl || "", currentInventory: true, location: "unknown", serial: "", paidPrice: "", currency: "", purchaseDate: "", sourceRefs: [], duplicateConfirmed: false, saleStatus: "none", createdAt: at };
+      copy = { id: "purchase:" + observationId, cardId: cardId, origin: "purchase", source: observation.source || "", sourceUrl: observation.sourceUrl || "", currentInventory: true, location: decision.location || (text(observation.source).toLowerCase()==="comc"?"comc":"in_transit"), serial: "", paidPrice: "", currency: "", purchaseDate: "", sourceRefs: [], duplicateConfirmed: false, saleStatus: "none", createdAt: at };
     }
     ensureBaseline(state, cardId, context, at);
     copy.sourceRefs = Array.from(new Set((copy.sourceRefs || []).concat(observationId)));
@@ -433,7 +452,7 @@
     if (nextHand === hand) return { handled:true, changed:false, requiresDetails:true, inventory:state };
     return { handled:true, changed:true, inventory:quickAllocation(state,cardId,nextHand,context) };
   }
-  var api = { canonicalCardId:canonicalCardId, sameCardId:sameCardId, isOneOfOne:isOneOfOne, LOCATIONS: LOCATIONS, SALE_STATUSES: SALE_STATUSES, normalizeState: normalizeState, hasStoredCopies: hasStoredCopies, mergeStates: mergeStates, legacyQuantity: legacyQuantity, getCopiesForCard: getCopiesForCard, summarizeCard: summarizeCard, matchesStatus: matchesStatus, countCards: countCards, needsSaleReview: needsSaleReview, sameSerial: sameSerial, sourceIdentity: sourceIdentity, purchaseUnits: purchaseUnits, upsertPurchase: upsertPurchase, validateCopy: validateCopy, editCopy: editCopy, resolveObservation: resolveObservation, splitObservation: splitObservation, addManualCopy: addManualCopy, quickQuantity: quickQuantity, quickAllocation: quickAllocation, quickStatusPresence: quickStatusPresence, isCountedCopy: isCountedCopy, inferredCurrency: inferredCurrency };
+  var api = { canonicalCardId:canonicalCardId, sameCardId:sameCardId, isOneOfOne:isOneOfOne, LOCATIONS: LOCATIONS, SALE_STATUSES: SALE_STATUSES, normalizeState: normalizeState, hasStoredCopies: hasStoredCopies, mergeStates: mergeStates, legacyQuantity: legacyQuantity, getCopiesForCard: getCopiesForCard, summarizeCard: summarizeCard, summarizeCards:summarizeCards, matchesStatus: matchesStatus, countCards: countCards, needsSaleReview: needsSaleReview, sameSerial: sameSerial, sourceIdentity: sourceIdentity, purchaseUnits: purchaseUnits, upsertPurchase: upsertPurchase, validateCopy: validateCopy, editCopy: editCopy, resolveObservation: resolveObservation, splitObservation: splitObservation, addManualCopy: addManualCopy, quickQuantity: quickQuantity, quickAllocation: quickAllocation, quickStatusPresence: quickStatusPresence, isCountedCopy: isCountedCopy, inferredCurrency: inferredCurrency };
   if (root) root.CopyInventory = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : null);
