@@ -591,6 +591,27 @@ function TylerBlackTracker() {
     }, 1000);
     return function() { clearInterval(iv); window.removeEventListener("authchange", onAuth); };
   }, []);
+  const [collectionCriteria, setCollectionCriteria] = useState(null);
+  const [criteriaIssue, setCriteriaIssue] = useState("");
+  const [collectionSegment, setCollectionSegment] = useState("all");
+  const [browseSubject, setBrowseSubject] = useState("all");
+  const [pinnedOnly, setPinnedOnly] = useState(false);
+  useEffect(function() {
+    let active=true,request=0;
+    async function readCriteria() {
+      const seq=++request,owner=window.trackerAuth?.userId();
+      setCollectionCriteria(null);setCriteriaIssue("");
+      if(!sportMode || !isOwner || !owner)return;
+      try {
+        const result=await window.trackerPrivateStore.load("collect-criteria-v1");
+        if(!active || seq!==request || owner!==window.trackerAuth?.userId() || window.MODE!==trackerMode)return;
+        if(!result.ok)throw Error(result.error || "Collection segments could not load.");
+        setCollectionCriteria(result.value || null);
+      } catch(error) {if(active && seq===request)setCriteriaIssue("Saved focus groups could not load. Card-based groups remain available.");}
+    }
+    readCriteria();window.addEventListener("authchange",readCriteria);
+    return function(){active=false;request++;window.removeEventListener("authchange",readCriteria);};
+  }, [sportMode,isOwner,trackerMode]);
   const [statuses, setStatuses] = useState({});
   const [cardDetails, setCardDetails] = useState({});
   const [copyInventory, setCopyInventory] = useState(function() { return window.CopyInventory.normalizeState(null); });
@@ -1428,6 +1449,18 @@ function TylerBlackTracker() {
       return next;
     });
   }, [saveDetails, pushUndo, logChange, persistField]);
+  const togglePinnedCard = useCallback(function(cardId) {
+    if(trackerMode === "tb" || !window.trackerAuth?.isOwner() || !loadComplete.current || loadedModeRef.current!==trackerMode || window.MODE!==trackerMode || !CARD_BY_ID[cardId])return false;
+    setSessionChanges(value=>value+1);
+    setCardDetails(previous=>{
+      const before=previous[cardId]?.pinned===true,nextValue=!before;
+      pushUndo({type:"detail",cardId:cardId,field:"pinned",prev:before});
+      logChange(cardId,"collection_focus","pinned",before ? "Pinned" : "Unpinned",nextValue ? "Pinned" : "Unpinned");
+      const next={...previous,[cardId]:{...previous[cardId],pinned:nextValue}};
+      saveDetails(next);return next;
+    });
+    return true;
+  }, [trackerMode,saveDetails,pushUndo,logChange]);
   const quickSaveCount = useCallback(async function(cardId, count) {
     try {
       var next = window.CopyInventory.quickQuantity(copyStateRef.current.inventory, cardId, count, {statuses:statuses,cardDetails:cardDetails});
@@ -1599,6 +1632,20 @@ function TylerBlackTracker() {
     const notOwned1of1 = total1of1 - owned1of1;
     return { ...window.CopyInventory.countCards(collectionViews), owned1of1, total1of1, notOwned1of1, forSale, dupeTransit, dupeSale, dupeComc, notSynced, totalSpent, recordedCosts: window.TrackerMarket.summarizeAmounts(recordedCosts) };
   }, [statuses, cardDetails, copySummaries, forSaleFlags, customEditVer, needsSync]);
+  const segmentIndex = useMemo(function(){return sportMode ? window.CollectionSegments.build(ALL_CARDS,trackerMode,collectionCriteria) : null;},[trackerMode,collectionCriteria,customEditVer]);
+  const segmentCards = useMemo(function(){return sportMode ? window.CollectionSegments.select(ALL_CARDS,segmentIndex,collectionSegment,"all") : ALL_CARDS;},[trackerMode,segmentIndex,collectionSegment,customEditVer]);
+  const browseSubjects = useMemo(function(){return sportMode ? window.CollectionSegments.subjects(segmentCards) : [];},[sportMode,segmentCards]);
+  const browseCards = useMemo(function(){const scoped=sportMode ? window.CollectionSegments.select(ALL_CARDS,segmentIndex,collectionSegment,browseSubject) : ALL_CARDS;return trackerMode!=="tb" && pinnedOnly ? scoped.filter(card=>cardDetails[card.id]?.pinned===true) : scoped;},[trackerMode,segmentIndex,collectionSegment,browseSubject,pinnedOnly,cardDetails,customEditVer]);
+  const browseKey = trackerMode+"|"+collectionSegment+"|"+browseSubject+"|"+pinnedOnly;
+  const pinnedCount = useMemo(function(){return segmentCards.filter(card=>cardDetails[card.id]?.pinned===true && (browseSubject==="all" || cardHasPlayer(card,browseSubject))).length;},[segmentCards,cardDetails,browseSubject]);
+  const browsingView=["collection","summary","lookup","detailed","gallery"].includes(activeTab);
+  function chooseBrowse(segment,subject,pins) {
+    if(privatePanelHasEdits()){window.alert("Save or cancel your current edit before changing the view.");return;}
+    setCollectionSegment(segment);setBrowseSubject(subject);setPinnedOnly(pins);
+    setFilterPlayer(null);setFilterYear("all");setFilterProduct("all");setFilterCardNum("");setFilterColor(null);setSearch("");setPage(0);
+  }
+  useEffect(function(){if(sportMode && segmentIndex && !segmentIndex.groups.some(group=>group.id===collectionSegment)){setCollectionSegment("all");setBrowseSubject("all");}},[sportMode,segmentIndex,collectionSegment]);
+  useEffect(function(){if(sportMode && browseSubject!=="all" && !browseSubjects.some(subject=>subject.key===browseSubject))setBrowseSubject("all");},[sportMode,browseSubject,browseSubjects]);
   const tempoProfileEnabled = trackerMode === "wnba" && !!window.TempoProfile;
   const tempoFocusCounts = useMemo(function() {
     if (!tempoProfileEnabled) return null;
@@ -1607,8 +1654,8 @@ function TylerBlackTracker() {
     return counts;
   }, [trackerMode, tempoProfileEnabled, customEditVer, tempoWants]);
   const collectionFocusCards = useMemo(function() {
-    return tempoProfileEnabled ? ALL_CARDS.filter(function(card) { return tempoFocus === "wanted" ? !!tempoWants?.wants?.[card.id] : window.TempoProfile.matches(card, tempoFocus); }) : ALL_CARDS;
-  }, [trackerMode, tempoProfileEnabled, tempoFocus, customEditVer, tempoWants]);
+    return tempoProfileEnabled ? browseCards.filter(function(card) { return tempoFocus === "wanted" ? !!tempoWants?.wants?.[card.id] : window.TempoProfile.matches(card, tempoFocus); }) : browseCards;
+  }, [trackerMode, tempoProfileEnabled, tempoFocus, customEditVer, tempoWants,browseCards]);
   const tempoFocusLabel = {primary:"Primary",all:"All cards",tempo:"Tempo cards",logo:"Tempo logo verified",uniform:"Tempo jersey",rookies:"Rookies",other:"Outside Primary",unverified:"Jersey unverified",wanted:"TCDB Wantlist"}[tempoFocus];
   // Smart filters: each dropdown only shows options that are still valid given the OTHER active filters.
   // years respects player+product (so picking a player narrows the year dropdown to that player's cards)
@@ -1796,7 +1843,7 @@ function TylerBlackTracker() {
         <div className="flex items-center gap-1.5">
           <span className="font-black tracking-tight whitespace-nowrap" style={{color: trackerMode === "wnba" ? "#a855f7" : "#FFC52F", fontSize:"clamp(13px,1.8vw,18px)"}}>{collectionTitle.toUpperCase()}</span>
           {trackerMode === "wnba" && window.Tempo2026 && <details className="relative text-[10px] text-purple-300"><summary className="cursor-pointer whitespace-nowrap" title="Checklist source coverage">Coverage</summary><div className="absolute left-0 top-5 w-72 max-w-[85vw] p-2 rounded border border-purple-800 bg-slate-950 text-slate-300 z-50">{window.TEMPO_CATALOG_COVERAGE_NOTE || window.Tempo2026.coverageNote}</div></details>}
-          {trackerMode === "wnba" && <span className="text-gray-500 text-[9px]" title="Totals across the full Tempo collection">Overall</span>}
+          {trackerMode !== "tb" && <span className="text-gray-500 text-[9px]" title="Totals across the full collection">Overall</span>}
           <div className="flex-1 rounded-full h-1.5 overflow-hidden min-w-8 max-w-24" style={{background:"#1a2d4a"}}>
             <div className="h-full flex">
               <button
@@ -1910,6 +1957,23 @@ function TylerBlackTracker() {
           })}
         </div>
       </div>
+      {trackerMode!=="tb" && browsingView && <div className="flex-shrink-0 border-b border-slate-800 px-3 py-2 bg-slate-950/40">
+        {sportMode && <div className="flex flex-wrap items-center gap-1.5 mb-2" aria-label="Collection segments">
+          <span className="text-xs font-bold text-slate-400 mr-1">Segment</span>
+          {(segmentIndex?.groups || []).map(group=><button key={group.id} aria-pressed={collectionSegment===group.id} onClick={()=>chooseBrowse(group.id,"all",pinnedOnly)} title="Browse existing cards by collection focus. Groups can overlap." className={"rounded px-2 py-1 text-xs font-semibold border "+(collectionSegment===group.id ? "bg-violet-950 border-violet-500 text-violet-100" : "border-slate-700 text-slate-300 hover:border-violet-500")}>
+            {group.label} <span className="opacity-60 tabular-nums ml-1">{group.count}</span>
+          </button>)}
+        </div>}
+        <div className="flex flex-wrap items-center gap-2">
+          {sportMode && <label className="flex items-center gap-2 text-xs text-slate-400"><span>{trackerMode==="racing" ? "Driver" : "Subject"}</span><select aria-label={trackerMode==="racing" ? "Driver within segment" : "Subject within segment"} value={browseSubject} onChange={event=>chooseBrowse(collectionSegment,event.target.value,pinnedOnly)} className="rounded bg-slate-900 border border-slate-600 text-slate-100 px-2 py-1 max-w-72">
+            <option value="all">All {trackerMode==="racing" ? "drivers" : "subjects"} · {browseSubjects.length}</option>
+            {browseSubjects.map(subject=><option key={subject.key} value={subject.key}>{subject.name} · {subject.count}</option>)}
+          </select></label>}
+          <button aria-pressed={pinnedOnly} onClick={()=>chooseBrowse(collectionSegment,browseSubject,!pinnedOnly)} className={"rounded border px-2 py-1 text-xs font-semibold "+(pinnedOnly ? "border-amber-400 text-amber-200 bg-amber-950/60" : "border-slate-700 text-slate-300")} title="Show your pinned focal cards">★ Pinned <span className="tabular-nums opacity-70">{pinnedCount}</span></button>
+          <span className="text-xs text-slate-400 ml-auto">{browseCards.length.toLocaleString()} card{browseCards.length===1 ? "" : "s"}</span>
+        </div>
+        {criteriaIssue && sportMode && <div className="text-xs text-amber-300 mt-1">{criteriaIssue}</div>}
+      </div>}
       {/* SCROLLABLE CONTENT */}
       <div className="flex-1 flex flex-col overflow-hidden" style={{padding:"clamp(2px,0.3vw,6px) clamp(4px,0.6vw,12px)"}}>
         {isOwner && window.AutographPanel && <div className={activeTab === "autographs" ? "flex-1 min-h-0 overflow-auto" : "hidden"}><window.AutographPanel key={trackerMode} scope={window.CollectionProfile.scope(trackerMode)} cards={ALL_CARDS} statuses={statuses} details={cardDetails} copyInventory={copyInventory} inventoryReady={copyStorage.ready} inventoryError={copyStorage.error} onRefreshInventory={refreshCopyInventory} isOwner={isOwner} active={activeTab === "autographs"}/></div>}
@@ -1966,7 +2030,7 @@ function TylerBlackTracker() {
         )}
         {tempoProfileEnabled && <TempoFocusSelect value={tempoFocus} onChange={setTempoFocus} counts={tempoFocusCounts} wants={tempoWants} wantsError={tempoWantsError}/>}
         {/* WNBA-only: player filter chip row. Single click to filter Collection to one player. */}
-        {trackerMode !== "tb" && collectionPlayerList.length > 0 && (
+        {trackerMode === "wnba" && collectionPlayerList.length > 0 && (
           <div className="flex flex-wrap gap-1 items-center mb-1 pb-1" style={{borderBottom:"1px solid #1a2d4a"}}>
             <span className="font-bold mr-1" style={{color:"#a855f7",fontSize:"clamp(8px,0.9vw,10px)"}}>{trackerMode === "racing" ? "Driver:" : "Player:"}</span>
             <button onClick={function(){ setFilterPlayer(null); }}
@@ -2096,7 +2160,8 @@ function TylerBlackTracker() {
                     {copySummary.managed && copySummary.inTransit && <span className="rounded bg-emerald-950 px-1 text-emerald-300 text-[8px] whitespace-nowrap">In Transit</span>}
                     {needsSync.has(card.id) ? <span className="text-pink-500">!</span> : null}
                   </div>
-                  <span className="text-gray-500 truncate hidden sm:inline flex-shrink min-w-0" style={{fontSize:"clamp(8px,0.9vw,10px)",maxWidth:"clamp(80px,12vw,200px)"}}>{card.product.slice(5)}</span>
+                  <span className="text-gray-500 truncate hidden sm:inline flex-shrink min-w-0" style={{fontSize:"clamp(8px,0.9vw,10px)",maxWidth:"clamp(80px,12vw,200px)"}}>{sportMode ? card.product.replace(/^\d{4}\s+/, "") : card.product.slice(5)}</span>
+                  {trackerMode!=="tb" && <button aria-label={(details.pinned===true ? "Unpin" : "Pin")+" focal card "+panelCardSubject(card)+" "+card.cardNumber+" "+card.cardSet} aria-pressed={details.pinned===true} title={details.pinned===true ? "Unpin focal card" : "Pin focal card"} onClick={event=>{event.stopPropagation();togglePinnedCard(card.id);}} className={"px-1 font-bold "+(details.pinned===true ? "text-amber-300" : "text-slate-600 hover:text-amber-300")}>{details.pinned===true ? "★" : "☆"}</button>}
                   {/* Inline qty +/- controls. Click +/- to adjust without expanding the row. */}
                   <div className="flex items-center gap-0.5 flex-shrink-0" onClick={function(e){e.stopPropagation();}}>
                     {(function() {
@@ -2242,17 +2307,17 @@ function TylerBlackTracker() {
         ) : activeTab === "cleanup" ? (
           <CleanupPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} hidePrices={hidePrices} />
         ) : activeTab === "detailed" ? (
-          <DetailedPanel statuses={statuses} copySummaries={copySummaries} openCardCopies={openCardCopies} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} needsSync={needsSync} initialSnFilter={detailedSnFilter} initialStatusFilter={detailedStatusFilter} initialCardId={detailedCardId} setDetailedCardId={setDetailedCardId} initialProductFilter={detailedProductFilter} setDetailedProductFilter={setDetailedProductFilter} initialCardNumFilter={detailedCardNumFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} editCustomCardById={editCustomCardById} customEditVer={customEditVer} targetByCardId={targetByCardId} setActiveTab={setActiveTab} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
+          <DetailedPanel cards={browseCards} browseKey={browseKey} onTogglePin={togglePinnedCard} statuses={statuses} copySummaries={copySummaries} openCardCopies={openCardCopies} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} needsSync={needsSync} initialSnFilter={detailedSnFilter} initialStatusFilter={detailedStatusFilter} initialCardId={detailedCardId} setDetailedCardId={setDetailedCardId} initialProductFilter={detailedProductFilter} setDetailedProductFilter={setDetailedProductFilter} initialCardNumFilter={detailedCardNumFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} editCustomCardById={editCustomCardById} customEditVer={customEditVer} targetByCardId={targetByCardId} setActiveTab={setActiveTab} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
         ) : activeTab === "copies" && isOwner ? (
           <window.CopyInventoryPanel key={copyStorageKey+":"+(copyStateRef.current.ownerId || "signed-out")} initialCardId={copyCardId} cards={ALL_CARDS.filter(function(card) { return trackerMode !== "tb" || !HIDDEN_DUPES.has(card.id); })} statuses={statuses} cardDetails={cardDetails} inventory={copyInventory} publicMedia={publicMedia} onInventoryChange={saveCopyInventory} onRefresh={refreshCopyInventory} isOwner={isOwner} storageReady={copyStorage.ready} loading={copyStorage.loading} readOnlyReason={copyStorage.error} />
         ) : activeTab === "gallery" ? (
-          <window.CardGalleryPanel key={copyStorageKey+":"+(copyStateRef.current.ownerId || "public")} cards={ALL_CARDS.filter(function(card){return trackerMode !== "tb" || !HIDDEN_DUPES.has(card.id);})} statuses={statuses} cardDetails={cardDetails} inventory={isOwner ? copyInventory : null} publicMedia={publicMedia} isOwner={isOwner} onOpenCopies={isOwner ? openCardCopies : null} loading={mediaStorage.loading || isOwner && copyStorage.loading} loadError={mediaStorage.error} onRefresh={async function(){var results=await Promise.all([refreshPublicMedia(),isOwner ? refreshCopyInventory() : Promise.resolve({ok:true})]);return results.find(function(result){return result && result.ok === false;}) || {ok:true};}} />
+          <window.CardGalleryPanel key={copyStorageKey+":"+(copyStateRef.current.ownerId || "public")+":"+browseKey} onTogglePin={trackerMode!=="tb" ? togglePinnedCard : null} cards={browseCards.filter(function(card){return trackerMode !== "tb" || !HIDDEN_DUPES.has(card.id);})} statuses={statuses} cardDetails={cardDetails} inventory={isOwner ? copyInventory : null} publicMedia={publicMedia} isOwner={isOwner} onOpenCopies={isOwner ? openCardCopies : null} loading={mediaStorage.loading || isOwner && copyStorage.loading} loadError={mediaStorage.error} onRefresh={async function(){var results=await Promise.all([refreshPublicMedia(),isOwner ? refreshCopyInventory() : Promise.resolve({ok:true})]);return results.find(function(result){return result && result.ok === false;}) || {ok:true};}} />
         ) : activeTab === "catalog" && trackerMode !== "wnba" ? (
           <window.CardCatalogPanel key={trackerMode} mode={trackerMode} cards={ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id);}).concat(isOwner ? loadCustomCards().filter(function(card){return card.archived;}) : [])} statuses={statuses} isOwner={isOwner} initialEditId={catalogEditId} onClearEdit={function(){setCatalogEditId(null);}} onSave={saveCatalogCard} onArchive={archiveCatalogCard} onRestore={restoreCatalogCard} onOpen={function(card){setDetailedCardId(card.id);setActiveTab("detailed");}} onStatusChange={setCardStatus} revision={customEditVer}/>
         ) : activeTab === "summary" ? (
-          <SummaryPanel statuses={summaryStatuses} copySummaries={copySummaries} cardDetails={cardDetails} setActiveTab={setActiveTab} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} />
+          <SummaryPanel cards={browseCards} browseKey={browseKey} onSelectSubject={key=>chooseBrowse(collectionSegment,key || "all",pinnedOnly)} statuses={summaryStatuses} copySummaries={copySummaries} cardDetails={cardDetails} setActiveTab={setActiveTab} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} />
         ) : activeTab === "lookup" ? (
-          <CardLookupPanel copyStorage={copyStorage} copyInventory={copyInventory} quickSaveHand={quickSaveHand} setDetailedCardId={setDetailedCardId} statuses={statuses} copySummaries={copySummaries} openCardCopies={openCardCopies} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} setCardQty={setCardQty} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} needsSync={needsSync} setActiveTab={setActiveTab} setDetailedProductFilter={setDetailedProductFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} setPricesSearchFilter={setPricesSearchFilter} superSearchMode={superSearchMode} targetByCardId={targetByCardId} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
+          <CardLookupPanel cards={browseCards} browseKey={browseKey} onTogglePin={togglePinnedCard} copyStorage={copyStorage} copyInventory={copyInventory} quickSaveHand={quickSaveHand} setDetailedCardId={setDetailedCardId} statuses={statuses} copySummaries={copySummaries} openCardCopies={openCardCopies} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} setCardQty={setCardQty} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} needsSync={needsSync} setActiveTab={setActiveTab} setDetailedProductFilter={setDetailedProductFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} setPricesSearchFilter={setPricesSearchFilter} superSearchMode={superSearchMode} targetByCardId={targetByCardId} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
         ) : null}
         </div>
         )}
@@ -2402,7 +2467,7 @@ function ProgressBar({ label, owned, transit, acquired, total, sub }) {
     </div>
   );
 }
-function SummaryPanel({ statuses, cardDetails = {}, copySummaries, setActiveTab, setDetailedStatusFilter, setDetailedSnFilter }) {
+function SummaryPanel({ cards = ALL_CARDS, browseKey = "", onSelectSubject, statuses, cardDetails = {}, copySummaries, setActiveTab, setDetailedStatusFilter, setDetailedSnFilter }) {
   var trackerMode = useTrackerMode();
   var catalogRevision = useCatalogRevision();
   var [view, setView] = useState("dashboard"); // dashboard, heatmap, breakdown
@@ -2415,6 +2480,16 @@ function SummaryPanel({ statuses, cardDetails = {}, copySummaries, setActiveTab,
   var [rookieOnly, setRookieOnly] = useState(false);
   // WNBA-only: filter stats to a single player. null = all players.
   var [selectedPlayer, setSelectedPlayer] = useState(null);
+  function selectSummarySubject(key) {
+    if (trackerMode === "wnba") setSelectedPlayer(function(current){return current === key ? null : key;});
+    else if (window.CollectionProfile.isSport(trackerMode) && onSelectSubject) onSelectSubject(key);
+  }
+  var previousBrowseKey = useRef(browseKey);
+  useEffect(function() {
+    if (previousBrowseKey.current === browseKey) return;
+    previousBrowseKey.current = browseKey;
+    setSelectedPlayer(null); setSnMin(1); setIncludeBlankSN(true); setExclude1of1(false); setRookieOnly(false); setExpanded(null); setExpandedProd(null);
+  }, [browseKey]);
   // Build the WNBA player list. Derived from actual cards in DB so anyone with at
   // least one card appears (including waived / inactive / non-roster players).
   // TEMPO_ROSTER is consulted only to look up display names.
@@ -2422,7 +2497,7 @@ function SummaryPanel({ statuses, cardDetails = {}, copySummaries, setActiveTab,
     if (trackerMode === "tb") return [];
     var roster = panelRoster();
     var keysSeen = {};
-    ALL_CARDS.forEach(function(card) {
+    cards.forEach(function(card) {
       cardPlayers(card).forEach(function(player){keysSeen[player]=true;});
     });
     return Object.keys(keysSeen).map(function(k) {
@@ -2432,7 +2507,7 @@ function SummaryPanel({ statuses, cardDetails = {}, copySummaries, setActiveTab,
       var la = a.name.split(" ").pop(); var lb = b.name.split(" ").pop();
       return la.localeCompare(lb);
     });
-  }, [trackerMode, catalogRevision]);
+  }, [trackerMode, catalogRevision, cards]);
 
   var PRESETS = [
     {label:"All",sn:1,blank:true,ex1:false},
@@ -2464,7 +2539,7 @@ function SummaryPanel({ statuses, cardDetails = {}, copySummaries, setActiveTab,
     var byYear={},byBrand={},byProduct={},byPlayer={},cardsByProduct={};
     cards.forEach(function(card) {
       // WNBA player filter — only include cards for the selected player when one is chosen
-      if (selectedPlayer && !cardHasPlayer(card,selectedPlayer)) return;
+      if (trackerMode === "wnba" && selectedPlayer && !cardHasPlayer(card,selectedPlayer)) return;
       if (!passesFilter(card, minSN, inclBlank, ex1of1, unnumOnly, spOnly)) return;
       var copyState = collectionCardState(card.id, sts, cardDetails, copySummaries);
       var isOwned = !!copyState.owned, isTransit = !!copyState.inTransit;
@@ -2494,41 +2569,41 @@ function SummaryPanel({ statuses, cardDetails = {}, copySummaries, setActiveTab,
   }
 
   var stats = useMemo(function() {
-    return calcStats(ALL_CARDS, statuses, snMin, includeBlankSN, exclude1of1, false, false);
-  }, [statuses, cardDetails, copySummaries, snMin, includeBlankSN, exclude1of1, rookieOnly, selectedPlayer, catalogRevision]);
+    return calcStats(cards, statuses, snMin, includeBlankSN, exclude1of1, false, false);
+  }, [statuses, cardDetails, copySummaries, snMin, includeBlankSN, exclude1of1, rookieOnly, selectedPlayer, catalogRevision, cards]);
 
   var presetStats = useMemo(function() {
     return PRESETS.map(function(p) {
-      var s = calcStats(ALL_CARDS, statuses, p.sn, p.blank, p.ex1, p.unnumOnly, p.spOnly);
+      var s = calcStats(cards, statuses, p.sn, p.blank, p.ex1, p.unnumOnly, p.spOnly);
       return {label:p.label, pct: s.total ? (s.acquired/s.total*100) : 0, owned:s.owned, transit:s.transit, acquired:s.acquired, total:s.total, sn:p.sn, blank:p.blank, ex1:p.ex1, unnumOnly:p.unnumOnly, spOnly:p.spOnly, snKey:p.snKey};
     });
-  }, [statuses, cardDetails, copySummaries, rookieOnly, selectedPlayer, catalogRevision]);
+  }, [statuses, cardDetails, copySummaries, rookieOnly, selectedPlayer, catalogRevision, cards]);
 
   var pct = stats.total ? (stats.acquired)/stats.total*100 : 0;
   var pctOwned = stats.total ? stats.owned/stats.total*100 : 0;
 
   // Rarest acquired — numbered cards + SP/SSP cards
   var rarestOwned = useMemo(function() {
-    var numbered = ALL_CARDS.filter(function(c) {
+    var numbered = cards.filter(function(c) {
       if (HIDDEN_DUPES.has(c.id) || !inChecklist(c)) return false;
       if (c.product.startsWith("TEST")) return false;
       if (rookieOnly && !panelCardIsRookie(c)) return false;
-      if (selectedPlayer && !cardHasPlayer(c, selectedPlayer)) return false;
+      if (trackerMode === "wnba" && selectedPlayer && !cardHasPlayer(c, selectedPlayer)) return false;
       var copyState = collectionCardState(c.id, statuses, cardDetails, copySummaries);
       if (!copyState.owned && !copyState.inTransit) return false;
       return c.copies && parseInt(c.copies) > 0;
     }).sort(function(a,b) { return parseInt(a.copies) - parseInt(b.copies); }).slice(0,12);
-    var spCards = ALL_CARDS.filter(function(c) {
+    var spCards = cards.filter(function(c) {
       if (HIDDEN_DUPES.has(c.id) || !inChecklist(c)) return false;
       if (c.product.startsWith("TEST")) return false;
       if (rookieOnly && !panelCardIsRookie(c)) return false;
-      if (selectedPlayer && !cardHasPlayer(c, selectedPlayer)) return false;
+      if (trackerMode === "wnba" && selectedPlayer && !cardHasPlayer(c, selectedPlayer)) return false;
       var copyState = collectionCardState(c.id, statuses, cardDetails, copySummaries);
       if (!copyState.owned && !copyState.inTransit) return false;
       return SSP_TAGS[c.cardSet] === "SSP" && !c.copies; // unnumbered SSP only
     });
     return { numbered: numbered, sp: spCards };
-  }, [statuses, cardDetails, copySummaries, rookieOnly, selectedPlayer, catalogRevision]);
+  }, [statuses, cardDetails, copySummaries, rookieOnly, selectedPlayer, catalogRevision, cards]);
 
   function pctColor(owned, transit, total) {
     if (total === 0) return "bg-gray-800";
@@ -2596,7 +2671,7 @@ function SummaryPanel({ statuses, cardDetails = {}, copySummaries, setActiveTab,
 
 
           {/* WNBA-only: player filter chips. Hidden in TB mode. */}
-          {trackerMode !== "tb" && playerList.length > 0 && (
+          {trackerMode === "wnba" && playerList.length > 0 && (
             <div className="flex flex-wrap gap-1 items-center px-1 pb-0.5" style={{borderBottom:"1px solid #1a2d4a"}}>
               <span className="font-bold mr-1" style={{color:"#a855f7",fontSize:"clamp(8px,0.9vw,10px)"}}>{trackerMode === "racing" ? "Driver:" : "Player:"}</span>
               <button onClick={function(){ setSelectedPlayer(null); }}
@@ -2616,7 +2691,7 @@ function SummaryPanel({ statuses, cardDetails = {}, copySummaries, setActiveTab,
       {/* ============ DASHBOARD VIEW ============ */}
       {view === "dashboard" && (
         <div className="space-y-1">
-          {trackerMode === "tb" && <div className="flex flex-wrap items-center justify-between gap-1 mb-1 text-[11px] text-gray-400"><span>Checklist completion</span><button onClick={function(){setActiveTab("catalog");}} className="text-violet-300 hover:text-violet-100">Proofs & other cards · {ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id) && !inChecklist(card);}).length} recorded →</button></div>}
+          {trackerMode === "tb" && <div className="flex flex-wrap items-center justify-between gap-1 mb-1 text-[11px] text-gray-400"><span>Checklist completion</span><button onClick={function(){setActiveTab("catalog");}} className="text-violet-300 hover:text-violet-100">Proofs & other cards · {cards.filter(function(card){return !HIDDEN_DUPES.has(card.id) && !inChecklist(card);}).length} recorded →</button></div>}
           {/* TOP ROW: Gauge+stats LEFT, By Year RIGHT */}
           <div className="flex gap-1.5 items-stretch">
             {/* Gauge + legend */}
@@ -2650,12 +2725,12 @@ function SummaryPanel({ statuses, cardDetails = {}, copySummaries, setActiveTab,
                     return rows.map(function(p) {
                       var d = p.d;
                       var yp = d.total ? (d.acquired)/d.total*100 : 0;
-                      var isSelected = selectedPlayer === p.key;
+                      var isSelected = trackerMode === "wnba" && selectedPlayer === p.key;
                       return (
-                        <div key={p.key} onClick={function(){ setSelectedPlayer(isSelected ? null : p.key); }}
+                        <div key={p.key} onClick={function(){selectSummarySubject(p.key);}}
                           className="flex items-center gap-1 cursor-pointer hover:bg-gray-800/50 rounded px-0.5 transition-colors"
                           style={{fontSize:"clamp(9px,1vw,11px)"}}
-                          title={isSelected ? "Click to clear filter" : ("Click to filter to " + p.name)}>
+                          title={trackerMode === "wnba" ? (isSelected ? "Click to clear filter" : ("Click to filter to " + p.name)) : "Filter all views to " + p.name}>
                           <span className={"font-bold text-right truncate flex-shrink-0 " + (isSelected ? "text-purple-300" : "")} style={{width:trackerMode === "wnba" ? "3.5rem" : "8rem",color:isSelected ? undefined : "#FFC52F"}}>{trackerMode === "wnba" ? p.last : p.name}</span>
                           <div className="flex-1 rounded-full h-2 overflow-hidden" style={{background:"#1a2d4a"}}>
                             <div className="h-full flex">
@@ -2900,16 +2975,16 @@ function SummaryPanel({ statuses, cardDetails = {}, copySummaries, setActiveTab,
     </div>
   );
 }
-function CardLookupPanel({ statuses, copyStorage = {ready:false}, copyInventory = null, quickSaveHand, copySummaries, openCardCopies, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, setCardQty, forSaleFlags, toggleForSale, needsSync, setActiveTab, setDetailedCardId, setDetailedProductFilter, setDetailedCardNumFilter, setDetailedStatusFilter, setDetailedSnFilter, setPricesSearchFilter, superSearchMode, targetByCardId, setTargetCardFilter, hidePrices }) {
+function CardLookupPanel({ cards = ALL_CARDS, browseKey = "", onTogglePin, statuses, copyStorage = {ready:false}, copyInventory = null, quickSaveHand, copySummaries, openCardCopies, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, setCardQty, forSaleFlags, toggleForSale, needsSync, setActiveTab, setDetailedCardId, setDetailedProductFilter, setDetailedCardNumFilter, setDetailedStatusFilter, setDetailedSnFilter, setPricesSearchFilter, superSearchMode, targetByCardId, setTargetCardFilter, hidePrices }) {
   var trackerMode = useTrackerMode();
   var catalogRevision = useCatalogRevision();
   var [lookupScope, setLookupScope] = useState("checklist");
   // Build a quick player-key → display name map. Empty in TB mode.
   var playerNameByKey = useMemo(function() {
     var roster=panelRoster(),m = {};
-    Object.keys(roster).forEach(function(k) { m[k] = roster[k].name; });
+    cards.forEach(function(card) { cardPlayers(card).forEach(function(k) { m[k] = roster[k] && roster[k].name || panelCardSubject(card); }); });
     return m;
-  }, [trackerMode, catalogRevision]);
+  }, [trackerMode, catalogRevision, cards]);
   var [lookupPlayer, setLookupPlayer] = useState("all");
   var [numSearch, setNumSearch] = useState("");
   var [selectedNum, setSelectedNum] = useState(null);
@@ -2921,9 +2996,15 @@ function CardLookupPanel({ statuses, copyStorage = {ready:false}, copyInventory 
   var [filterSN, setFilterSN] = useState(false);
   var [filterMem, setFilterMem] = useState(false);
   var [maxPR, setMaxPR] = useState(""); // max print run filter
+  var previousBrowseKey = useRef(browseKey);
+  useEffect(function() {
+    if (previousBrowseKey.current === browseKey) return;
+    previousBrowseKey.current = browseKey;
+    setLookupPlayer("all"); setLookupScope("checklist"); setNumSearch(""); setSelectedNum(null); setSelectedCard(null); setExpandedProducts({}); setStatusOnly("all"); setVarSearch(""); setFilterAuto(false); setFilterSN(false); setFilterMem(false); setMaxPR("");
+  }, [browseKey]);
   var allNumbers = useMemo(function() {
     var nums = {};
-    ALL_CARDS.forEach(function(c) {
+    cards.forEach(function(c) {
       if (HIDDEN_DUPES.has(c.id) || !matchesCatalogScope(c, lookupScope) || (lookupPlayer !== "all" && !cardHasPlayer(c, lookupPlayer))) return;
       if (!nums[c.cardNumber]) nums[c.cardNumber] = { count: 0, owned: 0, transit: 0, acquired: 0 };
       nums[c.cardNumber].count++;
@@ -2937,7 +3018,7 @@ function CardLookupPanel({ statuses, copyStorage = {ready:false}, copyInventory 
       if (!isNaN(an) && !isNaN(bn)) return an - bn;
       return a[0].localeCompare(b[0]);
     });
-  }, [statuses, cardDetails, copySummaries, lookupPlayer, lookupScope, catalogRevision]);
+  }, [statuses, cardDetails, copySummaries, lookupPlayer, lookupScope, catalogRevision, cards]);
   var filteredNums = useMemo(function() {
     if (!numSearch) return allNumbers;
     var q = numSearch.toLowerCase();
@@ -2945,8 +3026,8 @@ function CardLookupPanel({ statuses, copyStorage = {ready:false}, copyInventory 
   }, [allNumbers, numSearch]);
   var cardsForNum = useMemo(function() {
     if (!selectedNum) return [];
-    return ALL_CARDS.filter(function(c) { return c.cardNumber === selectedNum && !HIDDEN_DUPES.has(c.id) && matchesCatalogScope(c, lookupScope) && (lookupPlayer === "all" || cardHasPlayer(c, lookupPlayer)); });
-  }, [selectedNum, lookupPlayer, lookupScope, catalogRevision]);
+    return cards.filter(function(c) { return c.cardNumber === selectedNum && !HIDDEN_DUPES.has(c.id) && matchesCatalogScope(c, lookupScope) && (lookupPlayer === "all" || cardHasPlayer(c, lookupPlayer)); });
+  }, [selectedNum, lookupPlayer, lookupScope, catalogRevision, cards]);
   // Group by product, then list variants
   var productGroups = useMemo(function() {
     var map = {};
@@ -2969,7 +3050,7 @@ function CardLookupPanel({ statuses, copyStorage = {ready:false}, copyInventory 
       productGroups.forEach(function(g) { exp[g[0]] = true; });
       setExpandedProducts(exp);
     }
-  }, [selectedNum, lookupPlayer, lookupScope, catalogRevision]);
+  }, [selectedNum, lookupPlayer, lookupScope, catalogRevision, cards]);
   function toggleProduct(prod) {
     setExpandedProducts(function(prev) { var n = Object.assign({}, prev); n[prod] = !n[prod]; return n; });
   }
@@ -3077,7 +3158,7 @@ function CardLookupPanel({ statuses, copyStorage = {ready:false}, copyInventory 
           })}
         </div>
       </div>
-      <div className="flex items-center justify-between gap-2 mb-1"><select aria-label="Filter player" value={lookupPlayer} onChange={function(e){setLookupPlayer(e.target.value);setSelectedCard(null);}} className={"bg-gray-900 border border-gray-700 rounded px-1 text-[10px] " + (trackerMode === "tb" ? "hidden" : "")}><option value="all">{trackerMode === "racing" ? "All drivers" : "All players"}</option>{Object.keys(playerNameByKey).map(function(key){return <option key={key} value={key}>{playerNameByKey[key]}</option>;})}</select><CatalogScopeSelect value={lookupScope} onChange={function(scope){setLookupScope(scope);setSelectedCard(null);}}/>{lookupScope !== "checklist" && trackerMode === "tb" && <span className="text-[10px] text-gray-500">Recorded entries; not a complete proof checklist</span>}</div>
+      <div className="flex items-center justify-between gap-2 mb-1"><select aria-label="Filter player" value={lookupPlayer} onChange={function(e){setLookupPlayer(e.target.value);setSelectedCard(null);}} className={"bg-gray-900 border border-gray-700 rounded px-1 text-[10px] " + (trackerMode !== "wnba" ? "hidden" : "")}><option value="all">{trackerMode === "racing" ? "All drivers" : "All players"}</option>{Object.keys(playerNameByKey).map(function(key){return <option key={key} value={key}>{playerNameByKey[key]}</option>;})}</select><CatalogScopeSelect value={lookupScope} onChange={function(scope){setLookupScope(scope);setSelectedCard(null);}}/>{lookupScope !== "checklist" && trackerMode === "tb" && <span className="text-[10px] text-gray-500">Recorded entries; not a complete proof checklist</span>}</div>
       {/* Product groups with variants */}
       {selectedNum && (
         <div className="flex-1 overflow-y-auto min-h-0">
@@ -3232,7 +3313,7 @@ function CardLookupPanel({ statuses, copyStorage = {ready:false}, copyInventory 
               </button>; })()}
             </div>
           </div>
-          <div className="text-white font-bold text-[12px]">{trackerMode !== "tb" && <span className="text-purple-300 mr-2">{panelCardSubject(selectedCard)}</span>}{selectedCard.product}</div>
+          <div className="text-white font-bold text-[12px]">{trackerMode !== "tb" && <span className="text-purple-300 mr-2">{panelCardSubject(selectedCard)}</span>}{selectedCard.product}{trackerMode !== "tb" && onTogglePin && <button type="button" aria-pressed={d.pinned === true} aria-label={(d.pinned === true ? "Unpin focal card: " : "Pin focal card: ") + panelCardSubject(selectedCard) + " " + cardYear(selectedCard) + " " + selectedCard.product + " #" + selectedCard.cardNumber + " " + selectedCard.cardSet} title={d.pinned === true ? "Unpin focal card" : "Pin focal card"} onClick={function(e){e.stopPropagation();onTogglePin(selectedCard.id);}} className={"ml-2 rounded border px-1 text-[10px] " + (d.pinned === true ? "border-amber-600 text-amber-300 bg-amber-950/40" : "border-gray-700 text-gray-500 hover:text-amber-300")}>{d.pinned === true ? "★ Pinned" : "☆ Pin"}</button>}</div>
           <div className="text-gray-400 text-[10px]">#{selectedCard.cardNumber} -- {selectedCard.cardSet}{selectedCard.copies ? <span className="text-yellow-400 font-black ml-1" style={{fontSize:"12px"}}>{" /" + selectedCard.copies}</span> : ""} {sspBadge(selectedCard.cardSet)}{catalogBadge(selectedCard)}</div>
           {cardHasAutograph(selectedCard) && <span className="text-yellow-500 text-[8px] font-bold bg-yellow-950/40 px-1 rounded">AUTO</span>}
           {selectedCard.isMem === "Yes" && <span className="text-purple-500 text-[8px] font-bold bg-purple-950/40 px-1 rounded ml-0.5">MEM</span>}
@@ -3303,7 +3384,7 @@ function CardLookupPanel({ statuses, copyStorage = {ready:false}, copyInventory 
     </div>
   );
 }
-function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, needsSync, initialSnFilter, initialStatusFilter, initialCardId = null, setDetailedCardId, initialProductFilter = null, setDetailedProductFilter, initialCardNumFilter = null, setDetailedCardNumFilter, editCustomCardById, customEditVer, targetByCardId, setActiveTab, setTargetCardFilter, hidePrices }) {
+function DetailedPanel({ cards = ALL_CARDS, browseKey = "", onTogglePin, statuses, copySummaries, openCardCopies, cardDetails, updateCardDetail, setCardStatus, adjustCardQty, needsSync, initialSnFilter, initialStatusFilter, initialCardId = null, setDetailedCardId, initialProductFilter = null, setDetailedProductFilter, initialCardNumFilter = null, setDetailedCardNumFilter, editCustomCardById, customEditVer, targetByCardId, setActiveTab, setTargetCardFilter, hidePrices }) {
   var trackerMode = useTrackerMode();
   var [dPlayer, setDPlayer] = useState("all");
   var [dFilter, setDFilter] = useState(initialStatusFilter || "all");
@@ -3321,6 +3402,17 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
   var [batchSelected, setBatchSelected] = useState(new Set());
   var [batchBusy, setBatchBusy] = useState(false);
 
+  var viewRoster = useMemo(function() {
+    var roster = panelRoster(), scoped = {};
+    cards.forEach(function(card) { cardPlayers(card).forEach(function(key) { scoped[key] = roster[key] || {name:panelCardSubject(card)}; }); });
+    return scoped;
+  }, [cards, trackerMode, catalogRevision]);
+  var previousBrowseKey = useRef(browseKey);
+  useEffect(function() {
+    if (previousBrowseKey.current === browseKey) return;
+    previousBrowseKey.current = browseKey;
+    setDFilter("all"); setDYear("all"); setDPlayer("all"); setDProduct("all"); setDScope("checklist"); setDSearch(""); setDCardNum(""); setDSnFilter("all"); setDPage(0); setBatchMode(false); setBatchSelected(new Set());
+  }, [browseKey]);
   // Reset filters when initial props change
   useEffect(function() {
     if (initialSnFilter) setDSnFilter(initialSnFilter);
@@ -3332,7 +3424,7 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
 
   useEffect(function() {
     if (initialCardId) {
-      var targetCard = CARD_BY_ID[initialCardId];
+      var targetCard = cards.find(function(card){return String(card.id) === String(initialCardId);});
       if (targetCard) {
         setDScope(inChecklist(targetCard) ? "checklist" : "all");
         setDFilter("all"); setDYear(cardYear(targetCard) || "all"); setDPlayer(cardPlayers(targetCard)[0] || "all"); setDSearch(""); setDSnFilter("all");
@@ -3344,7 +3436,7 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
       setDPage(0);
       if (setDetailedCardId) setDetailedCardId(null);
     }
-  }, [initialCardId]);
+  }, [initialCardId, cards]);
 
   useEffect(function() {
     if (initialProductFilter) {
@@ -3359,14 +3451,14 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
   }, [initialProductFilter, initialCardNumFilter]);
 
   var PAGE_SIZE = 50;
-  var years = useMemo(function() { return [...new Set(ALL_CARDS.map(function(c) { return cardYear(c) || c.product.slice(0,4); }))].sort(); }, [catalogRevision]);
+  var years = useMemo(function() { return [...new Set(cards.map(function(c) { return cardYear(c) || c.product.slice(0,4); }))].sort(); }, [catalogRevision, cards]);
   var filteredProducts = useMemo(function() {
-    var cards = dYear === "all" ? ALL_CARDS : ALL_CARDS.filter(function(c) { return cardYear(c) === dYear; });
-    return [...new Set(cards.map(function(c) { return c.product; }))].sort();
-  }, [dYear, catalogRevision]);
+    var productCards = dYear === "all" ? cards : cards.filter(function(c) { return cardYear(c) === dYear; });
+    return [...new Set(productCards.map(function(c) { return c.product; }))].sort();
+  }, [dYear, catalogRevision, cards]);
   var filtered = useMemo(function() {
     var s = dSearch.toLowerCase();
-    return ALL_CARDS.filter(function(card) {
+    return cards.filter(function(card) {
       if (HIDDEN_DUPES.has(card.id) || !matchesCatalogScope(card, dScope) || (dPlayer !== "all" && !cardHasPlayer(card,dPlayer))) return false;
       var cs = statuses[card.id] || "not_owned";
       var cardDetail = cardDetails[card.id] || {};
@@ -3410,7 +3502,7 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
 
       return true;
     });
-  }, [statuses, cardDetails, copySummaries, dFilter, dYear, dPlayer, dProduct, dSearch, dCardNum, dSnFilter, customEditVer, dScope, catalogRevision]);
+  }, [statuses, cardDetails, copySummaries, dFilter, dYear, dPlayer, dProduct, dSearch, dCardNum, dSnFilter, customEditVer, dScope, catalogRevision, cards]);
   var sorted = useMemo(function() {
     if (!sortCol) return filtered;
     return [...filtered].sort(function(a, b) {
@@ -3447,8 +3539,8 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
   }, [filtered, sortCol, sortDir, statuses, cardDetails, copySummaries]);
   var totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   var pageCards = sorted.slice(dPage * PAGE_SIZE, (dPage + 1) * PAGE_SIZE);
-  useEffect(function() { setDPage(0); }, [dFilter, dYear, dPlayer, dProduct, dSearch, dCardNum, dSnFilter, sortCol, sortDir, dScope, catalogRevision]);
-  useEffect(function() { if (dProduct !== "all" && !filteredProducts.includes(dProduct)) setDProduct("all"); }, [dYear, catalogRevision]);
+  useEffect(function() { setDPage(0); }, [dFilter, dYear, dPlayer, dProduct, dSearch, dCardNum, dSnFilter, sortCol, sortDir, dScope, catalogRevision, cards]);
+  useEffect(function() { if (dProduct !== "all" && !filteredProducts.includes(dProduct)) setDProduct("all"); }, [dYear, catalogRevision, cards]);
   function toggleSort(col) {
     if (sortCol === col) { setSortDir(sortDir === "asc" ? "desc" : "asc"); }
     else { setSortCol(col); setSortDir("asc"); }
@@ -3501,7 +3593,7 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
     <div>
       <div className="flex gap-1 mb-1 flex-wrap items-center" style={{fontSize:"clamp(9px,1.1vw,11px)"}}>
         <CatalogScopeSelect value={dScope} onChange={setDScope}/>
-        {trackerMode !== "tb" && <select aria-label="Filter player" value={dPlayer} onChange={function(e){setDPlayer(e.target.value);}} className="bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5"><option value="all">{trackerMode === "racing" ? "All drivers" : "All players"}</option>{Object.entries(panelRoster()).map(function(entry){return <option key={entry[0]} value={entry[0]}>{entry[1].name}</option>;})}</select>}
+        {trackerMode === "wnba" && <select aria-label="Filter player" value={dPlayer} onChange={function(e){setDPlayer(e.target.value);}} className="bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5"><option value="all">{trackerMode === "racing" ? "All drivers" : "All players"}</option>{Object.entries(viewRoster).map(function(entry){return <option key={entry[0]} value={entry[0]}>{entry[1].name}</option>;})}</select>}
         <select value={dFilter} onChange={function(e) { setDFilter(e.target.value); }} className="bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5">
           <option value="all">Status</option>
           <option value="acquired">Owned+Transit</option>
@@ -3609,7 +3701,7 @@ function DetailedPanel({ statuses, copySummaries, openCardCopies, cardDetails, u
                     </select>}
                     {copySummary.managed && <span className="block text-[8px] text-cyan-300">{[copySummary.owned && "Owned", copySummary.inTransit && "In Transit"].filter(Boolean).join(" + ")}</span>}
                   </td>
-                  {trackerMode !== "tb" && <td className="px-1 py-0.5 text-purple-300 font-semibold" style={{maxWidth:"12rem"}}>{panelCardSubject(card)}<span className="block text-[8px] text-gray-500">{cardYear(card)}</span></td>}
+                  {trackerMode !== "tb" && <td className="px-1 py-0.5 text-purple-300 font-semibold" style={{maxWidth:"12rem"}}>{onTogglePin && <button type="button" aria-pressed={d.pinned === true} aria-label={(d.pinned === true ? "Unpin focal card: " : "Pin focal card: ") + panelCardSubject(card) + " " + cardYear(card) + " " + card.product + " #" + card.cardNumber + " " + card.cardSet} title={d.pinned === true ? "Unpin focal card" : "Pin focal card"} onClick={function(e){e.stopPropagation();onTogglePin(card.id);}} className={"mr-1 rounded px-0.5 " + (d.pinned === true ? "text-amber-300" : "text-gray-600 hover:text-amber-300")}>{d.pinned === true ? "★" : "☆"}</button>}{panelCardSubject(card)}<span className="block text-[8px] text-gray-500">{cardYear(card)}</span></td>}
                   <td className="px-0.5 py-0.5 text-gray-300 truncate" style={{maxWidth:"clamp(80px,11vw,180px)", fontSize:"9px"}} title={card.product}>{card.product}</td>
                   <td className="px-0.5 py-0.5 text-white font-medium whitespace-nowrap">{card.cardNumber}</td>
                   <td className="px-0.5 py-0.5 text-gray-400 truncate" style={{fontSize: "9px", maxWidth:"clamp(90px,13vw,220px)"}} title={card.cardSet}>{card.cardSet}{sspBadge(card.cardSet) ? <span className="ml-0.5">{sspBadge(card.cardSet)}{catalogBadge(card)}</span> : null}</td>

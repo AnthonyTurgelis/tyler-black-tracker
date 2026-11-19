@@ -16,7 +16,7 @@
     if(Array.isArray(card.subjects)&&card.subjects.length)return card.subjects.map(person=>text(typeof person==='string'?person:person?.name)).filter(Boolean).join(' / ');
     return text(card.subject||card.playerName||card.name||knownRoster?.[card.player]?.name||card.player);
   }
-  function subjectNames(card,knownRoster){return subject(card,knownRoster).split(/\s+\/\s+|\s+&\s+|\s*;\s*/).map(text).filter(Boolean);}
+  function subjectNames(card,knownRoster){return subject(card,knownRoster).split(/\s*[\/;|]\s*|\s+&\s+/).map(text).filter(Boolean);}
   function personKey(name){return 'subject:'+encodeURIComponent(text(name).normalize('NFKC').toLowerCase().replace(/\s+/g,' '));}
   function players(card){return [...new Set((Array.isArray(card?.players)&&card.players.length?card.players:[card?.player]).filter(Boolean))];}
   function flag(value,fallback){if(value===true||/^(?:yes|true|1)$/i.test(text(value)))return 'Yes';if(value===false||/^(?:no|false|0)$/i.test(text(value)))return 'No';return fallback?'Yes':'';}

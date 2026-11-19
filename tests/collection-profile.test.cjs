@@ -26,6 +26,18 @@ test('player keys are derived from complete subjects independently of card order
  assert.equal(P.roster(forward)[forward[1].player].name,'Dale Earnhardt Jr.');
 });
 
+test('TCDB multi-person separators preserve each complete name and the single shared card identity',()=>{
+ const originals=[{id:'tcdb:10176805',subject:'Kyle Busch/Daniel Suarez'},{id:'tcdb:4899615',subject:'Kevin Harvick /Mark Martin'},{id:'tcdb:3',subject:'Dale Earnhardt Jr.|Dale Earnhardt'}];
+ const before=JSON.stringify(originals),views=P.cards('racing',originals);
+ const names=[['Kyle Busch','Daniel Suarez'],['Kevin Harvick','Mark Martin'],['Dale Earnhardt Jr.','Dale Earnhardt']];
+ views.forEach((card,index)=>{
+  assert.equal(card.id,originals[index].id);assert.equal(card.subject,originals[index].subject);
+  assert.deepEqual(card.subjects,names[index]);assert.deepEqual(card.players,names[index].map(P.personKey));
+  assert.deepEqual(P.subjectNames(card),names[index]);assert.equal(P.roster([card])[card.players[1]].name,names[index][1]);
+ });
+ assert.equal(JSON.stringify(originals),before);
+});
+
 test('flags use explicit metadata and cannot infer ownership or rookie status from year or player',()=>{
  const cards=P.cards('racing',[{id:'a',product:'2026 Select',cardNumber:'1',subject:'Ryan Blaney',isAuto:false,attributes:'AU, RC, MEM'},
  {id:'b',year:2026,product:'Select',subject:'New Driver',isRC:'',isRookie:true,isRelic:true,printRun:99,copies:''},

@@ -19,7 +19,7 @@ test('dashboard counts owned and in-transit independently, deduplicates acquired
  const ctx=context('racing',{trackerMode:'racing',selectedPlayer:null,cardDetails:details,copySummaries:null,passesFilter:()=>true,SSP_TAGS:{},cardPlayers:c=>[c.player],cardHasPlayer:(c,p)=>c.player===p,collectionCardState:(id,s,d)=>copies.summarizeCard(null,id,s,d)});
  nested(ctx,'calcStats','\n  var stats =');const before=JSON.stringify({cards,statuses,details}),stats=ctx.calcStats(cards,statuses,1,true,false,false,false);
  assert.equal(stats.owned,2);assert.equal(stats.transit,2);assert.equal(stats.acquired,3);assert.equal(stats.total,4);assert.equal(stats.byProduct['2025 Panini Prizm'].total,1);assert.equal(stats.byProduct['2026 Panini Prizm'].total,3);assert.equal(stats.byPlayer.b.owned,1);assert.equal(stats.byPlayer.b.transit,1);assert.equal(stats.byPlayer.b.acquired,1);assert.equal(JSON.stringify({cards,statuses,details}),before);
- ctx.selectedPlayer='a';const selected=ctx.calcStats(cards,statuses,1,true,false,false,false);assert.equal(selected.total,2);assert.equal(selected.owned,1);assert.equal(selected.transit,1);
+ ctx.selectedPlayer='a';assert.equal(ctx.calcStats(cards,statuses,1,true,false,false,false).total,4);ctx.trackerMode='wnba';const selected=ctx.calcStats(cards,statuses,1,true,false,false,false);assert.equal(selected.total,2);assert.equal(selected.owned,1);assert.equal(selected.transit,1);
 });
 test('disabled sport pricing never writes or changes receipt financial evidence',()=>{
  let writes=0;const ctx=context('racing',{pricingEnabled:false,savePriceHistory:()=>writes++,priceKey:c=>c.id,CARD_BY_ID:{},AMBIGUOUS_PRICE_KEYS:new Set(),AMBIGUOUS_CARD_IDS:new Set()});
