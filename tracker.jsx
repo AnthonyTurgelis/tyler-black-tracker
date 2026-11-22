@@ -7834,6 +7834,23 @@ function COMCScannerPanel(props) {
 
 function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDetailedStatusFilter, setDetailedSnFilter, setDetailedProductFilter, setDetailedCardNumFilter }) {
   var [ph, setPh] = useState(function() { return loadPriceHistory(); });
+  // Separate live public-market observations. Never write these into historical
+  // scanner series, private paid prices, statuses, quantities, or copy locations.
+  var [publicOffers, setPublicOffers] = useState([]);
+  useEffect(function() {
+    var cancelled=false;
+    function read() {
+      try {
+        var raw=window.storage && window.storage.peek ? window.storage.peek("tb-public-market-evidence-v1") : localStorage.getItem("tb-public-market-evidence-v1");
+        var val=typeof raw==="string" ? JSON.parse(raw) : raw;
+        if (!cancelled) setPublicOffers(Array.isArray(val && val.observations) ? val.observations : []);
+      } catch(e) { if (!cancelled) setPublicOffers([]); }
+    }
+    read();
+    Promise.resolve(window.storageReady).then(read).catch(function(){});
+    return function(){cancelled=true;};
+  }, []);
+
   var [sortBy, setSortBy] = useState("recent");
   var [sortDir, setSortDir] = useState("desc");
   var [filterSrc, setFilterSrc] = useState("all");
@@ -8029,6 +8046,27 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
 
   return (
     <div className="space-y-2">
+      {publicOffers.length>0 && <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-2">
+        <div className="mb-1 flex flex-wrap items-baseline justify-between gap-1">
+          <span className="text-xs font-bold text-white">Verified public listing snapshots</span>
+          <span className="text-[10px] text-slate-400">Asks only · not sold prices · destination-dependent shipping</span>
+        </div>
+        <div className="space-y-1">
+          {publicOffers.slice().sort(function(a,b){return String(b.observedDate).localeCompare(String(a.observedDate));}).slice(0,12).map(function(e){
+            return <div key={e.id} className="flex flex-wrap items-center justify-between gap-x-2 border-t border-slate-800 pt-1 text-[11px]">
+              <span className="min-w-0 text-slate-200">2026 Update #{e.cardNumber} · {e.variant}</span>
+              <span className="font-semibold tabular-nums text-white">{e.currency} {Number(e.amount).toFixed(2)}
+                {e.shipping && e.shipping.amount!=null ? " + ship "+e.shipping.currency+" "+Number(e.shipping.amount).toFixed(2) : ""}
+              </span>
+              <span className={e.identityStatus==="review_required" ? "text-amber-300" : "text-slate-400"}>
+                {e.identityStatus==="review_required" ? "Review identity" : "Ask"} · {e.observedDate}
+              </span>
+              <a href={e.url} target="_blank" rel="noopener noreferrer" className="text-sky-300 underline">Listing</a>
+            </div>;
+          })}
+        </div>
+        <div className="mt-1 text-[10px] text-slate-500">Seller may accept a lower Best Offer. Shipping reflects the captured locale, not a guaranteed rate. No confirmed sale or collection ownership change.</div>
+      </div>}
       {priceSyncError ? <div role="alert" className="rounded border border-amber-700 bg-amber-950/40 p-2 text-xs text-amber-200">{priceSyncError} Your local price evidence is retained.<button className="ml-2 underline" onClick={function(){savePriceHistory(loadPriceHistory());}}>Retry save</button></div> : null}
       {/* Header */}
       <div className="bg-gray-800 rounded-lg p-2">
