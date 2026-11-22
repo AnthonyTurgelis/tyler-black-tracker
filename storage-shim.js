@@ -17,6 +17,7 @@
     "tb-alldata-v1",
     "tb-targets-v1",
     "tb-price-history-v1",
+    "tb-public-market-evidence-v1",
     "tb-tcdb-fixes-v1",
     "tb-tcdb-flags-v1",
     "tb-ebay-blocked-v1",
