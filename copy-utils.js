@@ -2,7 +2,9 @@
 (function (root) {
   "use strict";
   var media = root && root.TrackerMedia || (typeof require === "function" ? require("./media-utils.js") : null);
-  var LOCATIONS = { in_hand: "In hand", comc: "COMC", oklahoma_mailbox: "Oklahoma mailbox", in_transit: "In transit", unknown: "Unknown" };
+  var LOCATIONS = { in_hand: "In hand", comc: "COMC", in_transit: "In transit", unknown: "Unknown" };
+  // Read historical mailbox entries as in-transit while preserving source evidence and copy identity.
+  function canonicalCopy(copy) { return copy && copy.location === "oklahoma_mailbox" ? Object.assign({}, copy, { location: "in_transit" }) : copy; }
   var SALE_STATUSES = { none: "Keep", review: "Review for sale", listed: "Already listed", sold: "Sold" };
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function canonicalCardId(value) {
@@ -57,14 +59,14 @@
       var id = "legacy:" + cardId + ":" + unit;
       var copy = state.copies[id];
       seen.add(id);
-      if (copy) { if (!copy.archived) rows.push(copy); continue; }
+      if (copy) { if (!copy.archived) rows.push(canonicalCopy(copy)); continue; }
       var split=baseline.details || {},owned=Number(split.ownedQty),transit=Number(split.transitQty),legacyStatus=baseline.status;
       if(Number.isSafeInteger(owned)&&owned>=0&&Number.isSafeInteger(transit)&&transit>=0&&owned+transit===baseline.quantity)legacyStatus=unit<=owned?"owned":"in_transit";
       rows.push({ id: id, cardId: canonicalCardId(cardId), origin: "legacy", location: "unknown", legacyStatus: legacyStatus, legacyUnit: unit, unallocated: true, serial: "", paidPrice: "", currency: "", purchaseDate: "", sourceRefs: [], duplicateConfirmed: false, saleStatus: "none", legacyDetails: baseline.details, createdAt: "", updatedAt: "" });
     }
     Object.keys(state.copies).forEach(function (id) {
       var copy = state.copies[id];
-      if (sameCardId(copy.cardId,cardId) && !seen.has(id) && !copy.archived) rows.push(copy);
+      if (sameCardId(copy.cardId,cardId) && !seen.has(id) && !copy.archived) rows.push(canonicalCopy(copy));
     });
     return rows;
   }
@@ -94,9 +96,9 @@
     // Owned retains its established meaning of in hand. Confirmed copies elsewhere
     // are acquired but awaiting receipt, including a purchased copy with unknown location.
     var legacyAwaiting = (legacyStatus === "in_transit" || active.some(function(c){return c.origin==="legacy"&&c.legacyStatus==="in_transit"&&c.unallocated;})) && (!hasStoredCopies(state, cardId) || legacyUnallocated);
-    var inTransit = legacyAwaiting || locations.in_transit > 0 || locations.comc > 0 || locations.oklahoma_mailbox > 0 || active.some(function(c) { return c.origin !== "legacy" && c.location === "unknown"; });
+    var inTransit = legacyAwaiting || locations.in_transit > 0 || locations.comc > 0 || active.some(function(c) { return c.origin !== "legacy" && c.location === "unknown"; });
     var ownedQty=active.filter(function(c){return c.location==="in_hand"||c.origin==="legacy"&&c.unallocated&&(c.legacyStatus==="owned"||c.legacyStatus==="for_sale");}).length;
-    var transitQty=active.filter(function(c){return ["in_transit","comc","oklahoma_mailbox"].includes(c.location)||c.origin==="legacy"&&c.unallocated&&c.legacyStatus==="in_transit";}).length;
+    var transitQty=active.filter(function(c){return ["in_transit","comc"].includes(c.location)||c.origin==="legacy"&&c.unallocated&&c.legacyStatus==="in_transit";}).length;
     return { total: active.length, ownedQty:ownedQty, transitQty:transitQty, unknownQty:active.length-ownedQty-transitQty, locations: locations, unallocated: active.filter(function (c) { return c.origin === "legacy" && c.unallocated; }).length, hasInHand: locations.in_hand > 0, hasInTransit: locations.in_transit > 0, hasComc: locations.comc > 0, legacyStatus: legacyStatus, legacyOwned: legacyOwned, owned: owned, inTransit: inTransit, acquired: owned || inTransit, notOwned: !owned && !inTransit, managed: hasStoredCopies(state, cardId), saleReview: active.filter(needsSaleReview).length, listed: active.filter(function (c) { return c.saleStatus === "listed"; }).length };
   }
   function summarizeCards(input,cards,statuses,details) {
