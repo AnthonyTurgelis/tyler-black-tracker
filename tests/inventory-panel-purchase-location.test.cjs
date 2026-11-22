@@ -36,10 +36,10 @@ test('untouched location in purchase review preserves an existing manually recei
  }
 });
 test('deliberate location selections remain effective during purchase review',async()=>{
- for(const location of ['unknown','in_hand','oklahoma_mailbox']){
+ for(const location of ['unknown','in_hand','in_transit']){
   const f=fixture('ebay');f.ctx.form={...f.ctx.form,existingCopyId:'__new__',confirmAdditional:true,location};await f.save();
   assert.equal(Object.values(f.ctx.saved.copies)[0].location,location);
  }
- const linked=fixture('comc',true);linked.ctx.form={...linked.ctx.form,existingCopyId:linked.existingCopyId,location:'oklahoma_mailbox'};await linked.save();
- assert.equal(linked.ctx.saved.copies[linked.existingCopyId].location,'oklahoma_mailbox');
+ const linked=fixture('comc',true);linked.ctx.form={...linked.ctx.form,existingCopyId:linked.existingCopyId,location:'in_transit'};await linked.save();
+ assert.equal(linked.ctx.saved.copies[linked.existingCopyId].location,'in_transit');
 });
