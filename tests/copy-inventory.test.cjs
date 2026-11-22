@@ -211,10 +211,10 @@ test('a multi-card lot cannot silently become one new counted copy', () => {
 
 test('independent copy edits merge by record timestamp', () => {
   const a = CI.editCopy({},7,'legacy:7:1',{location:'comc'},context);
-  const b = CI.editCopy({},7,'legacy:7:2',{location:'oklahoma_mailbox'},{...context,now:'2026-11-16T05:00:00Z'});
+  const b = CI.editCopy({},7,'legacy:7:2',{location:'in_transit'},{...context,now:'2026-11-16T05:00:00Z'});
   const merged = CI.mergeStates(a,b);
   assert.equal(merged.copies['legacy:7:1'].location,'comc');
-  assert.equal(merged.copies['legacy:7:2'].location,'oklahoma_mailbox');
+  assert.equal(merged.copies['legacy:7:2'].location,'in_transit');
   assert.equal(CI.getCopiesForCard(merged,7,context.statuses,context.cardDetails).length,2);
 });
 
@@ -229,8 +229,8 @@ test('collection flags include Owned and Transit independently while acquired co
   assert.equal(context.statuses[7],'owned'); assert.equal(context.cardDetails[7].qty,'2');
 });
 
-test('COMC, Oklahoma, and unknown purchased copies are acquired but never automatically In hand or Owned', () => {
-  for (const location of ['comc','oklahoma_mailbox','unknown','in_transit']) {
+test('COMC, unknown, and in-transit copies are acquired but never automatically In hand or Owned', () => {
+  for (const location of ['comc','unknown','in_transit']) {
     const inventory=CI.addManualCopy({},9,{location},{...context,confirmAdditional:true}).inventory;
     const summary=CI.summarizeCard(inventory,9,context.statuses,context.cardDetails);
     assert.equal(summary.total,1); assert.equal(summary.owned,false,location);
@@ -284,4 +284,20 @@ test('private purchase staging retains the exact currency evidence without chang
   assert.equal(row.rawPrice,'$12.50');assert.deepEqual(row.currencyEvidence,evidence);
   evidence.currency='USD';assert.equal(row.currencyEvidence.currency,'CAD');
   assert.deepEqual(result.inventory.copies,{});assert.deepEqual(result.inventory.baselines,{});
+});
+
+// Historical snapshots used a separate mailbox location, now consolidated into In Transit.
+test('older mailbox copies display as In Transit without changing Owned flags, counts, or purchase evidence', () => {
+  const original={copies:{'manual:9:old':{id:'manual:9:old',cardId:9,origin:'manual',location:'oklahoma_mailbox',source:'ebay',sourceOrderId:'receipt-9',saleStatus:'none'}}};
+  const before=JSON.stringify(original);
+  const rows=CI.getCopiesForCard(original,9,context.statuses,context.cardDetails);
+  assert.equal(rows.length,1);
+  assert.equal(rows[0].location,'in_transit');
+  const summary=CI.summarizeCard(original,9,context.statuses,context.cardDetails);
+  assert.equal(summary.total,1);assert.equal(summary.transitQty,1);assert.equal(summary.ownedQty,0);
+  assert.equal(summary.locations.in_transit,1);assert.equal(CI.LOCATIONS.oklahoma_mailbox,undefined);
+  assert.equal(JSON.stringify(original),before);
+  const edited=CI.editCopy(original,9,'manual:9:old',{notes:'verified'},{...context,now:'2026-11-22T16:00:00Z'});
+  assert.equal(edited.copies['manual:9:old'].location,'in_transit');
+  assert.equal(edited.copies['manual:9:old'].sourceOrderId,'receipt-9');
 });
