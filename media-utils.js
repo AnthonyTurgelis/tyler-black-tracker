@@ -24,12 +24,19 @@
       return url.protocol === "https:" && !url.username && !url.password ? url.href : "";
     } catch (_) { return ""; }
   }
+  function photoUrl(photo) {
+    var value = text(photo && photo.url);
+    // Only a private own-copy scan can carry a small inline JPEG.
+    if (photo && photo.kind === "own_photo" && value.length <= 200000 &&
+        /^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/]+={0,2}$/.test(value)) return value;
+    return safeImageUrl(value);
+  }
   function normalizePhotos(input, options) {
     options = options || {};
     var output = [], seen = new Set();
     (Array.isArray(input) ? input : []).forEach(function(photo, index) {
       if (!photo || typeof photo !== "object") return;
-      var url = safeImageUrl(photo.url);
+      var url = photoUrl(photo);
       if (!url || seen.has(url)) return;
       var kind = KINDS[photo.kind] ? photo.kind : "reference";
       if (options.publicOnly && photo.kind !== "reference") return;
@@ -45,7 +52,7 @@
   // Use smaller COMC and eBay reference scans for gallery thumbnails.
   // Keep the exact original URL for the full-screen card viewer.
   function thumbnailUrl(photo) {
-    var original = safeImageUrl(photo && photo.url);
+    var original = photoUrl(photo);
     if (!original) return "";
     try {
       var u = new URL(original);
@@ -243,7 +250,7 @@
     });
     return Object.values(groups).sort(function(a, b) { return b.minimumExtras - a.minimumExtras || String(a.cardId).localeCompare(String(b.cardId),undefined,{numeric:true}); });
   }
-  var api = { KINDS: KINDS, safeImageUrl: safeImageUrl, thumbnailUrl: thumbnailUrl, normalizePhotos: normalizePhotos, preferredPhotos: preferredPhotos,
+  var api = { KINDS: KINDS, safeImageUrl: safeImageUrl, photoUrl: photoUrl, thumbnailUrl: thumbnailUrl, normalizePhotos: normalizePhotos, preferredPhotos: preferredPhotos,
     mergePhotos: mergePhotos, normalizePublicMedia: normalizePublicMedia, normalizeScopedMedia:normalizeScopedMedia,setCardReferences:setCardReferences,canonicalCardId:canonicalCardId,sameCardId:sameCardId,primaryJerseyNumber:primaryJerseyNumber,serialNumbers: serialNumbers,
     exactVariantPhotos:exactVariantPhotos,photosForCopy:photosForCopy,photoSourceLabel:photoSourceLabel,isExternalSourceScan:isExternalSourceScan,REVIEW_LABELS:REVIEW_LABELS,reviewFlags:reviewFlags,observationPhotoPlan:observationPhotoPlan,observationFacts:observationFacts,observationMatchesScope:observationMatchesScope,
     credibleSerial: credibleSerial, secondaryEvidence: secondaryEvidence, jerseyMatches: jerseyMatches, comcDuplicateGroups: comcDuplicateGroups };

@@ -596,6 +596,7 @@ function TylerBlackTracker() {
   const [collectionSegment, setCollectionSegment] = useState("all");
   const [browseSubject, setBrowseSubject] = useState("all");
   const [pinnedOnly, setPinnedOnly] = useState(false);
+  const [wantedOnly, setWantedOnly] = useState(false);
   useEffect(function() {
     let active=true,request=0;
     async function readCriteria() {
@@ -1635,9 +1636,13 @@ function TylerBlackTracker() {
   const segmentIndex = useMemo(function(){return sportMode ? window.CollectionSegments.build(ALL_CARDS,trackerMode,collectionCriteria) : null;},[trackerMode,collectionCriteria,customEditVer]);
   const segmentCards = useMemo(function(){return sportMode ? window.CollectionSegments.select(ALL_CARDS,segmentIndex,collectionSegment,"all") : ALL_CARDS;},[trackerMode,segmentIndex,collectionSegment,customEditVer]);
   const browseSubjects = useMemo(function(){return sportMode ? window.CollectionSegments.subjects(segmentCards) : [];},[sportMode,segmentCards]);
-  const browseCards = useMemo(function(){const scoped=sportMode ? window.CollectionSegments.select(ALL_CARDS,segmentIndex,collectionSegment,browseSubject) : ALL_CARDS;return trackerMode!=="tb" && pinnedOnly ? scoped.filter(card=>cardDetails[card.id]?.pinned===true) : scoped;},[trackerMode,segmentIndex,collectionSegment,browseSubject,pinnedOnly,cardDetails,customEditVer]);
-  const browseKey = trackerMode+"|"+collectionSegment+"|"+browseSubject+"|"+pinnedOnly;
-  const pinnedCount = useMemo(function(){return segmentCards.filter(card=>cardDetails[card.id]?.pinned===true && (browseSubject==="all" || cardHasPlayer(card,browseSubject))).length;},[segmentCards,cardDetails,browseSubject]);
+  const subjectCards = useMemo(() => sportMode ? window.CollectionSegments.select(ALL_CARDS,segmentIndex,collectionSegment,browseSubject) : ALL_CARDS,[sportMode,segmentIndex,collectionSegment,browseSubject,customEditVer]);
+  const wantedCount = useMemo(() => subjectCards.filter(card=>Number(cardDetails[card.id]?.wantedQty)>0).length,[subjectCards,cardDetails]);
+  const pinnedCount = useMemo(() => subjectCards.filter(card=>cardDetails[card.id]?.pinned===true).length,[subjectCards,cardDetails]);
+  const browseCards = useMemo(() => subjectCards.filter(card=>
+    (!pinnedOnly || cardDetails[card.id]?.pinned===true) && (!wantedOnly || Number(cardDetails[card.id]?.wantedQty)>0)
+  ),[subjectCards,pinnedOnly,wantedOnly,cardDetails]);
+  const browseKey = [trackerMode,collectionSegment,browseSubject,pinnedOnly,wantedOnly].join("|");
   const browsingView=["collection","summary","lookup","detailed","gallery"].includes(activeTab);
   function chooseBrowse(segment,subject,pins) {
     if(privatePanelHasEdits()){window.alert("Save or cancel your current edit before changing the view.");return;}
@@ -1814,7 +1819,7 @@ function TylerBlackTracker() {
   const needRegular = stats.notOwned - stats.notOwned1of1;
   const TABS = [
     {id:"collection",label:"Collection",color:"yellow",ownerOnly:true},
-    {id:"catalog",label:"Catalogue",color:"purple",noTempo:true},
+    {id:"catalog",label:"Catalogue",color:"purple"},
     {id:"gallery",label:"Gallery",color:"amber"},
     {id:"copies",label:"Copies",color:"cyan",ownerOnly:true},
     {id:"autographs",label:"IP autos",color:"purple",ownerOnly:true},
@@ -1969,6 +1974,7 @@ function TylerBlackTracker() {
             <option value="all">All {trackerMode==="racing" ? "drivers" : "subjects"} · {browseSubjects.length}</option>
             {browseSubjects.map(subject=><option key={subject.key} value={subject.key}>{subject.name} · {subject.count}</option>)}
           </select></label>}
+          {sportMode && <button aria-pressed={wantedOnly} onClick={()=>{if(privatePanelHasEdits())return;setWantedOnly(!wantedOnly);setPage(0);}} className={"rounded border px-2 py-1 text-xs font-semibold "+(wantedOnly ? "border-sky-400 text-sky-200 bg-sky-950/60" : "border-slate-700 text-slate-300")}>Wantlist <span className="tabular-nums opacity-70">{wantedCount}</span></button>}
           <button aria-pressed={pinnedOnly} onClick={()=>chooseBrowse(collectionSegment,browseSubject,!pinnedOnly)} className={"rounded border px-2 py-1 text-xs font-semibold "+(pinnedOnly ? "border-amber-400 text-amber-200 bg-amber-950/60" : "border-slate-700 text-slate-300")} title="Show your pinned focal cards">★ Pinned <span className="tabular-nums opacity-70">{pinnedCount}</span></button>
           <span className="text-xs text-slate-400 ml-auto">{browseCards.length.toLocaleString()} card{browseCards.length===1 ? "" : "s"}</span>
         </div>
@@ -2295,7 +2301,7 @@ function TylerBlackTracker() {
         ) : activeTab === "tweets" ? (
           <LinkedTweetsPanel isOwner={isOwner} />
         ) : activeTab === "comc_scanner" ? (
-          <COMCScannerPanel copySummaries={copySummaries} cards={ALL_CARDS} statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} importPurchaseCopy={importPurchaseCopy} needsSync={needsSync} setDetailedCardId={setDetailedCardId} setActiveTab={setActiveTab} persistedState={scannerStateRef.current} onStateChange={function(s) { scannerStateRef.current = s; }} editCustomCardById={editCustomCardById} />
+          <COMCScannerPanel saveSportCard={sportMode ? saveSportCatalogRecord : null} copySummaries={copySummaries} cards={ALL_CARDS} statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} importPurchaseCopy={importPurchaseCopy} needsSync={needsSync} setDetailedCardId={setDetailedCardId} setActiveTab={setActiveTab} persistedState={scannerStateRef.current} onStateChange={function(s) { scannerStateRef.current = s; }} editCustomCardById={editCustomCardById} />
         ) : activeTab === "targets" ? (
           <TargetsPanel cards={ALL_CARDS} statuses={statuses} setCardStatus={setCardStatus} updateCardDetail={updateCardDetail} setDetailedCardId={setDetailedCardId} setActiveTab={setActiveTab} initialCardFilter={targetCardFilter} setTargetCardFilter={setTargetCardFilter} />
         ) : activeTab === "prices" ? (
@@ -2312,8 +2318,8 @@ function TylerBlackTracker() {
           <window.CopyInventoryPanel key={copyStorageKey+":"+(copyStateRef.current.ownerId || "signed-out")} initialCardId={copyCardId} cards={ALL_CARDS.filter(function(card) { return trackerMode !== "tb" || !HIDDEN_DUPES.has(card.id); })} statuses={statuses} cardDetails={cardDetails} inventory={copyInventory} publicMedia={publicMedia} onInventoryChange={saveCopyInventory} onRefresh={refreshCopyInventory} isOwner={isOwner} storageReady={copyStorage.ready} loading={copyStorage.loading} readOnlyReason={copyStorage.error} />
         ) : activeTab === "gallery" ? (
           <window.CardGalleryPanel key={copyStorageKey+":"+(copyStateRef.current.ownerId || "public")+":"+browseKey} onTogglePin={trackerMode!=="tb" ? togglePinnedCard : null} cards={browseCards.filter(function(card){return trackerMode !== "tb" || !HIDDEN_DUPES.has(card.id);})} statuses={statuses} cardDetails={cardDetails} inventory={isOwner ? copyInventory : null} publicMedia={publicMedia} isOwner={isOwner} onOpenCopies={isOwner ? openCardCopies : null} loading={mediaStorage.loading || isOwner && copyStorage.loading} loadError={mediaStorage.error} onRefresh={async function(){var results=await Promise.all([refreshPublicMedia(),isOwner ? refreshCopyInventory() : Promise.resolve({ok:true})]);return results.find(function(result){return result && result.ok === false;}) || {ok:true};}} />
-        ) : activeTab === "catalog" && trackerMode !== "wnba" ? (
-          <window.CardCatalogPanel key={trackerMode} mode={trackerMode} cards={ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id);}).concat(isOwner ? loadCustomCards().filter(function(card){return card.archived;}) : [])} statuses={statuses} isOwner={isOwner} initialEditId={catalogEditId} onClearEdit={function(){setCatalogEditId(null);}} onSave={saveCatalogCard} onArchive={archiveCatalogCard} onRestore={restoreCatalogCard} onOpen={function(card){setDetailedCardId(card.id);setActiveTab("detailed");}} onStatusChange={setCardStatus} revision={customEditVer}/>
+        ) : activeTab === "catalog" ? (
+          <window.CardCatalogPanel key={trackerMode} mode={trackerMode} readOnly={trackerMode==="wnba"} copySummaries={copySummaries} cards={ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id);}).concat(isOwner ? loadCustomCards().filter(function(card){return card.archived;}) : [])} statuses={statuses} isOwner={isOwner} initialEditId={catalogEditId} onClearEdit={function(){setCatalogEditId(null);}} onSave={saveCatalogCard} onArchive={archiveCatalogCard} onRestore={restoreCatalogCard} onOpen={function(card){setDetailedCardId(card.id);setActiveTab("detailed");}} onStatusChange={setCardStatus} revision={customEditVer}/>
         ) : activeTab === "summary" ? (
           <SummaryPanel cards={browseCards} segmentCards={ALL_CARDS} segmentIndex={segmentIndex} browseKey={browseKey} onSelectSegment={key=>chooseBrowse(key,"all",false)} onSelectSubject={key=>chooseBrowse(collectionSegment,key || "all",pinnedOnly)} statuses={summaryStatuses} copySummaries={copySummaries} cardDetails={cardDetails} setActiveTab={setActiveTab} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} />
         ) : activeTab === "lookup" ? (
@@ -4732,7 +4738,6 @@ function COMCScannerPanel(props) {
   }
 
   async function handleAddToDb(idx) {
-    if (window.CollectionProfile?.isSport(window.MODE)) { setImportMessage("Choose an existing wantlist card for this scan. Catalogue expansion is paused for this collection."); return; }
     if (!window.trackerAuth || !window.trackerAuth.isOwner()) return;
     var item = parsed[idx];
     if (!item) return;
@@ -4749,6 +4754,20 @@ function COMCScannerPanel(props) {
     // Save custom card
     var custom = loadCustomCards();
     // Check for duplicates
+    if (props.saveSportCard) {
+      var product = String(f.product || "").trim(), year = String(f.year || "").trim();
+      if (!dbSubject || !product || !year || !dbCardNo) { setImportMessage("Choose a subject, year, product and card number."); return; }
+      var same = (a,b)=>String(a || "").trim().toLowerCase()===String(b || "").trim().toLowerCase();
+      if (cards.some(c=>same(cardYear(c),year) && same(c.product.replace(/^\d{4}(?:-\d{2})?\s+/, ""), product) && same(c.cardNumber,dbCardNo) && same(c.cardSet,dbVariant) && same(window.CollectionScanner.subject(c,scanRoster),dbSubject))) {
+        setImportMessage("This card is already in the catalogue."); return;
+      }
+      var result=await props.saveSportCard({subject:dbSubject,year,product,cardSet:dbVariant,cardNumber:dbCardNo,copies:dbPrintRun,isAuto:f.isAuto?"Yes":"",isMem:f.isMem?"Yes":"",isRC:f.isRC?"Yes":"",verification:"unverified"});
+      if (!result.ok) { setImportMessage(result.error); return; }
+      setParsed(rows=>rows.map((row,index)=>index===idx ? {...row,match:{card:result.card,score:100,subjectVerified:true}} : row));
+      setShowAddDbForm(false);setAddingIdx(null);
+      setImportMessage("Card added to this collection’s catalogue.");
+      return;
+    }
     var isDupe = custom.some(function(cc) {
       return cc.product === dbProduct && cc.cardNumber === dbCardNo && cc.cardSet === dbVariant && (!multiSubject || window.CollectionScanner.subject(cc,scanRoster) === dbSubject);
     }) || ALL_CARDS.some(function(c) {

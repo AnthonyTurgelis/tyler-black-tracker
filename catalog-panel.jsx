@@ -181,8 +181,8 @@
     var proofSignatureCounts = {all:0,signed:0,unsigned:0,unknown:0};
     proofEntries.forEach(function(entry){if(proofTypeFilter === "all" || entry.info.issueType === proofTypeFilter){proofSignatureCounts.all++;proofSignatureCounts[entry.info.signature]++;}});
 
-    var owned = filtered.filter(function (entry) { return statuses[entry.card.id] === "owned"; }).length;
-    var incoming = filtered.filter(function (entry) { return statuses[entry.card.id] === "in_transit"; }).length;
+    var owned = filtered.filter(function (entry) { return props.copySummaries?.[entry.card.id]?.owned ?? (statuses[entry.card.id] === "owned"); }).length;
+    var incoming = filtered.filter(function (entry) { return props.copySummaries?.[entry.card.id]?.inTransit ?? (statuses[entry.card.id] === "in_transit"); }).length;
     var isOpenEnded = filter === "proofs" || filter === "custom" || filter === "review";
 
     React.useEffect(function () { setShown(50); }, [filter, search, proofTypeFilter, proofSignatureFilter, subjectFilter, yearFilter]);

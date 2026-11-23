@@ -292,7 +292,7 @@
       catch (_) { return "Use a complete http or https listing link."; }
     }
     if (copy.photos != null && !Array.isArray(copy.photos)) return "Photos must be a list of image links.";
-    if ((copy.photos || []).some(function(photo) { return !photo || !media.safeImageUrl(photo.url) || photo.sourceUrl && !media.safeImageUrl(photo.sourceUrl); })) return "Use complete HTTPS image and source links without sign-in credentials.";
+    if ((copy.photos || []).some(function(photo) { return !photo || !media.photoUrl(photo) || photo.sourceUrl && !media.safeImageUrl(photo.sourceUrl); })) return "Use complete HTTPS image and source links without sign-in credentials.";
     if ((copy.photos || []).some(function(photo) { return !media.KINDS[photo.kind] || ["front", "back"].indexOf(photo.side) < 0; })) return "Choose a source label and front or back for every photo.";
     if (text(copy.secondaryJerseyNumber) && !/^\d{1,3}$/.test(text(copy.secondaryJerseyNumber))) return "Enter the other jersey number shown on this card, using digits only.";
     if (copy.secondaryJerseyEvidence && copy.secondaryJerseyEvidence.sourceUrl && !media.safeImageUrl(copy.secondaryJerseyEvidence.sourceUrl)) return "Use a complete HTTPS link for the jersey evidence.";

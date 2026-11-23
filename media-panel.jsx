@@ -197,10 +197,17 @@ function CardGalleryPanel({cards = [], statuses = {}, cardDetails = {}, inventor
   const proofScope = /^(proofs|preproduction|manufacturer_proofs|prototypes)(?:_(signed|unsigned|unknown))?$/.test(scope);
   const showMissingForScope = proofScope || scope === "review";
   const entries = React.useMemo(() => {
+    const copiesByCard = new Map();
+    if (isOwner) CI.copiesForCards(state,cards,statuses,cardDetails).forEach(({card,copy})=>{
+      if (copy.saleStatus === "sold") return;
+      if (!copiesByCard.has(card.id)) copiesByCard.set(card.id,[]);
+      copiesByCard.get(card.id).push(copy);
+    });
+    const summaries = CI.summarizeCards(state,cards,statuses,cardDetails);
     const observationsByCard = {};
     if (isOwner) Object.values(state.observations).forEach(observation => { if (observation.cardId && TM.reviewFlags(observation).identityConfirmed && !["ignored","split"].includes(observation.disposition)) { if (!observationsByCard[observation.cardId]) observationsByCard[observation.cardId] = []; observationsByCard[observation.cardId].push(observation); } });
     return cards.filter(card => (currentMode !== "tb" || card.id !== 1) && !card.archived && !card.hiddenDuplicate).map(card => {
-      const copies = isOwner ? CI.getCopiesForCard(state, card.id, statuses, cardDetails).filter(copy => copy.saleStatus !== "sold") : [];
+      const copies = copiesByCard.get(card.id) || [];
       const observations = observationsByCard[card.id] || [];
       const records = copies.concat(observations);
       let photos = [];
@@ -214,7 +221,7 @@ function CardGalleryPanel({cards = [], statuses = {}, cardDetails = {}, inventor
       const matches = records.map(record => TM.jerseyMatches(record, "", media.cards[card.id], primary));
       const primaryMatch = legacy.primary || matches.some(match => match.primary);
       const secondary = Array.from(new Set([legacy].concat(matches).filter(match => match.secondary).map(match => match.secondaryNumber)));
-      return { card, photos, summary:CI.summarizeCard(state, card.id, statuses, cardDetails), primary:primaryMatch, secondary,
+      return { card, photos, summary:summaries[card.id], primary:primaryMatch, secondary,
         pending:observations.filter(observation => !observation.matchedCopyId && !["ignored","split"].includes(observation.disposition)).length,
         text:[mediaCardSubject(card),card.player,mediaCardProduct(card), card.cardNumber, card.cardSet, (cardDetails[card.id] || {}).serial, ...records.map(record => record.serial || "")].join(" ").toLowerCase() };
     });

@@ -198,3 +198,13 @@ test('conflicting source updates visibly require purchase, identity, and serial 
   assert.equal(flags.identity,true);assert.equal(flags.identityConfirmed,false);assert.equal(flags.serial,true);assert.equal(flags.purchase,true);
   assert.equal(JSON.stringify(observation),before);
 });
+
+test('private own-copy JPEG thumbnails survive edits and stay out of reference media',()=>{
+  const url='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ==';
+  const photo={id:'front',kind:'own_photo',url};
+  assert.equal(TM.thumbnailUrl(photo),url);
+  assert.equal(TM.preferredPhotos([photo])[0].url,url);
+  assert.deepEqual(TM.normalizePhotos([photo],{publicOnly:true}),[]);
+  assert.deepEqual(TM.normalizePhotos([{...photo,kind:'reference'}]),[]);
+  assert.equal(TM.photoUrl({...photo,url:'data:image/svg+xml;base64,/9j/AAAA'}),'');
+});
