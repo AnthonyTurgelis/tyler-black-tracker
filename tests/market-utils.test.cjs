@@ -124,3 +124,14 @@ test('graded and raw offers remain separate and cached source freshness is retai
   assert.equal(raw.shippingScope,'Destination-specific quote');
   assert.equal(market.groupSeries([{}])[0].conditionLabel,'Condition unverified');
 });
+
+test('scan headline includes known postage once and distinguishes incomplete prices', () => {
+  const quote = extra => market.scanPrice({price:'12.30',currency:'CAD',shippingNum:3.45,shippingCurrency:'CAD',...extra});
+  assert.equal(quote({}).amount,15.75);
+  assert.equal(quote({shippingNum:0}).detail,'Free shipping');
+  assert.equal(quote({shippingNum:0,shipping:''}).detail,'Shipping unknown');
+  assert.equal(quote({shippingCurrency:'USD'}).detail,'+ 3.45 USD shipping');
+  assert.equal(quote({priceBasis:'order_total'}).amount,12.3);
+  assert.equal(quote({shippingScope:'order',itemsInOrder:2,quantity:1}).amount,12.3);
+  assert.equal(quote({shippingScope:'order',itemsInOrder:1,quantity:1}).amount,15.75);
+});

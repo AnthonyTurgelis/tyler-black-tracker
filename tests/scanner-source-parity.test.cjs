@@ -57,3 +57,9 @@ test('page-level receipt headers never bleed across different orders',()=>{
  const text='Time placed\tJune 12, 2025\nOrder number\torder-a\n'+title+'\nUS $20.00\nTime placed\tJune 13, 2025\nOrder number\torder-b\n2025 Parkside #1 Alex Palou\nUS $17.50';
  const rows=S.parseListings(text,{source:'eBay',cards});assert.equal(rows.length,2);assert.equal(rows[0].orderNum,'order-a');assert.equal(rows[0].date,'June 12, 2025');assert.equal(rows[1].orderNum,'order-b');assert.equal(rows[1].date,'June 13, 2025');assert.equal(rows[1].price,'17.5');
 });
+
+test('CSV item shipping reaches the headline price without changing the original amount',()=>{
+ const csv='Item Title,Item Price,Currency,Item Shipping,Shipping Currency\n'+title+',10,CAD,2.49,CAD';
+ const [r]=S.parseListings(csv,{cards,source:'eBay'});
+ assert.equal(r.price,'10');assert.equal(require('../market-utils').scanPrice(r).amount,12.49);
+});
