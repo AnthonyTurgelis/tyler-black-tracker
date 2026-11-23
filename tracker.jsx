@@ -5092,7 +5092,7 @@ function COMCScannerPanel(props) {
         if (titleLow.indexOf(EBAY_SPORT_EXCLUDE[si]) !== -1) { excluded = true; break; }
       }
       if (excluded) continue;
-      var price = "", rawPrice = "", shipping = "", shippingNum = 0, shippingCurrency = "UNKNOWN", timeLeft = "", condition = "";
+      var price = "", rawPrice = "", shipping = "", shippingNum = null, shippingCurrency = "UNKNOWN", timeLeft = "", condition = "";
       var listingType = "", bids = "", binPrice = "";
       for (var j = i + 1; j < Math.min(i + 20, lines.length); j++) {
         var jl = lines[j].trim();
@@ -5114,8 +5114,8 @@ function COMCScannerPanel(props) {
         }
         if (/^Buy It Now/.test(jl)) { listingType = listingType || "bin"; continue; }
         if (/^or Best Offer/.test(jl)) { if (!listingType) listingType = "best_offer"; continue; }
-        if (/delivery$/.test(jl) || /shipping$/.test(jl)) {
-          if (/Free delivery|Free shipping/i.test(jl)) { shipping = "Free"; shippingNum = 0; }
+        if (/^(?:delivery|shipping|postage)\s*:/i.test(jl) || /(?:delivery|shipping|postage)(?:\s+estimate)?$/i.test(jl)) {
+          if (/\bfree\b/i.test(jl)) { shipping = "Free"; shippingNum = 0; }
           else { var sm2 = window.ScanCurrency.parseMoney(jl); if (sm2 && sm2.amount != null && !sm2.conflict) { shipping = jl; shippingNum = sm2.amount; shippingCurrency = sm2.currency; } }
           continue;
         }
@@ -5133,7 +5133,8 @@ function COMCScannerPanel(props) {
       if (shipping && shippingCurrency === "UNKNOWN") {
         parsed.shippingCurrency = window.ScanCurrency.infer({price:shippingNum,rawPrice:shipping,source:"eBay"}, {text:parsed.currencyText + "\n" + text,fallbackCurrency:scanCurrency}).currency;
       }
-      parsed.totalPrice = shippingNum === 0 || (itemCurrency !== "UNKNOWN" && parsed.shippingCurrency === itemCurrency) ? ((parseFloat(price) || 0) + shippingNum).toFixed(2) : "";
+      var delivered = window.TrackerMarket.scanPrice(parsed,itemCurrency);
+      parsed.totalPrice = delivered.includesShipping ? delivered.amount.toFixed(2) : "";
       parsed.timeLeft = timeLeft;
       parsed.condition = condition;
       parsed.listingType = listingType || "bin";
@@ -6985,7 +6986,7 @@ function COMCScannerPanel(props) {
     if (col === "price") {
       var group = parsedCurrency(a.parsed).localeCompare(parsedCurrency(b.parsed)) || parsedPriceKind(a.parsed).localeCompare(parsedPriceKind(b.parsed));
       if (group) return group;
-      av = parseFloat(a.parsed.totalPrice || a.parsed.price) || 0; bv = parseFloat(b.parsed.totalPrice || b.parsed.price) || 0;
+      av = window.TrackerMarket.scanPrice(a.parsed, parsedCurrency(a.parsed)).amount || 0; bv = window.TrackerMarket.scanPrice(b.parsed, parsedCurrency(b.parsed)).amount || 0;
     }
     else if (col === "year") { av = a.parsed.year; bv = b.parsed.year; }
     else if (col === "product") { av = (a.parsed.product || "").toLowerCase(); bv = (b.parsed.product || "").toLowerCase(); }
@@ -7422,11 +7423,12 @@ function COMCScannerPanel(props) {
                     var isActiveTarget = isTargeted && targetMatch && targetMatch.status === "active";
                     // Price drop detection for ALL targeted cards (active and watching)
                     var hasPriceDrop = false;
+                    var scanPrice = window.TrackerMarket.scanPrice(p, parsedCurrency(p));
                     var priceDropAmt = 0;
                     if (isTargeted && targetMatch && parsedCurrency(p) !== "UNKNOWN" && parsedCurrency(p) === targetMatch.currency && parsedPriceKind(p) === targetMatch.priceKind) {
                       var benchmarkPrice = targetMatch.watchPrice || parseFloat(targetMatch.price) || 0;
                       if (benchmarkPrice > 0) {
-                        var currentTotal = parseFloat(p.totalPrice || p.price) || 0;
+                        var currentTotal = scanPrice.amount || 0;
                         if (currentTotal > 0 && currentTotal < benchmarkPrice) {
                           hasPriceDrop = true;
                           priceDropAmt = benchmarkPrice - currentTotal;
@@ -7464,7 +7466,7 @@ function COMCScannerPanel(props) {
                           <td className="px-0.5 py-0.5 text-gray-300 truncate" style={{maxWidth:"clamp(90px,12vw,200px)"}} title={isExact ? m.card.cardSet + (p.variant && p.variant !== (m.card.cardSet || "Base") ? " (listing: " + p.variant + ")" : "") : p.variant}>{isExact ? (m.card.cardSet || "Base") : (p.variant || "Base")}{isExact && sspBadge(m.card.cardSet)}{p.isAuto ? <span className="ml-0.5 text-yellow-400 text-[8px] font-bold bg-yellow-900/50 px-0.5 rounded">AU</span> : ""}{p.graded ? <span className="ml-0.5 text-pink-400 text-[8px] font-bold bg-pink-900/50 px-0.5 rounded">{p.graded}</span> : ""}</td>
                           <td className="px-0.5 py-0.5 font-mono whitespace-nowrap">{isExact ? <span className="text-gray-400">{m.card.cardNumber}</span> : (p.cardNoClean || p.cardNo ? <span className="text-gray-400">{p.cardNoClean || p.cardNo}</span> : "")}</td>
                           <td className="px-0.5 py-0.5 font-mono whitespace-nowrap">{p.serial ? <span className="text-yellow-300 font-bold bg-yellow-900/30 px-0.5 rounded">{"#" + p.serial}</span> : ""}{p.printRun ? <span className="text-purple-400 font-bold">{"/" + p.printRun}</span> : (isExact && m.card.copies ? <span className="text-purple-400/60">{"/" + m.card.copies}</span> : "")}</td>
-                          <td className={"px-0.5 py-0.5 text-right font-bold whitespace-nowrap " + (isNeed ? "text-green-300" : "text-gray-500")} style={{fontSize:"10px"}}>{p.listingType === "auction" ? <span className="text-red-400" style={{fontSize:"7px"}} title={"Auction - " + (p.bids || 0) + " bids"}>{"\uD83D\uDD28"}</span> : p.listingType === "best_offer" ? <span className="text-cyan-400" style={{fontSize:"7px"}} title="Best Offer">{"\uD83E\uDD1D"}</span> : ""}{parsedMoney(p)}<span className="block text-[8px] font-normal text-gray-400">{window.TrackerMarket.kindLabel(parsedPriceKind(p))}</span>{p.source === "eBay" && p.shippingNum > 0 ? <span className="text-gray-600 block" style={{fontSize:"8px"}}>{"Shipping + " + window.TrackerMarket.formatMoney(p.shippingNum, p.shippingCurrency)}</span> : ""}{p.source === "SportLots" && p.slQuantity ? <span className="text-blue-400 block" style={{fontSize:"8px"}}>{"x" + p.slQuantity}</span> : ""}{p.source === "Whatnot" && p.seller ? <span className="text-violet-400 block" style={{fontSize:"8px"}}>{p.seller}</span> : ""}{p.source === "130point" && p._130pt ? <span className={p._130pt.forSale ? "text-lime-400 block" : "text-teal-500 block"} style={{fontSize:"7px"}} title={p._130pt.forSale ? "For Sale - ends " + p._130pt.date : p._130pt.isBestOffer ? "Listed " + parsedMoney(p, p._130pt.listPrice) + " sold " + parsedMoney(p, p._130pt.salePrice) : "Fixed price"}>{p._130pt.forSale ? "\uD83C\uDFF7\uFE0F" : ""}{p._130pt.forSale ? "" : p._130pt.date}{p._130pt.isBestOffer && !p._130pt.forSale ? " -" + p._130pt.discount + "%" : ""}</span> : ""}</td>
+                          <td className={"px-0.5 py-0.5 text-right font-bold whitespace-nowrap " + (isNeed ? "text-green-300" : "text-gray-500")} style={{fontSize:"10px"}}>{p.listingType === "auction" ? <span className="text-red-400" style={{fontSize:"7px"}} title={"Auction - " + (p.bids || 0) + " bids"}>{"\uD83D\uDD28"}</span> : p.listingType === "best_offer" ? <span className="text-cyan-400" style={{fontSize:"7px"}} title="Best Offer">{"\uD83E\uDD1D"}</span> : ""}{parsedMoney(p,scanPrice.amount)}<span className="block text-[8px] font-normal text-gray-400">{window.TrackerMarket.kindLabel(parsedPriceKind(p))} · {scanPrice.detail}</span>{p.source === "SportLots" && p.slQuantity ? <span className="text-blue-400 block" style={{fontSize:"8px"}}>{"x" + p.slQuantity}</span> : ""}{p.source === "Whatnot" && p.seller ? <span className="text-violet-400 block" style={{fontSize:"8px"}}>{p.seller}</span> : ""}{p.source === "130point" && p._130pt ? <span className={p._130pt.forSale ? "text-lime-400 block" : "text-teal-500 block"} style={{fontSize:"7px"}} title={p._130pt.forSale ? "For Sale - ends " + p._130pt.date : p._130pt.isBestOffer ? "Listed " + parsedMoney(p, p._130pt.listPrice) + " sold " + parsedMoney(p, p._130pt.salePrice) : "Fixed price"}>{p._130pt.forSale ? "\uD83C\uDFF7\uFE0F" : ""}{p._130pt.forSale ? "" : p._130pt.date}{p._130pt.isBestOffer && !p._130pt.forSale ? " -" + p._130pt.discount + "%" : ""}</span> : ""}</td>
                           <td className="px-0.5 py-0.5 text-center">
                             {isExact ? <span className={"text-[9px] font-bold " + (m.variantMismatch ? "text-yellow-400" : "text-green-400")}>{(m.override ? "\ud83d\udccc" : m.score + "%" + (m.variantMismatch ? "\u26a0" : ""))}</span> : m ? <span className="text-[9px] text-red-400">~{m.score}%</span> : <span className="text-gray-600 text-[9px]">-</span>}
                           </td>
@@ -7797,6 +7799,7 @@ function COMCScannerPanel(props) {
                   var p = item.parsed;
                   var m = item.match;
                   var isApplied = applied[idx];
+                  var resultPrice = window.TrackerMarket.scanPrice(p, parsedCurrency(p));
                   var currentStatus = m ? (statuses[m.card.id] || "not_owned") : null;
                   return (
                     <tr key={idx} className={"border-b border-gray-800 " + (isApplied ? "opacity-40 " : "") + (!m ? "bg-red-900/15" : m.score >= 85 ? "bg-green-900/10" : "bg-yellow-900/10")}>
@@ -7809,7 +7812,7 @@ function COMCScannerPanel(props) {
                       <td className="px-0.5 py-0.5 truncate" style={{maxWidth:"clamp(100px,15vw,250px)"}}>
                         {m ? <span className="text-cyan-300">{"#" + m.card.cardNumber + " " + (m.card.cardSet || "Base")}{sspBadge(m.card.cardSet)}</span> : <span className="text-gray-600">—</span>}
                       </td>
-                      <td className="px-0.5 py-0.5 text-right text-green-300 font-bold whitespace-nowrap">{parsedMoney(p)}<span className="block text-[8px] font-normal text-gray-400">{window.TrackerMarket.kindLabel(parsedPriceKind(p))}</span></td>
+                      <td className="px-0.5 py-0.5 text-right text-green-300 font-bold whitespace-nowrap">{parsedMoney(p,resultPrice.amount)}<span className="block text-[8px] font-normal text-gray-400">{window.TrackerMarket.kindLabel(parsedPriceKind(p))} · {resultPrice.detail}</span></td>
                       <td className="px-0.5 py-0.5 text-center whitespace-nowrap">
                         {m ? <span className={"font-bold text-[9px] " + (currentStatus === "owned" ? "text-green-300" : currentStatus === "in_transit" ? "text-emerald-300" : "text-red-400")}>{currentStatus === "owned" ? "OWN" : currentStatus === "in_transit" ? "TRNS" : "NEED"}</span> : ""}
                       </td>

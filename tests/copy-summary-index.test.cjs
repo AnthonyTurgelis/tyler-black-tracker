@@ -21,3 +21,15 @@ test('copy indexing avoids scanning unrelated copies for each catalog card',()=>
  const summaries=C.summarizeCards({copies},cards,{},{});
  assert.equal(Object.keys(summaries).length,500);assert.equal(summaries['499'].total,1);assert.ok(reads<10000,'card-ID reads should grow with copies, not copies × catalog cards');
 });
+
+test('copy list counts COMC and earlier in-transit marks together, keeping exclusions accessible', () => {
+  const cards = [{id:1}, {id:2}];
+  const statuses = {1:'owned',2:'in_transit'};
+  const state = {copies:{
+    comc:{id:'comc',cardId:1,origin:'purchase',location:'comc',currentInventory:true},
+    receipt:{id:'receipt',cardId:1,origin:'purchase',source:'ebay',currentInventory:false,location:'unknown'}
+  }};
+  const rows=C.copiesForCards(state,cards,statuses,{});
+  assert.deepEqual(rows,cards.flatMap(card=>C.getCopiesForCard(state,card.id,statuses,{}).map(copy=>({card,copy}))));
+  assert.deepEqual(rows.map(row=>C.copyStatus(row.copy)),['owned','in_transit','excluded','in_transit']);
+});

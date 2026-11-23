@@ -110,9 +110,12 @@
     var grade=(p.rawSet+'\n'+block).match(/\b(PSA|BGS|SGC|CGC|CSG)\s+(10|[1-9](?:\.5)?)(?:\s+(10|[1-9](?:\.5)?))?\b/i);
     if(!p.grading&&grade)p.grading={company:grade[1].toUpperCase(),cardGrade:grade[2],...(grade[3]?{autoGrade:grade[3]}:{})};
     if(p.grading){var cert=field(/(?:cert(?:ification)?(?: number| no\.?| #)?|certificate)\s*[:#]\s*([A-Za-z0-9-]+)/i);if(cert)p.grading={...p.grading,certNumber:cert};}
-    var ship=block.split(/\r?\n/).find(function(line){return /shipping|postage/i.test(line)&&!/(?:ships? to|shipping address|shipping country|ships? from)/i.test(line)&&(/free/i.test(line)||money.parseMoney(line));});
-    if(ship){var paid=money.parseMoney(ship);p.shipping=ship.trim();if(/free\s+(?:shipping|postage)/i.test(ship)){p.shippingNum=0;p.shippingCurrency=p.currency||'UNKNOWN';}else if(paid){p.shippingNum=paid.amount;p.shippingCurrency=paid.currency;}}
+    var ship=block.split(/\r?\n/).find(function(line){return /shipping|postage|delivery/i.test(line)&&!/(?:ships? to|shipping address|shipping country|delivery date|estimated delivery|ships? from)/i.test(line)&&(/free/i.test(line)||money.parseMoney(line));});
+    if(ship){var paid=money.parseMoney(ship);p.shipping=ship.trim();if(/\bfree\b/i.test(ship)){p.shippingNum=0;p.shippingCurrency=p.currency||'UNKNOWN';}else if(paid&&!paid.conflict){p.shippingNum=paid.amount;p.shippingCurrency=paid.currency;}}
     var financialText=p.orderNum?block+'\n'+page:'';
+    var itemCount=fieldIn(financialText,/(?:^|\n)\s*Total[^\n]*?\((\d+) items?\)/i);
+    if(itemCount) p.itemsInOrder=Number(itemCount);
+    if(p.orderNum && ship && /^\s*Shipping\s*:/i.test(ship) && (p.itemsInOrder>1 || /(?:^|\n)\s*Order total/i.test(financialText))) p.shippingScope='order';
     if(financialText&&p.shippingNum==null){var orderShipping=fieldIn(financialText,/(?:^|\n)Shipping\s*[:\t\n]\s*([^\n]+)/i),shippingMoney=money.parseMoney(orderShipping);if(shippingMoney){p.shippingNum=shippingMoney.amount;p.shippingCurrency=shippingMoney.currency;p.shippingScope='order';p.shipping=orderShipping;}}
     if(financialText){var taxText=fieldIn(financialText,/(?:^|\n)(?:Sales )?Tax\*?\s*[:\t\n]\s*([^\n]+)/i),tax=money.parseMoney(taxText);if(tax)p.orderTax={...tax,raw:taxText};
       var charged=fieldIn(financialText,/(?:^|\n)(?:Charged|Total paid|Payment(?: info| amount| total)?)\s*[:\t\n]\s*([^\n]+)/i),settlement=money.parseMoney(charged);if(settlement)p.settlement={...settlement,raw:charged,basis:'order_payment'};
@@ -150,6 +153,15 @@
       p.priceBasis='item';p.date=read(row,['Date Purchased','Purchase Date','Order Date','Date Sold','Date']);p.seller=read(row,['Purchased From','Seller']);p.orderNum=read(row,['Order Number','Order ID']);p.itemId=read(row,['Item ID','COMC Item ID']);p.itemUrl=read(row,['Item URL','URL']);
       if(/^COMC$/i.test(source)&&header.includes('itemid')&&header.includes('datesold')&&(header.includes('purchasedfrom')||header.includes('purchasedby'))){p.dateFormat='MM/DD/YYYY';p.rawEventDate=p.date;}
       p.quantity=read(row,['Quantity Purchased','Quantity','Qty']);p.account=read(row,['Buyer Account','Account','Username']);p.shipTo=read(row,['Ship To','Shipping Country','Shipping Address']);p.condition=read(row,['Condition']);p.unitIndex=read(row,['Unit Index']);
+      var orderShip=read(row,['Order Shipping']), ship=orderShip||read(row,['Item Shipping','Shipping','Shipping Cost','Postage']);
+      if(ship){
+        var charge=money.parseMoney(ship);
+        p.shipping=ship;
+        if (/^free(?:\s|$)/i.test(ship)) p.shippingNum=0;
+        else if(charge && !charge.conflict) p.shippingNum=charge.amount;
+        p.shippingCurrency=money.code(read(row,['Shipping Currency']))!=='UNKNOWN' ? money.code(read(row,['Shipping Currency'])) : charge && charge.currency!=='UNKNOWN' ? charge.currency : p.currency;
+        p.shippingScope=orderShip?'order':'item';
+      }
       var total=read(row,['Order Total']);if(total)p.orderTotal=money.parseMoney(total);out.push(metadata(p,row.join('\n'),{...options,fullText:text}));
     });return out;
   }

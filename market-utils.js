@@ -50,6 +50,25 @@
     var cur = currency(code);
     return number.toFixed(2) + (cur === "UNKNOWN" ? " (currency unknown)" : " " + cur);
   }
+  function scanPrice(row, itemCurrency) {
+    var item = amount(row.price), code = currency(itemCurrency || row.currency);
+    var shipping = amount(row.shippingNum);
+    // Old eBay scans initialized shippingNum to zero even when the listing omitted shipping.
+    if (shipping === 0 && row.shipping === "") shipping = null;
+    var shipCode = currency(row.shippingCurrency);
+    var detail = "";
+    if (row.priceBasis === "order_total") detail = "Order total";
+    else if (shipping === null) detail = "Shipping unknown";
+    else if (shipping === 0) detail = "Free shipping";
+    else if (row.shippingScope === "order" && !(Number(row.itemsInOrder) === 1 && Number(row.quantity || 1) === 1)) {
+      detail = "Order shipping " + formatMoney(shipping, shipCode);
+    } else if (shipCode === "UNKNOWN" || code !== shipCode || item === null) {
+      detail = "+ " + formatMoney(shipping, shipCode) + " shipping";
+    } else {
+      return {amount:(Math.round(item*100) + Math.round(shipping*100))/100, includesShipping:true, detail:"Incl. " + formatMoney(shipping, shipCode) + " shipping"};
+    }
+    return {amount:item, includesShipping:item !== null && shipping === 0 && row.priceBasis !== "order_total", detail:detail};
+  }
   function summarizeAmounts(items) {
     var result = { totals: {}, unknownCount: 0 };
     (items || []).forEach(function(item) {
@@ -171,7 +190,7 @@
     return output;
   }
   var api = { currency: currency, detectCurrency: detectCurrency, amount: amount, safeUrl: safeUrl,
-    itemId: itemId, kind: kind, kindLabel: kindLabel, conditionLabel: conditionLabel, seriesKey: seriesKey, formatMoney: formatMoney, summarizeAmounts: summarizeAmounts, formatTotals: formatTotals, formatEvidenceTotals: formatEvidenceTotals,
+    itemId: itemId, kind: kind, kindLabel: kindLabel, conditionLabel: conditionLabel, seriesKey: seriesKey, formatMoney: formatMoney, scanPrice: scanPrice, summarizeAmounts: summarizeAmounts, formatTotals: formatTotals, formatEvidenceTotals: formatEvidenceTotals,
     observation: observation, observationKey: observationKey, record: record, groupSeries: groupSeries,
     importStatus: importStatus, purchasePatch: purchasePatch, detailOverrides: detailOverrides };
   if (root) root.TrackerMarket = api;
