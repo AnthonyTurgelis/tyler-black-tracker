@@ -123,8 +123,7 @@
     if(p.recordType==='purchase')p.requiresQuantityReview=!/^\d+$/.test(String(p.quantity||''))||Number(p.quantity)<1||Number(p.quantity)>1||/\b(?:lot|bundle|set of)\b/i.test(p.rawSet);
     p.kind=p.kind || (p.recordType==='purchase'?'purchase':p.recordType==='sold'?'sold':p.listingType==='auction'?'current_bid':'asking');
     p.priceBasis=p.priceBasis || 'item';p.originalPriceBasis=p.originalPriceBasis || p.priceBasis;p.needsIdentityReview=p.subjectAmbiguous;
-    var applied=money.apply(p,{text:options.fullText||block,fallbackCurrency:options.fallbackCurrency});
-    if(applied.shippingNum===0&&applied.shippingCurrency==='UNKNOWN')applied.shippingCurrency=applied.currency;
+    var applied=money.apply(p,{text:options.fullText||block,page:options.page,fallbackCurrency:options.fallbackCurrency});
     applied.needsSourceReview=applied.needsSourceReview===true||applied.isReturn===true;
     applied.needsReview=applied.currencyEvidence.needsReview||applied.needsIdentityReview||applied.needsSourceReview||!applied.price||applied.priceBasis!=='item';
     return applied;
@@ -152,14 +151,14 @@
       var returned=read(row,['Is Return']);if(returned)p.isReturn=/^(?:true|yes|1)$/i.test(returned);
       p.priceBasis='item';p.date=read(row,['Date Purchased','Purchase Date','Order Date','Date Sold','Date']);p.seller=read(row,['Purchased From','Seller']);p.orderNum=read(row,['Order Number','Order ID']);p.itemId=read(row,['Item ID','COMC Item ID']);p.itemUrl=read(row,['Item URL','URL']);
       if(/^COMC$/i.test(source)&&header.includes('itemid')&&header.includes('datesold')&&(header.includes('purchasedfrom')||header.includes('purchasedby'))){p.dateFormat='MM/DD/YYYY';p.rawEventDate=p.date;}
-      p.quantity=read(row,['Quantity Purchased','Quantity','Qty']);p.account=read(row,['Buyer Account','Account','Username']);p.shipTo=read(row,['Ship To','Shipping Country','Shipping Address']);p.condition=read(row,['Condition']);p.unitIndex=read(row,['Unit Index']);
+      p.quantity=read(row,['Quantity Purchased','Quantity','Qty']);p.account=read(row,['Buyer Account','Account','Username']);p.shipTo=read(row,['Ship To Country','Shipping Country','Destination Country','Delivery Country','Ship To','Shipping Address','Ship To Postal Code','Ship To ZIP']);p.condition=read(row,['Condition']);p.unitIndex=read(row,['Unit Index']);
       var orderShip=read(row,['Order Shipping']), ship=orderShip||read(row,['Item Shipping','Shipping','Shipping Cost','Postage']);
       if(ship){
         var charge=money.parseMoney(ship);
         p.shipping=ship;
         if (/^free(?:\s|$)/i.test(ship)) p.shippingNum=0;
         else if(charge && !charge.conflict) p.shippingNum=charge.amount;
-        p.shippingCurrency=money.code(read(row,['Shipping Currency']))!=='UNKNOWN' ? money.code(read(row,['Shipping Currency'])) : charge && charge.currency!=='UNKNOWN' ? charge.currency : p.currency;
+        p.shippingCurrency=money.code(read(row,['Shipping Currency']))!=='UNKNOWN' ? money.code(read(row,['Shipping Currency'])) : charge && charge.currency;
         p.shippingScope=orderShip?'order':'item';
       }
       var total=read(row,['Order Total']);if(total)p.orderTotal=money.parseMoney(total);out.push(metadata(p,row.join('\n'),{...options,fullText:text}));
@@ -175,6 +174,7 @@
       return !recommendationBlock;
     }).join('\n');
     var table=parseTable(text,options);if(table)return table;
+    options={...options,page:money.pageEvidence(text)};
     var lines = text.split(/\r?\n/), results = [];
     var source = options.source || (/Sold Via:|Current Price:/i.test(text) ? '130point' : /Low Price:|Total Quantity:/i.test(text) ? 'SportLots' : /Opens in a new window or tab|Order number:|ebay\./i.test(text) ? 'eBay' : /Whatnot|Ships from|Card image/i.test(text) ? 'Whatnot' : /COMC|NM or Better/i.test(text) ? 'COMC' : 'Scan');
     if (source === 'SportLots' && /Low Price:/i.test(text)) return parseSportLots(text, options);

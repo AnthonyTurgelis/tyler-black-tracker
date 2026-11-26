@@ -66,3 +66,11 @@ test('payment settlement, tax, exchange evidence and raw date stay separate from
  const next=CI.upsertPurchase(CI.normalizeState(null),{...fields,source:'ebay',sourceItemId:'i',sourceOrderId:'o',cardId:'tcdb:1',quantity:1,paidPrice:'50',currency:'USD'},{priceVerified:true});const record=next.inventory.observations[next.observationId];
  for(const key of Object.keys(fields))assert.deepEqual(record[key],fields[key]);assert.equal(record.paidPrice,'50');assert.equal(record.currency,'USD');assert.equal(Object.keys(next.inventory.copies).length,0);
 });
+
+test('a stored UNKNOWN value still resolves from the purchase destination without allocating a copy',()=>{
+ const CI=require('../copy-utils');
+ const next=CI.upsertPurchase(CI.normalizeState(null),{source:'ebay',sourceItemId:'i',sourceOrderId:'o',cardId:'tcdb:1',quantity:1,paidPrice:'50',currency:'UNKNOWN',shipToCountry:'CA'},{priceVerified:true});
+ assert.equal(next.inventory.observations[next.observationId].currency,'CAD');
+ assert.deepEqual(next.inventory.copies,{});
+ assert.equal(CI.inferredCurrency({currency:'USD',shippingCountry:'CA'}),'USD');
+});

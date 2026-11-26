@@ -2,6 +2,7 @@
 (function (root) {
   "use strict";
   var media = root && root.TrackerMedia || (typeof require === "function" ? require("./media-utils.js") : null);
+  var market = root && root.TrackerMarket || (typeof require === "function" ? require("./market-utils.js") : null);
   var LOCATIONS = { in_hand: "In hand", comc: "COMC", in_transit: "In transit", unknown: "Unknown" };
   // Read historical mailbox entries as in-transit while preserving source evidence and copy identity.
   function canonicalCopy(copy) { return copy && copy.location === "oklahoma_mailbox" ? Object.assign({}, copy, { location: "in_transit" }) : copy; }
@@ -17,13 +18,8 @@
   function text(value) { return value == null ? "" : String(value).trim(); }
   function inferredCurrency(item) {
     item = item || {};
-    var destination = item.shippingCountry || item.shipToCountry || item.deliveryCountry || item.destinationCountry || item.shipCountry;
-    if (!destination && item.shippingAddress && typeof item.shippingAddress === "object")
-      destination = item.shippingAddress.countryCode || item.shippingAddress.country;
-    var country = text(destination).toLowerCase().replace(/\./g, "");
-    if (country === "ca" || country === "can" || country === "canada") return "CAD";
-    if (country === "us" || country === "usa" || country === "united states" || country === "united states of america") return "USD";
-    return "";
+    var unit = market.entryCurrency(Object.assign({}, item, {price:item.paidPrice || item.price}));
+    return unit === "UNKNOWN" ? "" : unit;
   }
   function normalizeState(value) {
     value = value && typeof value === "object" ? value : {};
@@ -236,7 +232,7 @@
     ["shippingScope","shipping","shippingCurrency","grading","condition","acquisitionPrice","acquisitionCurrency","acquisitionDate"].forEach(function(key){if(purchase[key]!=null)observation[key]=clone(purchase[key]);});
     if (options.priceVerified === true && observation.reportedQuantity === 1 && !observation.requiresQuantityReview && purchase.paidPrice != null && purchase.paidPrice !== "") {
       if (!Number.isFinite(Number(purchase.paidPrice)) || Number(purchase.paidPrice) < 0) throw new Error("Enter a non-negative item price.");
-      observation.paidPrice = text(purchase.paidPrice); observation.currency = text(purchase.currency || inferredCurrency(observation)).toUpperCase(); observation.priceVerified = true;
+      observation.paidPrice = text(purchase.paidPrice); observation.currency = inferredCurrency(Object.assign({}, observation, purchase)); observation.priceVerified = true;
     } else if (purchase.paidPrice != null && purchase.paidPrice !== "") observation.reportedPrice = text(purchase.paidPrice);
     if (options.imageVerified === true) {
       if (purchase.serial != null && purchase.serial !== "") observation.serial = text(purchase.serial);
@@ -351,7 +347,7 @@
       copy.secondaryJerseyNumber = text(observation.secondaryJerseyNumber);
       copy.secondaryJerseyEvidence = clone(observation.secondaryJerseyEvidence);
     }
-    if ((copy.paidPrice == null || copy.paidPrice === "") && observation.priceVerified && observation.paidPrice !== "") { copy.paidPrice = observation.paidPrice; copy.currency = observation.currency || inferredCurrency(observation); }
+    if ((copy.paidPrice == null || copy.paidPrice === "") && observation.priceVerified && observation.paidPrice !== "") { copy.paidPrice = observation.paidPrice; copy.currency = inferredCurrency(observation); }
     if (!copy.purchaseDate) copy.purchaseDate = observation.purchaseDate || "";
     if (decision.location && decision.location !== "unknown") copy.location = decision.location;
     if (decision.duplicateConfirmed === true) copy.duplicateConfirmed = true;

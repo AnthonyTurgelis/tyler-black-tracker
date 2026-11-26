@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../purchase-receipts-panel.jsx'),'utf8');
-const sandbox={window:{},URL};
+const sandbox={window:{TrackerMarket:require('../market-utils'),ScanCurrency:require('../scan-currency')},URL};
 vm.runInNewContext(source.split('/* RECEIPT_PANEL_UI */')[0],sandbox);
 const U=sandbox.window.PurchaseReceiptCore;
 const clone=value=>JSON.parse(JSON.stringify(value));
@@ -121,4 +121,11 @@ test('COMC proof and item links preserve their platform; unknown numeric IDs are
  assert.equal(U.receiptSources({receipt:{sourceUrl:comc.receipt.sourceUrl}}).length,1);
  assert.equal(U.receiptSources({receipt:{sourceUrl:'javascript:alert(1)',events:[]}}).length,0);
  assert.equal(comc.receipt.events[0].eventType,'purchase');
+});
+
+test('receipt item uses ship-to while a separate settlement keeps its own currency', () => {
+  assert.equal(U.money({amount:'7.25',currency:'UNKNOWN'},{shippingCountry:'CA'}),'CAD 7.25');
+  assert.equal(U.money({amount:'7.25'},{platform:'COMC'}),'USD 7.25');
+  assert.equal(U.money({amount:'9.80',currency:'USD'},{shippingCountry:'CA'}),'USD 9.80');
+  assert.equal(U.money({amount:'9.80'}),'9.80');
 });

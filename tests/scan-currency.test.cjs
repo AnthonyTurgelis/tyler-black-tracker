@@ -77,3 +77,26 @@ test('inferred saved scanner state is recalculated when the context changes', ()
   assert.equal(scan.infer(first, {text:'Ship to USA'}).currency, 'USD');
   assert.equal(scan.infer(first, {}).currency, 'UNKNOWN');
 });
+
+test('ship-to fields accept country codes, structured addresses and postal-only destinations', () => {
+  for (const [row, currency] of [
+    [{shipToCountry:'CA'},'CAD'], [{shippingAddress:{countryCode:'US'}},'USD'],
+    [{shipTo:'Yukon, OK 73099'},'USD'], [{shipTo:'M5V\u200e'},'CAD']
+  ]) assert.equal(scan.infer({price:'10',...row}).currency,currency);
+  for (const text of ['Ships from: OK 73099','Located in Toronto M5V 0G8','Item number: 73099','Deliver to Paris, France 75008']) {
+    assert.equal(scan.infer({price:'10'},{text}).currency,'UNKNOWN',text);
+  }
+  assert.equal(scan.infer({price:'10'},{text:'Deliver to: 73099\nDeliver to: M5V'}).currency,'UNKNOWN');
+});
+
+test('changing a scan fallback updates bare item and shipping amounts while explicit currencies win', () => {
+  const initial = scan.apply({price:'10',rawPrice:'$10',shippingNum:2,shipping:'+$2 shipping'},{fallbackCurrency:'USD'});
+  const changed = scan.apply(initial,{fallbackCurrency:'CAD'});
+  assert.equal(changed.currency,'CAD');
+  assert.equal(changed.shippingCurrency,'CAD');
+  assert.equal(scan.infer(changed,{}).currency,'CAD');
+  assert.equal(scan.apply(changed,{fallbackCurrency:'UNKNOWN'}).currency,'UNKNOWN');
+  const mixed = scan.apply({...initial,rawPrice:'US $10',shipping:'+$10 shipping',shippingNum:10,currencyText:'US $10\n+$10 shipping'},{text:'Ship to: M5V'});
+  assert.equal(mixed.currency,'USD');
+  assert.equal(mixed.shippingCurrency,'CAD');
+});

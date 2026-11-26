@@ -62,7 +62,7 @@ test('asking, bids, sold, paid and currencies form separate price series', () =>
   const groups = market.groupSeries(entries);
   assert.equal(groups.length, 6);
   assert.equal(groups.find(g => g.currency === 'UNKNOWN').kind, 'unknown');
-  assert.match(market.formatMoney(5, ''), /currency unknown/);
+  assert.equal(market.formatMoney(5, ''), '5.00');
   assert.equal(market.formatMoney(5, 'CAD'), '5.00 CAD');
 });
 
@@ -134,4 +134,20 @@ test('scan headline includes known postage once and distinguishes incomplete pri
   assert.equal(quote({priceBasis:'order_total'}).amount,12.3);
   assert.equal(quote({shippingScope:'order',itemsInOrder:2,quantity:1}).amount,12.3);
   assert.equal(quote({shippingScope:'order',itemsInOrder:1,quantity:1}).amount,15.75);
+});
+
+test('history resolves missing codes without changing the stored identity, amounts or unverifiable eBay rows', () => {
+  const rows = [
+    {source:'COMC',price:5}, {source:'SportLots',price:8,currency:'UNKNOWN'},
+    {source:'eBay',price:5}, {source:'eBay',price:9,sourceText:'Shipping to M5V'},
+    {source:'COMC',price:5,currency:'CAD'}
+  ];
+  const before = JSON.stringify(rows);
+  const series = market.groupSeries(rows);
+  assert.deepEqual(rows.map(market.entryCurrency), ['USD','USD','UNKNOWN','CAD','CAD']);
+  assert.equal(series.find(group=>group.currency==='USD').entries.length, 2);
+  assert.equal(series.find(group=>group.currency==='UNKNOWN').entries.length, 1);
+  assert.equal(market.observation({price:10,shipToCountry:'CA'}).currency,'CAD');
+  assert.equal(market.entryCurrency({price:5,source:'COMC',currencyEvidence:{conflicts:['conflict']}}),'UNKNOWN');
+  assert.equal(JSON.stringify(rows), before);
 });

@@ -1,10 +1,23 @@
 /* Shared, testable rules for market evidence and purchase imports. */
 (function (root) {
   "use strict";
+  var scan = typeof module !== "undefined" && module.exports ? require("./scan-currency.js") : root.ScanCurrency;
   var KINDS = { asking: "Asking", current_bid: "Current bid", sold: "Sold", purchase: "Paid", unknown: "Legacy / unknown type" };
   function currency(value) {
     var code = String(value || "").trim().toUpperCase();
     return /^[A-Z]{3}$/.test(code) ? code : "UNKNOWN";
+  }
+  function entryCurrency(entry) {
+    var stored = currency(entry.currency);
+    var original = entry.currencyEvidence;
+    if (entry.currencyUnconfirmedByOwner || original && original.conflicts && original.conflicts.length && !entry.currencyConfirmedByOwner) return "UNKNOWN";
+    if (stored !== "UNKNOWN") return stored;
+    // Older price history often kept just a numeric price, title and marketplace.
+    var hasContext = entry.rawPrice || entry.currencyText || entry.sourceText || scan.shipTo(entry) || original;
+    if (!hasContext && Number.isFinite(Number(entry.price))) return scan.sourceCurrency(entry.source);
+    var evidence = scan.infer(Object.assign({}, entry, {currencyText:entry.currencyText || entry.sourceText}));
+    if (evidence.currency !== "UNKNOWN" || evidence.conflicts.length) return evidence.currency;
+    return currency(entry.currencyEvidence && entry.currencyEvidence.currency);
   }
   function detectCurrency(value) {
     var text = String(value || "");
@@ -42,13 +55,13 @@
     if (grading.company && (grading.cardGrade || grading.grade)) return String(grading.company).toUpperCase() + " " + (grading.cardGrade || grading.grade) + (grading.autographGrade ? " / Auto " + grading.autographGrade : "");
     return String(entry.condition || "").trim() || "Condition unverified";
   }
-  function seriesKey(entry) { return [currency(entry.currency), kind(entry.kind), entry.priceBasis || "unknown", conditionLabel(entry).toLowerCase().replace(/\s+/g, " ")].join("|"); }
+  function seriesKey(entry) { return [entryCurrency(entry), kind(entry.kind), entry.priceBasis || "unknown", conditionLabel(entry).toLowerCase().replace(/\s+/g, " ")].join("|"); }
   function kindLabel(value) { return KINDS[kind(value)]; }
   function formatMoney(value, code) {
     var number = amount(value);
     if (number == null) return "—";
     var cur = currency(code);
-    return number.toFixed(2) + (cur === "UNKNOWN" ? " (currency unknown)" : " " + cur);
+    return number.toFixed(2) + (cur === "UNKNOWN" ? "" : " " + cur);
   }
   function scanPrice(row, itemCurrency) {
     var item = amount(row.price), code = currency(itemCurrency || row.currency);
@@ -104,8 +117,7 @@
     var when = new Date(input.observedAt || Date.now());
     if (!Number.isFinite(when.getTime())) return null;
     var url = safeUrl(input.itemUrl || input.url || input.sourceUrl);
-    var code = currency(input.currency);
-    if (code === "UNKNOWN") code = detectCurrency(input.rawPrice || input.price);
+    var code = entryCurrency(input);
     var entry = {
       price: price, source: input.source || "unknown", currency: code,
       kind: kind(input.kind), priceBasis: input.priceBasis || "item",
@@ -145,7 +157,7 @@
     var groups = {};
     (entries || []).forEach(function (entry) {
       var key = seriesKey(entry);
-      if (!groups[key]) groups[key] = { key: key, currency: currency(entry.currency), kind: kind(entry.kind), conditionLabel: conditionLabel(entry), entries: [] };
+      if (!groups[key]) groups[key] = { key: key, currency: entryCurrency(entry), kind: kind(entry.kind), conditionLabel: conditionLabel(entry), entries: [] };
       groups[key].entries.push(entry);
     });
     return Object.values(groups);
@@ -189,7 +201,7 @@
     });
     return output;
   }
-  var api = { currency: currency, detectCurrency: detectCurrency, amount: amount, safeUrl: safeUrl,
+  var api = { currency: currency, entryCurrency: entryCurrency, detectCurrency: detectCurrency, amount: amount, safeUrl: safeUrl,
     itemId: itemId, kind: kind, kindLabel: kindLabel, conditionLabel: conditionLabel, seriesKey: seriesKey, formatMoney: formatMoney, scanPrice: scanPrice, summarizeAmounts: summarizeAmounts, formatTotals: formatTotals, formatEvidenceTotals: formatEvidenceTotals,
     observation: observation, observationKey: observationKey, record: record, groupSeries: groupSeries,
     importStatus: importStatus, purchasePatch: purchasePatch, detailOverrides: detailOverrides };

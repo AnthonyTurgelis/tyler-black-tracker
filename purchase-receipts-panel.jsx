@@ -31,10 +31,15 @@
     if(platform==="ebay")return {label:"eBay item",url:"https://www.ebay.com/itm/"+id};
     return null;
   }
-  function money(value) {
+  function money(value, receipt) {
     if (!plain(value)) return "Not stated";
     const amount = value.amount != null ? String(value.amount) : Number.isSafeInteger(value.amountMinor) ? (value.amountMinor/100).toFixed(2) : "";
-    return amount ? (value.currency || "Currency unknown")+" "+amount : "Not stated";
+    if (!amount) return "Not stated";
+    const currency = root.TrackerMarket.entryCurrency({
+      source: receipt?.platform, shipTo: receipt && root.ScanCurrency.shipTo(receipt),
+      price: amount, rawPrice: value.raw, currency: value.currency
+    });
+    return currency === "UNKNOWN" ? amount : currency+" "+amount;
   }
   function applyLink(input, receiptId, choice, context) {
     const state=normalize(input),record=state.records[receiptId];
@@ -179,7 +184,7 @@
       </form>}
       <div className="overflow-x-auto rounded border border-slate-700"><table className="w-full text-left text-xs"><thead className="bg-slate-900 text-slate-400"><tr><th className="p-2">Receipt</th><th className="p-2">Amounts</th><th className="p-2">Status / evidence</th><th className="p-2">Catalog link</th></tr></thead><tbody>{filtered.slice(0,limit).map(row=>{const r=row.receipt,sources=U.receiptSources(row),itemLink=U.itemLink(row),refund=r.refundIssued,linked=row.link?.status==="approved",ownScope=U.scope(row.collection)===currentScope;return <tr key={row.id} className="border-t border-slate-800 align-top" data-receipt-id={row.id}>
         <td className="p-2 min-w-56 max-w-sm"><p className="font-medium">{r.title}</p><p className="mt-1 text-slate-400">{row.account} · {scopeName(row.collection)}</p><p className="text-slate-400">Order {row.orderId} · Item {row.itemId}</p>{r.serialFromTitle && <p className="text-cyan-300">Serial reported: {r.serialFromTitle}</p>}<div className="mt-1 flex gap-3">{sources[0] && <a className="text-sky-300 underline" href={U.safeUrl(sources[0].sourceUrl)} target="_blank" rel="noreferrer">{U.proofLabel(sources[0].sourceUrl)}</a>}{itemLink && <a className="text-sky-300 underline" href={itemLink.url} target="_blank" rel="noreferrer">{itemLink.label}</a>}</div></td>
-        <td className="p-2 whitespace-nowrap"><p>Item {U.money(r.itemPrice)}</p><p className="text-slate-400">Order {U.money(r.orderTotal)}</p><p className="text-cyan-200">Charged {U.money(r.settlementCharged)}</p>{refund && <p className="text-amber-200">Refund {U.money(refund)}</p>}{r.settlementRefundIssued && <p className="text-amber-200">Refund paid {U.money(r.settlementRefundIssued)}</p>}</td>
+        <td className="p-2 whitespace-nowrap"><p>Item {U.money(r.itemPrice,r)}</p><p className="text-slate-400">Order {U.money(r.orderTotal,r)}</p><p className="text-cyan-200">Charged {U.money(r.settlementCharged)}</p>{refund && <p className="text-amber-200">Refund {U.money(refund)}</p>}{r.settlementRefundIssued && <p className="text-amber-200">Refund paid {U.money(r.settlementRefundIssued)}</p>}</td>
         <td className="p-2 min-w-40 max-w-sm"><p>{human(r.fulfillmentStatus)}</p><p className={r.case || refund ? "text-amber-200" : "text-slate-400"}>{human(r.financialStatus)}</p>{r.recipientMismatch && <p className="text-amber-200">Recipient differs; review ownership.</p>}{r.case && <p className="text-amber-200">Case {r.case.caseId}: refund {r.case.refundOutcome}</p>}<details className="mt-1"><summary className="cursor-pointer text-slate-400">Sources and review notes</summary><div className="space-y-1 py-1">{[...new Set([...(row.reviewReasons || []),...(r.reviewReasons || [])])].map((reason,index)=><p key={index} className="text-slate-400">{reason}</p>)}{sources.map((event,index)=><a key={event.sourceMessageId || index} className="block text-sky-300 underline" href={U.safeUrl(event.sourceUrl)} target="_blank" rel="noreferrer">{String(event.timestamp || "").slice(0,10)} · {human(event.eventType)}</a>)}</div></details></td>
         <td className="p-2 min-w-40 max-w-xs">{linked?<><p className="text-emerald-300">{row.link.cardLabel || "Card "+row.link.cardId}</p><p className="text-slate-400">Approved {String(row.link.approvedAt || "").slice(0,10)}</p><button className={button+" mt-1"} disabled={!canEdit} onClick={()=>unlink(row)}>Remove link</button></>:<p className="text-slate-400">Pending review</p>}{ownScope?<button className={button+" mt-1 block"} disabled={!canEdit} onClick={()=>openEditor(row)}>{linked?"Change link":"Review card link"}</button>:<p className="mt-1 text-slate-400">Open {scopeName(row.collection)} to link.</p>}</td>
       </tr>;})}</tbody></table></div>

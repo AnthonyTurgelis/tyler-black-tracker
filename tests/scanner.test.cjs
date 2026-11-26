@@ -200,3 +200,18 @@ test('Tempo source shortcuts use the actual player and ambiguous sparklines stay
   ctx.PRICE_HISTORY[key][1].kind='asking';
   assert.ok(ctx.Sparkline({card:cards[0]}));
 });
+
+test('eBay clipboard lines resolve the ship-to ZIP or postal code for item and postage on both scanners', () => {
+  const legacy = legacyFunctions(['parseEbaySearchResults']);
+  const title = '2024 Topps Heritage #578 Tyler Black';
+  for (const [destination, expected] of [['Deliver to\n73099', 'USD'], ['Shipping to M5V', 'CAD']]) {
+    const text = [destination, title, 'Opens in a new window or tab', 'Pre-Owned', '$12.50', 'Buy It Now', '+$2.25 shipping', 'from United States'].join('\n');
+    for (const rows of [legacy.parseEbaySearchResults(text), scan.parseListings(text,{source:'eBay',cards:[{subject:'Tyler Black'}]})]) {
+      assert.equal(rows.length, 1);
+      const [listing] = rows;
+      assert.equal(listing.currency, expected);
+      assert.equal(listing.shippingCurrency, expected);
+      assert.equal(market.scanPrice(listing).amount, 14.75);
+    }
+  }
+});

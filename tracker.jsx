@@ -4361,13 +4361,14 @@ function COMCScannerPanel(props) {
   var scanRoster = multiSubject ? panelRoster() : {};
   function subjectNames(text) { return multiSubject ? window.CollectionScanner.subjects(text, cards, scanRoster) : (/\btyler\s+black\b/i.test(text) ? ["Tyler Black"] : []); }
   function acceptsSubject(text) { return subjectNames(text).length === 1; }
-  function scanEvidence(p) { return window.ScanCurrency.infer(p, {text:rawInput, fallbackCurrency:scanCurrency}); }
+  function scanEvidence(p) { return window.ScanCurrency.infer(p, {page:scanPage, fallbackCurrency:scanCurrency}); }
   function genericListings(text, source) { return window.CollectionScanner.parseListings(text, {source:source,cards:cards,roster:scanRoster,fallbackCurrency:scanCurrency}); }
   var updateCardDetail = props.updateCardDetail, setCardStatus = props.setCardStatus;
   var setDetailedCardId = props.setDetailedCardId, setActiveTab = props.setActiveTab;
   var persistedState = props.persistedState, onStateChange = props.onStateChange;
   var _ps = persistedState || {};
   var _ri = useState(_ps.rawInput || ""), rawInput = _ri[0], setRawInput = _ri[1];
+  var scanPage = useMemo(function() { return window.ScanCurrency.pageEvidence(rawInput); }, [rawInput]);
   var _pa = useState(_ps.parsed || []), parsed = _pa[0], setParsed = _pa[1];
   var _ap = useState(_ps.applied || {}), applied = _ap[0], setApplied = _ap[1];
   var _im = useState(""), importMessage = _im[0], setImportMessage = _im[1];
@@ -4426,6 +4427,19 @@ function COMCScannerPanel(props) {
     return m;
   }, []);
 
+  function changeScanCurrency(value) {
+    setScanCurrency(value);
+    setParsed(function(rows) {
+      return rows.map(function(row) {
+        var p = window.ScanCurrency.apply(row.parsed, {page:scanPage, fallbackCurrency:value});
+        if (p.shippingNum != null) {
+          var quote = window.TrackerMarket.scanPrice(p, p.currency);
+          p.totalPrice = quote.includesShipping ? quote.amount.toFixed(2) : "";
+        }
+        return Object.assign({}, row, {parsed:p});
+      });
+    });
+  }
   function parsedCurrency(p) {
     return scanEvidence(p).currency;
   }
@@ -5086,7 +5100,9 @@ function COMCScannerPanel(props) {
   }
 
   function parseEbaySearchResults(text) {
-    var lines = text.split("\n");
+    // eBay copies the accessibility label inline or on the line after the title.
+    var lines = text.replace(/\r?\n[ \t]*Opens in a new window or tab/g, " Opens in a new window or tab").split("\n");
+    var context = {page:window.ScanCurrency.pageEvidence(text), fallbackCurrency:scanCurrency};
     var listings = [];
     var stopParsing = false;
     for (var i = 0; i < lines.length; i++) {
@@ -5148,11 +5164,8 @@ function COMCScannerPanel(props) {
       parsed.shipping = shipping;
       parsed.shippingNum = shippingNum;
       parsed.shippingCurrency = shippingCurrency;
-      var itemCurrency = window.ScanCurrency.infer(parsed, {text:text,fallbackCurrency:scanCurrency}).currency;
-      if (shipping && shippingCurrency === "UNKNOWN") {
-        parsed.shippingCurrency = window.ScanCurrency.infer({price:shippingNum,rawPrice:shipping,source:"eBay"}, {text:parsed.currencyText + "\n" + text,fallbackCurrency:scanCurrency}).currency;
-      }
-      var delivered = window.TrackerMarket.scanPrice(parsed,itemCurrency);
+      parsed = window.ScanCurrency.apply(parsed, context);
+      var delivered = window.TrackerMarket.scanPrice(parsed,parsed.currency);
       parsed.totalPrice = delivered.includesShipping ? delivered.amount.toFixed(2) : "";
       parsed.timeLeft = timeLeft;
       parsed.condition = condition;
@@ -7071,11 +7084,11 @@ function COMCScannerPanel(props) {
 
         {importMessage && <div role="status" className="text-[11px] text-cyan-200 bg-cyan-950/40 border border-cyan-800 rounded p-2 mb-2">{importMessage}{Object.keys(applied).length > 0 && parsed.some(function(item){return item.parsed.recordType === "purchase";}) ? <button onClick={function(){props.setActiveTab("copies");}} className="ml-3 text-cyan-300 underline">Review purchases</button> : null}</div>}
         {mode === "ebay" && parsed.some(function(item) { return item.parsed.recordType === "purchase"; }) && <button disabled={importBusy} onClick={applyAll} className="text-[10px] px-2 py-1 mb-2 bg-cyan-700 rounded disabled:opacity-50">{importBusy ? "Importing…" : "Import matched purchases · In Transit"}</button>}
-        {showInput && <label className="flex items-center gap-2 text-[10px] text-gray-300 mb-2">Prices in this scan
-          <select aria-label="Scan currency" value={scanCurrency} onChange={function(e) { setScanCurrency(e.target.value); }} className="bg-gray-900 border border-gray-600 rounded px-1 py-0.5">
+        {(showInput || parsed.some(function(item){return item.parsed.price && parsedCurrency(item.parsed) === "UNKNOWN";})) && <label className="flex items-center gap-2 text-[10px] text-gray-300 mb-2">Scan currency
+          <select aria-label="Scan currency" value={scanCurrency} onChange={function(e) { changeScanCurrency(e.target.value); }} className="bg-gray-900 border border-gray-600 rounded px-1 py-0.5">
             {["UNKNOWN", "USD", "CAD", "GBP", "EUR", "AUD"].map(function(code) { return <option key={code} value={code}>{code === "UNKNOWN" ? "Auto" : code}</option>; })}
           </select>
-          <span className="text-gray-500">From price, source or ship-to.</span>
+          {!showInput && <span className="text-gray-500">Choose a currency for unlabeled prices.</span>}
         </label>}
         {!showInput && parsed.length > 0 ? (
           <div className="flex items-center gap-2 mt-1">
@@ -8093,7 +8106,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
       {/* Header */}
       <div className="bg-gray-800 rounded-lg p-2">
         <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
-          <h3 className="text-indigo-400 font-bold text-sm">Price Scanner <span className="text-[9px] text-gray-500 font-normal ml-1">asking prices, bids and sold evidence kept separate</span></h3>
+          <h3 className="text-indigo-400 font-bold text-sm">Price Scanner <span className="text-[9px] text-gray-500 font-normal ml-1">{rows.some(function(row){return row.currency === "UNKNOWN";}) ? "Amounts without a code have no recorded currency." : ""}</span></h3>
           <div className="flex gap-2 text-[9px] text-gray-400">
             <span>{Object.keys(ph).length} cards</span>
             <span>{totalEntries} prices</span>
@@ -8153,7 +8166,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
             </div>
             <div className="text-indigo-300 text-[11px] font-medium mb-2">
               {c.cardSet || "Base"}{c.copies ? " /" + c.copies : ""}
-              <span className="ml-2 text-cyan-300">{window.TrackerMarket.kindLabel(r.kind)} · {r.currency === "UNKNOWN" ? "currency unknown" : r.currency} · {r.conditionLabel}{r.first.priceBasis && r.first.priceBasis !== "item" ? " · "+r.first.priceBasis : ""}</span>
+              <span className="ml-2 text-cyan-300">{window.TrackerMarket.kindLabel(r.kind)}{r.currency === "UNKNOWN" ? "" : " · "+r.currency} · {r.conditionLabel}{r.first.priceBasis && r.first.priceBasis !== "item" ? " · "+r.first.priceBasis : ""}</span>
               <span className="ml-3 inline-flex gap-1.5">
                 <button onClick={function(e) { e.stopPropagation(); setActiveTab("detailed"); setDetailedProductFilter(c.product); setDetailedCardNumFilter(c.cardNumber); setDetailedStatusFilter("all"); setDetailedSnFilter("all"); }} className="text-[9px] px-1.5 py-0 rounded bg-purple-900/40 border border-purple-700/50 text-purple-300 hover:bg-purple-800/50 font-bold">{"View #" + c.cardNumber}</button>
                 <button onClick={function(e) { e.stopPropagation(); setActiveTab("detailed"); setDetailedProductFilter(c.product); setDetailedCardNumFilter(null); setDetailedStatusFilter("all"); setDetailedSnFilter("all"); }} className="text-[9px] px-1.5 py-0 rounded bg-gray-700/60 border border-gray-600/50 text-gray-300 hover:bg-gray-600/50 font-bold">Full Set</button>
@@ -8390,7 +8403,7 @@ function PricesPanel({ cards, statuses, setActiveTab, setDetailedCardId, setDeta
                     <td className="py-0.5 px-1">{row.flagged ? <span className="text-yellow-400 text-[9px]" title="Suspicious - verify match">⚠</span> : <span className={"inline-block w-1.5 h-1.5 rounded-full " + statusDot}></span>}</td>
                     <td className="py-0.5 px-1 text-gray-300 truncate" style={{maxWidth:"clamp(100px,12vw,200px)"}} title={c.product + " - Click to view full set"}><button onClick={function(e) { e.stopPropagation(); setActiveTab("detailed"); setDetailedProductFilter(c.product); setDetailedCardNumFilter(null); setDetailedStatusFilter("all"); setDetailedSnFilter("all"); }} className="text-left hover:text-indigo-300 hover:underline truncate w-full">{c.product.replace(/^\d{4}\s*/, "")}</button></td>
                     <td className="py-0.5 px-1"><button onClick={function(e) { e.stopPropagation(); setActiveTab("detailed"); setDetailedProductFilter(c.product); setDetailedCardNumFilter(c.cardNumber); setDetailedStatusFilter("all"); setDetailedSnFilter("all"); }} className="text-gray-500 hover:text-purple-300 hover:underline" title={"View all #" + c.cardNumber + " variants"}>{c.cardNumber}</button></td>
-                    <td className="py-0.5 px-1 text-gray-400 truncate" style={{maxWidth:"clamp(80px,10vw,180px)"}} title={c.cardSet}>{c.cardSet || "Base"}<span className="block text-[8px] text-cyan-400">{window.TrackerMarket.kindLabel(row.kind)} · {row.currency === "UNKNOWN" ? "currency unknown" : row.currency}</span><span className="block text-[8px] text-violet-300">{row.conditionLabel}{row.first.priceBasis && row.first.priceBasis !== "item" ? " · "+row.first.priceBasis : ""}</span></td>
+                    <td className="py-0.5 px-1 text-gray-400 truncate" style={{maxWidth:"clamp(80px,10vw,180px)"}} title={c.cardSet}>{c.cardSet || "Base"}<span className="block text-[8px] text-cyan-400">{window.TrackerMarket.kindLabel(row.kind)}{row.currency === "UNKNOWN" ? "" : " · "+row.currency}</span><span className="block text-[8px] text-violet-300">{row.conditionLabel}{row.first.priceBasis && row.first.priceBasis !== "item" ? " · "+row.first.priceBasis : ""}</span></td>
                     <td className="py-0.5 px-1 text-right text-purple-400 font-bold">{c.copies ? "/" + c.copies : ""}</td>
                     <td className="py-0.5 px-1 text-right font-bold text-indigo-300">{window.TrackerMarket.formatMoney(row.latestPrice, row.currency)}</td>
                     <td className={"py-0.5 px-1 text-right font-bold " + trendColor}>{trendText}</td>

@@ -103,7 +103,7 @@
   function legacyObservations(collection){return Object.values(collection?.imports||{}).filter(e=>e?.status==='observation'&&e?.cardId!=null);}
   function groupSeries(entries){
     const groups=new Map();
-    for(const entry of entries||[]){const lifecycle=entry.isReturn?'Returned':String(entry.lifecycleStatus||''),key=M.seriesKey(entry)+'|'+lifecycle;if(!groups.has(key))groups.set(key,{key,currency:M.currency(entry.currency),kind:M.kind(entry.kind),conditionLabel:M.conditionLabel(entry),lifecycle,entries:[]});groups.get(key).entries.push(entry);}
+    for(const entry of entries||[]){const lifecycle=entry.isReturn?'Returned':String(entry.lifecycleStatus||''),key=M.seriesKey(entry)+'|'+lifecycle;if(!groups.has(key))groups.set(key,{key,currency:M.entryCurrency(entry),kind:M.kind(entry.kind),conditionLabel:M.conditionLabel(entry),lifecycle,entries:[]});groups.get(key).entries.push(entry);}
     return [...groups.values()];
   }
   const api={cardId,date,priceKind,label,searchLinks,review,entry,append,remove,reassign,target,legacyObservations,groupSeries};

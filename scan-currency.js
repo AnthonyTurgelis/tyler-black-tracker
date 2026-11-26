@@ -61,21 +61,32 @@
       alternatives: tokens.filter(function(t) { return t !== primary; }).map(function(t) { return { amount: t.amount, currency: t.currency, converted: t.converted }; }) };
   }
   function destination(value) {
-    var text = String(value || ""), found = [];
+    if (value && typeof value === "object") {
+      return destination(value.countryCode || value.country || value.addressCountry || value.postalCode || value.zip);
+    }
+    var text = String(value || "").replace(/[\u200b-\u200f\ufeff]/g, "").trim(), found = [];
     function add(c) { if (found.indexOf(c) < 0) found.push(c); }
-    if (/\bCanada\b|\bCAN\b|\b[A-Z]\d[A-Z][ -]?\d[A-Z]\d\b/i.test(text)) add("CAD");
-    if (/\bUnited States(?: of America)?\b|\bU\.?S\.?A\.?\b|^\s*US\s*$/i.test(text)) add("USD");
+    if (/\bCanada\b|\bCAN\b|^CA$|^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z]$|\b[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ -]?\d[ABCEGHJ-NPRSTV-Z]\d\b/i.test(text)) add("CAD");
+    if (/\bUnited States\b|\bU\.?S\.?A\b|^U\.?S\.?$/i.test(text)) add("USD");
+    // Accept a ZIP when the destination is just the code, or a US state precedes it.
+    if (/^(?:ZIP(?: code)?\s*:?\s*)?\d{5}(?:-\d{4})?$/i.test(text) ||
+        /\b(?:AL|AK|AZ|AR|CA|CO|CT|DE|DC|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|PR)\s+\d{5}(?:-\d{4})?\b/i.test(text)) add("USD");
     return found;
+  }
+  function shipTo(row) {
+    return row.shippingCountry || row.shipToCountry || row.destinationCountry || row.deliveryCountry ||
+      row.shipCountry || row.shippingAddress || row.shipTo || row.shippingDestination;
   }
   function destinationEvidence(text) {
     var lines = String(text || "").split(/\r?\n/), found = [];
     for (var i = 0; i < lines.length; i++) {
-      var m = lines[i].match(/(?:^|\b)(?:ship(?:s|ping|ped)?\s+to|deliver(?:y|ing)?\s+to|delivery\s+(?:destination|address)|shipping\s+address|ship-to)\s*:?\s*(.*)$/i);
+      var m = lines[i].match(/\b(?:(?:ship(?:s|ping|ped)?|deliver(?:y|ing|ed)?)[\s-]+to(?:\s+country)?|(?:shipping|delivery)\s+(?:destination|address|country|location))\s*:?\s*(.*)$/i);
       if (!m) continue;
-      var block = m[1];
+      var block = m[1].trim();
       for (var j = i + 1; j < Math.min(i + 7, lines.length); j++) {
-        if (/^(?:bill(?:ing)?|ship(?:s|ped|ping)? from|seller|item|order|payment|subtotal|total|price|quantity|returns?|shipping(?:\s*[:$]))\b/i.test(lines[j].trim())) break;
-        block += "\n" + lines[j];
+        var next = lines[j].trim();
+        if (destination(block).length || /^(?:bill(?:ing)?|ships?\b|shipping|shipped|deliver|located\b|from\b|seller|item|order|payment|subtotal|total|price|quantity|returns?|(?:19|20)\d{2}\s+\S|.*Opens in a new window)/i.test(next)) break;
+        block = (block + "\n" + next).trim();
       }
       destination(block).forEach(function(c) { if (found.indexOf(c) < 0) found.push(c); });
     }
@@ -89,18 +100,25 @@
     });
     return found;
   }
-  function infer(parsed, context) {
+  function pageEvidence(text) {
+    return { destinations: destinationEvidence(text), declarations: declarations(text) };
+  }
+  function sourceCurrency(source) {
+    return /^(?:comc|sportlots)$/i.test(String(source || "").trim()) ? "USD" : "UNKNOWN";
+  }
+  function infer(parsed, context, isShipping) {
     parsed = parsed || {}; context = context || {};
     var evidence = [], conflicts = [], selected = "UNKNOWN", reason = "unknown", confidence = "unknown";
     var value = amount(parsed.price), raw = String(parsed.rawPrice || parsed.price || "");
     var tokens = moneyTokens(raw), matching = value == null ? tokens : tokens.filter(function(t) { return t.amount === value; });
     var previous = parsed.currencyEvidence;
-    var explicit = !previous || /^(?:explicit|manual)/.test(previous.reason || "") ? code(parsed.currency) : "UNKNOWN";
+    var explicit = !previous || parsed.currencyConfirmedByOwner || /^explicit/.test(previous.reason || "") ? code(parsed.currency) : "UNKNOWN";
     if (explicit !== "UNKNOWN") evidence.push({ currency: explicit, reason: "explicit-field" });
     matching.forEach(function(t) { if (t.currency !== "UNKNOWN") evidence.push({ currency: t.currency, reason: "explicit-price", converted: t.converted }); });
     // This is a per-listing block, never the entire multi-listing paste.
-    if (!evidence.length && parsed.currencyText) {
-      var rowTokens = moneyTokens(parsed.currencyText).filter(function(t) { return value != null && t.amount === value; });
+    if (!evidence.length && parsed.currencyText && !isShipping) {
+      var itemText = parsed.currencyText.split(/\r?\n/).filter(function(line) { return !/shipping|postage|delivery|order total|tax|charged|exchange rate/i.test(line); }).join("\n");
+      var rowTokens = moneyTokens(itemText).filter(function(t) { return value != null && t.amount === value; });
       rowTokens.forEach(function(t) { if (t.currency !== "UNKNOWN") evidence.push({ currency: t.currency, reason: "explicit-row-price", converted: t.converted }); });
     }
     var distinct = [];
@@ -114,16 +132,17 @@
     }
     choose(distinct, evidence.length ? evidence[0].reason : "explicit", "explicit");
     choose(declarations(parsed.currencyText), "row-declaration", "explicit");
-    choose(declarations(context.text || context.rawText), "page-declaration", "explicit");
-    var fallback = code(context.fallbackCurrency);
+    choose(context.page ? context.page.declarations : declarations(context.text || context.rawText), "page-declaration", "explicit");
+    var fallback = code(context.fallbackCurrency == null && previous && previous.reason === "manual-fallback" ? previous.currency : context.fallbackCurrency);
     if (fallback !== "UNKNOWN") choose([fallback], "manual-fallback", "manual");
     var source = String(parsed.source || context.source || "").toLowerCase();
     // Native COMC/Sportlots figures use USD; never infer this from a seller
     // called COMC on another marketplace. Explicit row/page codes win above.
-    if (source === "comc" || source === "sportlots") choose(["USD"], "source-" + source, "inferred");
-    var ship = destination(parsed.shipTo || parsed.shippingDestination || parsed.shippingCountry);
+    var nativeCode = sourceCurrency(source);
+    if (nativeCode !== "UNKNOWN") choose([nativeCode], "source-" + source, "inferred");
+    var ship = destination(shipTo(parsed));
     if (!ship.length) ship = destinationEvidence(parsed.currencyText);
-    if (!ship.length) ship = destinationEvidence(context.text || context.rawText);
+    if (!ship.length) ship = context.page ? context.page.destinations : destinationEvidence(context.text || context.rawText);
     choose(ship, "shipping-destination", "inferred");
     if (converted && parsed.recordType === "purchase") conflicts.push("Converted display is not a paid transaction amount");
     return { currency: selected, reason: reason, confidence: confidence, inferred: confidence === "inferred",
@@ -133,9 +152,16 @@
     var result = Object.assign({}, parsed), evidence = infer(parsed, context);
     result.currency = evidence.currency;
     result.currencyEvidence = evidence;
+    if (result.shippingNum != null && (code(result.shippingCurrency) === "UNKNOWN" || result.shippingCurrencyInferred)) {
+      // A converted item and its postage can use different currencies.
+      var postage = Object.assign({}, parsed, { price: parsed.shippingNum, rawPrice: parsed.shipping, currency: "", currencyEvidence: undefined });
+      var postageEvidence = result.shippingNum === 0 ? evidence : infer(postage, context, true);
+      result.shippingCurrency = postageEvidence.currency;
+      result.shippingCurrencyInferred = postageEvidence.confidence !== "explicit";
+    }
     return result;
   }
-  var api = { code: code, codes: codes, amount: amount, parseMoney: parseMoney, infer: infer, apply: apply, destinationEvidence: destinationEvidence };
+  var api = { code: code, codes: codes, amount: amount, parseMoney: parseMoney, infer: infer, apply: apply, destinationEvidence: destinationEvidence, pageEvidence: pageEvidence, sourceCurrency: sourceCurrency, shipTo: shipTo };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.ScanCurrency = api;
 })(typeof window !== "undefined" ? window : typeof globalThis !== "undefined" ? globalThis : this);
