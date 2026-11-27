@@ -94,6 +94,7 @@
       if (original) ["id","tcdbId","tcdbSetId","sourceId","sourceItemId","sourcePersonUrl"].forEach(function(key){if(Object.prototype.hasOwnProperty.call(original,key)) next[key]=original[key]; else delete next[key];});
       if (next.parentCardId && original && String(next.parentCardId) === String(original.id)) return {error:"A card cannot be linked to itself."};
     }
+    if (!generic) next.issueType = infoFor({...next,isCustom:!original || original.isCustom}).issueType;
     var validationCard = generic ? Object.assign({}, next, {product:next.year.slice(0,4)+" "+next.product.replace(/^[12]\d{3}(?:-\d{2,4})?\s+/,""),catalogMeta:null}) : next;
     var error = window.CardCatalog.validate(validationCard,original);
     if (error) return {error:error};
@@ -109,7 +110,8 @@
     var statuses = props.statuses || {};
     var mode = props.mode || props.scope || "tb", generic = mode !== "tb";
     var canEdit = !!props.isOwner && props.readOnly !== true && props.storageReady !== false && typeof props.onSave === "function";
-    const [filter, setFilter] = React.useState(generic ? "all" : "2026");
+    const [category, setFilter] = React.useState(generic ? "all" : "2026");
+    const filter = props.proofsOnly ? "proofs" : category;
     const [subjectFilter,setSubjectFilter] = React.useState("");
     const [yearFilter,setYearFilter] = React.useState("");
     const [search, setSearch] = React.useState("");
@@ -290,6 +292,7 @@
       finally { setArchiveBusy(null); setSyncIssues(readSyncIssues(mode)); }
     }
 
+    var formType = form && (generic ? form.issueType : infoFor({...form,isCustom:true}).issueType);
     var coreLocked = !!(editingCard && !editingCard.isCustom && (!generic || editingCard.tcdbId || editingCard.sourceId));
     var relatedCards = form ? entries.filter(function (entry) {
       if (!window.CardCatalog.isChecklistCard(entry.card)) return false;
@@ -304,11 +307,11 @@
         <div className="mx-auto w-full max-w-6xl space-y-2 pb-6">
           <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-800 pb-2">
             <div>
-              <h2 className="text-base font-bold text-yellow-300">Card catalogue</h2>
-              <p className="text-xs text-gray-400">Published cards, proofs and your own additions.</p>
+              <h2 className="text-base font-bold text-yellow-300">{props.proofsOnly ? "Proofs & prototypes" : "Card catalogue"}</h2>
+              {!props.proofsOnly && <p className="text-xs text-gray-400">Published cards, proofs and your own additions.</p>}
             </div>
             {props.isOwner && <div className="flex flex-wrap gap-1.5">
-              <button type="button" disabled={!canEdit || busy || !!form} onClick={function () { openEditor(null, false); }} className={BUTTON}>+ Add card</button>
+              {!props.proofsOnly && <button type="button" disabled={!canEdit || busy || !!form} onClick={function () { openEditor(null, false); }} className={BUTTON}>+ Add card</button>}
               <button type="button" disabled={!canEdit || busy || !!form} onClick={function () { openEditor(null, true); }} className="rounded border border-yellow-600 bg-yellow-500 px-2.5 py-1.5 text-xs font-bold text-gray-950 hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-300">+ Add proof</button>
             </div>}
           </header>
@@ -323,21 +326,21 @@
 
           {form && props.isOwner && <section ref={editorRef} className="rounded-lg border border-yellow-700/60 bg-gray-900 p-3" aria-labelledby="catalog-editor-title">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 id="catalog-editor-title" className="text-sm font-bold text-yellow-200">{editingCard ? "Edit card" : isProof(form.issueType) ? "Add a proof" : "Add a card"}</h3>
+              <h3 id="catalog-editor-title" className="text-sm font-bold text-yellow-200">{editingCard ? "Edit card" : isProof(formType) ? "Add a proof" : "Add a card"}</h3>
               <button type="button" className="text-xs text-gray-400 underline hover:text-white" disabled={busy} onClick={function () { setForm(null); setEditingCard(null); setFormError(""); }}>Cancel</button>
             </div>
             <form onSubmit={submitForm} className="space-y-3">
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <label className={FIELD}>Card type<select aria-label="Card type" className={INPUT} value={form.issueType} onChange={function (event) { updateField("issueType", event.target.value); }}>{TYPES.map(function (item) { return <option key={item[0]} value={item[0]}>{item[1]}</option>; })}</select></label>
+                <label className={FIELD}>Card type<select aria-label="Card type" className={INPUT} value={formType} onChange={function (event) { updateField("issueType", event.target.value); }}>{TYPES.map(function (item) { return <option key={item[0]} value={item[0]}>{item[1]}</option>; })}</select></label>
                 <label className={FIELD}>Evidence<select aria-label="Evidence" className={INPUT} value={form.verification} onChange={function (event) { updateField("verification", event.target.value); }}><option value="unverified">Needs verification</option><option value="observed">Card / photo observed</option><option value="checklist">Documented checklist entry</option></select></label>
                 {generic && <><label className={FIELD}>{mode === "racing" ? "Driver / subject" : "Player / subject"}<input aria-label="Card subject" className={INPUT} disabled={coreLocked} value={form.subject} onChange={function(event){updateField("subject",event.target.value);}} placeholder={mode === "racing" ? "Ryan Blaney" : "Name shown on card"} autoComplete="off" /></label><label className={FIELD}>Year<input aria-label="Card year" className={INPUT} disabled={coreLocked} inputMode="text" maxLength="9" value={form.year} onChange={function(event){updateField("year",event.target.value);}} placeholder="2024" /></label></>}
                 <label className={FIELD + " sm:col-span-2"}>{generic ? "Product / set" : "Year and product"}<input aria-label={generic ? "Product / set" : "Year and product"} className={INPUT} disabled={coreLocked} value={form.product} onChange={function (event) { updateField("product", event.target.value); }} placeholder={generic ? "Panini National Treasures" : "2021 Leaf Metal Draft"} autoComplete="off" /></label>
                 <label className={FIELD}>Card number<input aria-label="Card number" className={INPUT} disabled={coreLocked} value={form.cardNumber} onChange={function (event) { updateField("cardNumber", event.target.value); }} placeholder={generic ? "Card number or NNO" : "BA-TB1 or NNO"} autoComplete="off" /></label>
                 <label className={FIELD}>Print run<input aria-label="Print run" className={INPUT} disabled={coreLocked} inputMode="numeric" value={form.copies} onChange={function (event) { updateField("copies", event.target.value); }} placeholder="Leave blank if unknown" autoComplete="off" /></label>
-                <label className={FIELD + " sm:col-span-2"}>Exact variant<input aria-label="Exact variant" className={INPUT} disabled={coreLocked} value={form.cardSet} onChange={function (event) { updateField("cardSet", event.target.value); }} placeholder={isProof(form.issueType) ? "Pre-Production Proof Green Prismatic Unsigned" : "Base, Gold, or the full variant name"} autoComplete="off" /></label>
+                <label className={FIELD + " sm:col-span-2"}>Exact variant<input aria-label="Exact variant" className={INPUT} disabled={coreLocked} value={form.cardSet} onChange={function (event) { updateField("cardSet", event.target.value); }} placeholder={isProof(formType) ? "Pre-Production Proof Green Prismatic Unsigned" : "Base, Gold, or the full variant name"} autoComplete="off" /></label>
               </div>
               {coreLocked && <p className="text-xs text-gray-500">Set, number and variant come from the published catalogue. You can update the classification and evidence below.</p>}
-              {isProof(form.issueType) && <div className="grid grid-cols-2 gap-2 rounded border border-gray-700 bg-gray-950/40 p-2">
+              {isProof(formType) && <div className="grid grid-cols-2 gap-2 rounded border border-gray-700 bg-gray-950/40 p-2">
                 <label className={FIELD}>Colour<input aria-label="Proof colour" className={INPUT} value={form.proofColor} onChange={function (event) { updateField("proofColor", event.target.value); }} placeholder="Green" /></label>
                 <label className={FIELD}>Finish<input aria-label="Proof finish" className={INPUT} value={form.proofFinish} onChange={function (event) { updateField("proofFinish", event.target.value); }} placeholder="Prismatic / Wave" /></label>
                 <label className={FIELD}>Signature<select aria-label="Signature" className={INPUT} value={form.signature} onChange={function (event) { updateField("signature", event.target.value); }}><option value="unknown">Unknown</option><option value="signed">Signed</option><option value="unsigned">Unsigned</option></select></label>
@@ -364,13 +367,13 @@
             </form>
           </section>}
 
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Catalogue category">
+          {!props.proofsOnly && <div className="flex flex-wrap gap-1.5" role="group" aria-label="Catalogue category">
             {categoryFilters.map(function (item) { return <button key={item[0]} type="button" aria-pressed={filter === item[0]} onClick={function () { setFilter(item[0]); }} className={"rounded border px-2.5 py-1.5 text-xs font-semibold " + (filter === item[0] ? "border-yellow-500 bg-yellow-500/10 text-yellow-200" : "border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-200")}>{item[1]} <span className="ml-1 text-[10px] opacity-70">{counts[item[0]]}</span></button>; })}
-          </div>
+          </div>}
           {filter === "proofs" && <div className="space-y-2 rounded border border-violet-900/60 bg-violet-950/20 p-3">
             <div className="flex flex-wrap items-center gap-2"><label className="text-xs text-gray-400">Proof category <select aria-label="Proof category" value={proofTypeFilter} onChange={function(event){setProofTypeFilter(event.target.value);}} className="ml-1 rounded border border-gray-600 bg-gray-950 px-2 py-1.5 text-gray-200"><option value="all">All proofs and prototypes ({proofEntries.length})</option>{[["pre_production_proof","Pre-production proofs"],["manufacturer_proof","Other manufacturer proofs"],["prototype","Prototypes / test issues"]].map(function(item){return <option key={item[0]} value={item[0]}>{item[1]} ({proofEntries.filter(function(entry){return entry.info.issueType === item[0];}).length})</option>;})}</select></label></div>
             <div className="flex flex-wrap gap-1.5" role="group" aria-label="Proof signature">{[["all","All signatures"],["signed","Signed"],["unsigned","Unsigned"],["unknown","Signature unconfirmed"]].map(function(item){return <button type="button" key={item[0]} aria-pressed={proofSignatureFilter === item[0]} onClick={function(){setProofSignatureFilter(item[0]);}} className={"rounded border px-2.5 py-1.5 text-xs " + (proofSignatureFilter === item[0] ? "border-violet-400 bg-violet-950 text-violet-200" : "border-gray-700 text-gray-400")}>{item[1]} ({proofSignatureCounts[item[0]]})</button>;})}</div>
-            <p className="text-xs text-gray-400">Unsigned proofs remain separate from signed proofs even when the product family includes “Autographs.” An unconfirmed signature is not treated as signed. These recorded categories do not enter standard checklist completion.</p>
+            <p className="text-xs text-gray-400">Proofs are counted separately from checklist completion.</p>
           </div>}
           <div className="flex flex-wrap items-center gap-2">
             <label className="min-w-0 flex-1"><span className="sr-only">Search catalogue</span><input aria-label="Search catalogue" type="search" className={INPUT} placeholder={generic ? "Search name, year, product, card # or variant" : "Search product, card # or variant"} value={search} onChange={function (event) { setSearch(event.target.value); }} /></label>
@@ -389,7 +392,7 @@
               <div className="flex flex-wrap gap-x-3 gap-y-1"><a href="https://www.breakninja.com/baseball/2026-Topps-Update-Series-Baseball-Checklist-Milwaukee-Brewers.php" target="_blank" rel="noopener noreferrer" className="text-blue-300 underline">Player checklist ↗</a><a href="https://www.yocardo.com/WebRoot/Store28/Shops/91062111/6AB0/D075/2373/F2D5/7C0D/0A0C/6D0F/9144/2026_Topps_Update_Series_Baseball_Checklist.pdf" target="_blank" rel="noopener noreferrer" className="text-blue-300 underline">Topps checklist PDF ↗</a><a href="https://www.checklistinsider.com/2026-topps-update-series-baseball" target="_blank" rel="noopener noreferrer" className="text-blue-300 underline">Parallel print runs ↗</a></div>
             </div>
           </details>}
-          {filter === "archived" ? <p className="text-xs leading-relaxed text-gray-500">Archived cards are excluded from active collection counts. Restore a card to bring back its saved status and history.</p> : filter !== "2026" && <p className="text-xs leading-relaxed text-gray-500">Proofs and custom cards are tracked separately from checklist completion. Unlicensed releases and printing plates can still be checklist cards.{isOpenEnded ? " Counts cover recorded cards; there is no assumed complete proof rainbow." : ""}</p>}
+          {filter === "archived" ? <p className="text-xs leading-relaxed text-gray-500">Archived cards are excluded from active collection counts. Restore a card to bring back its saved status and history.</p> : filter !== "2026" && filter !== "proofs" && <p className="text-xs leading-relaxed text-gray-500">Proofs and custom cards are tracked separately from checklist completion. Unlicensed releases and printing plates can still be checklist cards.{isOpenEnded ? " Counts cover recorded cards; there is no assumed complete proof rainbow." : ""}</p>}
 
           <div className="overflow-hidden rounded border border-gray-800" role="list" aria-label="Catalogue cards">
             {filtered.slice(0, shown).map(function (entry) {

@@ -209,8 +209,17 @@ function getCardQty(cardDetails, statuses, cardId, copySummaries) {
   var s = statuses && statuses[cardId];
   return (s === "owned" || s === "in_transit") ? 1 : 0;
 }
-function collectionCardState(cardId, statuses, cardDetails, copySummaries) {
-  return copySummaries && copySummaries[cardId] || window.CopyInventory.summarizeCard(null, cardId, statuses, cardDetails);
+function collectionCardState(cardId, statuses, cardDetails, copySummaries, checklistAliasIds) {
+  function read(id) {
+    return copySummaries && copySummaries[id] || window.CopyInventory.summarizeCard(null, id, statuses, cardDetails);
+  }
+  var primary = read(cardId);
+  if (!checklistAliasIds) return primary;
+  // Combine presence for checklist coverage only. Each stored record still owns its copies and quantities.
+  var linked = checklistAliasIds.map(read);
+  var owned = primary.owned || linked.some(record => record.owned);
+  var inTransit = primary.inTransit || linked.some(record => record.inTransit);
+  return {...primary, owned, inTransit, acquired: owned || inTransit, notOwned: !owned && !inTransit};
 }
 // COLOR_PALETTE: keywords found in card variants → background tint + text color.
 // Includes literal colors plus parallel-pattern names (ice, holo, mojo, etc).
@@ -405,6 +414,14 @@ async function saveCustomCards(cards) {
   window.dispatchEvent(new CustomEvent("catalogchange"));
   return result;
 }
+// A proof and its released parallel can share the same product, printed number and finish.
+function separateProofPriceHistory(card) {
+  if (window.MODE !== "tb") return;
+  var key = window.PriceHistoryUtils.legacyCardKey(card), proof = window.CardCatalog.isProof(card);
+  if (ALL_CARDS.some(c => window.PriceHistoryUtils.legacyCardKey(c) === key && window.CardCatalog.isProof(c) !== proof)) {
+    card.priceKey = key + "|card:" + card.id;
+  }
+}
 function loadCatalogMeta() {
   if (window.MODE !== "tb") return {};
   try { return JSON.parse(localStorage.getItem("tb-catalog-meta-v1") || "{}"); } catch(e) { return {}; }
@@ -421,6 +438,7 @@ function matchesCatalogScope(card, scope) {
 }
 function catalogBadge(card) {
   if (window.MODE !== "tb") return null;
+  if (card.checklistAliasOf) return React.createElement("span", {className:"ml-1 text-[9px] text-gray-400",title:"Counted under checklist entry " + card.checklistAliasOf}, "Linked record");
   var info = window.CardCatalog.getInfo(card);
   if (info.issueType === "standard" && info.verification !== "unverified") return null;
   var label = window.CardCatalog.isProof(card) ? "Proof · " + (info.signature === "unknown" ? "signature unconfirmed" : info.signature) : info.issueType === "custom" ? "Custom" : "Review";
@@ -739,6 +757,7 @@ function TylerBlackTracker() {
     if (privatePanelHasEdits() && next !== activeTab) { setSaveToast("Save or cancel the open copy edit before changing tabs."); return false; }
     setActiveTabState(next); return true;
   }, [activeTab]);
+  const [detailedViewKey, setDetailedViewKey] = useState(0);
   const [detailedSnFilter, setDetailedSnFilter] = useState(null);
   const [detailedStatusFilter, setDetailedStatusFilter] = useState(null);
   const [detailedCardId, setDetailedCardId] = useState(null);
@@ -918,6 +937,7 @@ function TylerBlackTracker() {
         candidate.id = window.CardCatalog.nextCustomId(customs);
         candidate.isCustom = true;
         candidate.addedDate = new Date().toISOString().slice(0,10);
+        separateProofPriceHistory(candidate);
         customs.push(candidate);
       }
       result = await saveCustomCards(customs);
@@ -1613,7 +1633,7 @@ function TylerBlackTracker() {
       visibleTotal++;
       const s = statuses[card.id] || "not_owned";
       const d = cardDetails[card.id] || {};
-      const view = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+      const view = collectionCardState(card.id, statuses, cardDetails, copySummaries, card.checklistAliasIds);
       collectionViews.push(view);
       const is1of1 = String(card.copies) === "1";
       if (is1of1) total1of1++;
@@ -1694,7 +1714,7 @@ function TylerBlackTracker() {
       if (HIDDEN_DUPES.has(card.id)) return false;
       if (!matchesCatalogScope(card, catalogScope)) return false;
       const cardStatus = statuses[card.id] || "not_owned";
-      const view = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+      const view = collectionCardState(card.id, statuses, cardDetails, copySummaries, catalogScope === "checklist" && card.checklistAliasIds);
       if (filterYear !== "all" && cardYear(card) !== filterYear) return false;
       if (filterPlayer && !cardHasPlayer(card,filterPlayer)) return false;
       if (filterColor && !extractColors(card.cardSet).includes(filterColor)) return false;
@@ -1815,11 +1835,24 @@ function TylerBlackTracker() {
   if (loading) return <div className="h-screen bg-gray-950 text-white flex items-center justify-center"><div className="text-lg font-light tracking-wide text-gray-400">Loading collection...</div></div>;
   const pct = stats.total ? (stats.owned / stats.total * 100).toFixed(1) : 0;
   const pctWithTransit = stats.total ? (stats.acquired / stats.total * 100).toFixed(1) : 0;
-  const acquired = stats.acquired;
+  function openChecklistStatus(status, printRun = "all") {
+    if (!setActiveTab("detailed")) return;
+    setCollectionSegment("all");
+    setBrowseSubject("all");
+    setPinnedOnly(false);
+    setWantedOnly(false);
+    setDetailedCardId(null);
+    setDetailedProductFilter(null);
+    setDetailedCardNumFilter(null);
+    setDetailedStatusFilter(status);
+    setDetailedSnFilter(printRun);
+    setDetailedViewKey(previous => previous + 1);
+  }
   const needRegular = stats.notOwned - stats.notOwned1of1;
   const TABS = [
     {id:"collection",label:"Collection",color:"yellow",ownerOnly:true},
     {id:"catalog",label:"Catalogue",color:"purple"},
+    {id:"proofs",label:"Proofs",color:"purple",tbOnly:true},
     {id:"gallery",label:"Gallery",color:"amber"},
     {id:"copies",label:"Copies",color:"cyan",ownerOnly:true},
     {id:"autographs",label:"IP autos",color:"purple",ownerOnly:true},
@@ -1845,52 +1878,56 @@ function TylerBlackTracker() {
     <div data-tracker-ready="true" className="h-screen text-white flex flex-col overflow-hidden" style={{background:"#0a1628",fontSize:"clamp(10px,1.4vw,13px)",letterSpacing:"-0.01em"}}>
       {/* STICKY HEADER */}
       <div className="flex-shrink-0 backdrop-blur-sm border-b z-30" style={{background:"rgba(10,22,40,0.97)",borderColor:"#1a2d4a",padding:"clamp(2px,0.3vw,4px) clamp(4px,0.6vw,12px)"}}>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
           <span className="font-black tracking-tight whitespace-nowrap" style={{color: trackerMode === "wnba" ? "#a855f7" : "#FFC52F", fontSize:"clamp(13px,1.8vw,18px)"}}>{collectionTitle.toUpperCase()}</span>
           {trackerMode === "wnba" && window.Tempo2026 && <details className="relative text-[10px] text-purple-300"><summary className="cursor-pointer whitespace-nowrap" title="Checklist source coverage">Coverage</summary><div className="absolute left-0 top-5 w-72 max-w-[85vw] p-2 rounded border border-purple-800 bg-slate-950 text-slate-300 z-50">{window.TEMPO_CATALOG_COVERAGE_NOTE || window.Tempo2026.coverageNote}</div></details>}
           {trackerMode !== "tb" && <span className="text-gray-500 text-[9px]" title="Totals across the full collection">Overall</span>}
           <div className="flex-1 rounded-full h-1.5 overflow-hidden min-w-8 max-w-24" style={{background:"#1a2d4a"}}>
             <div className="h-full flex">
               <button
-                onClick={function() { setActiveTab("detailed"); setDetailedStatusFilter("owned"); setDetailedSnFilter(null); }}
+                onClick={() => openChecklistStatus("owned")}
                 className="transition-all cursor-pointer"
                 style={{width: pct + "%", background:"#22c55e"}}
                 title="Click to view owned cards"
               />
               <button
-                onClick={function() { setActiveTab("detailed"); setDetailedStatusFilter("in_transit"); setDetailedSnFilter(null); }}
+                onClick={() => openChecklistStatus("in_transit")}
                 className="transition-all cursor-pointer"
                 style={{width: (pctWithTransit - pct) + "%", background:"#86efac"}}
                 title="Click to view in-transit cards"
               />
               <button
-                onClick={function() { setActiveTab("detailed"); setDetailedStatusFilter("not_owned"); setDetailedSnFilter("not_1of1"); }}
+                onClick={() => openChecklistStatus("not_owned", "not_1of1")}
                 className="transition-all cursor-pointer"
                 style={{width: (stats.total ? (needRegular / stats.total * 100) : 0) + "%", background:"rgba(220,80,80,0.5)"}}
                 title="Click to view needed cards (non-1/1s)"
               />
               <button
-                onClick={function() { setActiveTab("detailed"); setDetailedStatusFilter("not_owned"); setDetailedSnFilter("1of1"); }}
+                onClick={() => openChecklistStatus("not_owned", "1of1")}
                 className="bg-red-300/40 transition-all hover:bg-red-300/60 cursor-pointer"
                 style={{width: (stats.total ? (stats.notOwned1of1 / stats.total * 100) : 0) + "%"}}
                 title="Click to view needed 1/1s"
               />
             </div>
           </div>
-          <span className="font-bold whitespace-nowrap" style={{fontSize:"clamp(9px,1.1vw,11px)",color:"#22c55e"}} title="Checklist acquired: owned or in transit">{pctWithTransit}%</span>
+          <button type="button" data-checklist-acquired onClick={() => openChecklistStatus("acquired")}
+            className="whitespace-nowrap rounded px-1 text-emerald-300 hover:bg-gray-800/50" style={{fontSize:"clamp(10px,1.1vw,12px)"}}
+            title="View unique checklist cards owned or in transit">
+            Owned + In Transit <strong className="tabular-nums">{stats.acquired}/{stats.total}</strong> <span className="text-gray-400">({pctWithTransit}%)</span>
+          </button>
           <span style={{color:"#2a3f5f"}}>|</span>
           <div className="flex items-center gap-1 flex-shrink-0" style={{fontSize:"clamp(9px,1.1vw,11px)"}}>
             <button
-              onClick={function() { setActiveTab("detailed"); setDetailedStatusFilter("owned"); setDetailedSnFilter(null); }}
+              onClick={() => openChecklistStatus("owned")}
               className="hover:bg-gray-800/50 rounded px-1 -mx-1 transition-colors"
               title="Click to view owned cards"
             >
               <span className="font-bold" style={{color:"#22c55e"}}>{stats.owned}</span><span style={{color:"#7a8ba8"}} className="ml-0.5">owned</span>
             </button>
-            <button onClick={function(){setActiveTab("detailed");setDetailedStatusFilter("in_transit");setDetailedSnFilter(null);}} className="hover:bg-gray-800/50 rounded px-1" title="Click to view in-transit cards"><span className="font-bold text-emerald-300">{stats.inTransit}</span><span className="ml-0.5 text-gray-400">in transit</span></button>
+            <button onClick={() => openChecklistStatus("in_transit")} className="hover:bg-gray-800/50 rounded px-1" title="Click to view in-transit cards"><span className="font-bold text-emerald-300">{stats.inTransit}</span><span className="ml-0.5 text-gray-400">in transit</span></button>
             <span style={{color:"#2a3f5f"}} className="mx-0.5">&middot;</span>
             <button
-              onClick={function() { setActiveTab("detailed"); setDetailedStatusFilter("not_owned"); setDetailedSnFilter(null); }}
+              onClick={() => openChecklistStatus("not_owned")}
               className="hover:bg-gray-800/50 rounded px-1 -mx-1 transition-colors"
               title="Click to view needed cards"
             >
@@ -1899,7 +1936,7 @@ function TylerBlackTracker() {
           </div>
           <span style={{color:"#2a3f5f"}}>|</span>
           <button
-            onClick={function() { setActiveTab("detailed"); setDetailedSnFilter("1of1"); setDetailedStatusFilter("acquired"); }}
+            onClick={() => openChecklistStatus("acquired", "1of1")}
             className="flex items-center gap-1 flex-shrink-0 hover:bg-gray-800/50 rounded px-1 -mx-1 transition-colors"
             style={{fontSize:"clamp(9px,1.1vw,11px)"}}
             title="Click to view all 1/1s"
@@ -2125,7 +2162,7 @@ function TylerBlackTracker() {
             var status = statuses[card.id] || "not_owned";
             var details = cardDetails[card.id] || {};
             var isExpanded = expandedCard === card.id;
-            var copySummary = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+            var copySummary = collectionCardState(card.id, statuses, cardDetails, copySummaries, catalogScope === "checklist" && card.checklistAliasIds);
             var tempoProfile = tempoProfileEnabled ? window.TempoProfile.classify(card) : null;
             var displayStatus = copySummary.owned ? "owned" : copySummary.inTransit ? "in_transit" : status;
             var cfg = STATUS_CONFIG[displayStatus];
@@ -2313,13 +2350,13 @@ function TylerBlackTracker() {
         ) : activeTab === "cleanup" ? (
           <CleanupPanel statuses={statuses} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} forSaleFlags={forSaleFlags} toggleForSale={toggleForSale} hidePrices={hidePrices} />
         ) : activeTab === "detailed" ? (
-          <DetailedPanel cards={browseCards} browseKey={browseKey} onTogglePin={togglePinnedCard} statuses={statuses} copySummaries={copySummaries} openCardCopies={openCardCopies} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} needsSync={needsSync} initialSnFilter={detailedSnFilter} initialStatusFilter={detailedStatusFilter} initialCardId={detailedCardId} setDetailedCardId={setDetailedCardId} initialProductFilter={detailedProductFilter} setDetailedProductFilter={setDetailedProductFilter} initialCardNumFilter={detailedCardNumFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} editCustomCardById={editCustomCardById} customEditVer={customEditVer} targetByCardId={targetByCardId} setActiveTab={setActiveTab} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
+          <DetailedPanel key={detailedViewKey} cards={browseCards} browseKey={browseKey} onTogglePin={togglePinnedCard} statuses={statuses} copySummaries={copySummaries} openCardCopies={openCardCopies} cardDetails={cardDetails} updateCardDetail={updateCardDetail} setCardStatus={setCardStatus} adjustCardQty={adjustCardQty} needsSync={needsSync} initialSnFilter={detailedSnFilter} initialStatusFilter={detailedStatusFilter} initialCardId={detailedCardId} setDetailedCardId={setDetailedCardId} initialProductFilter={detailedProductFilter} setDetailedProductFilter={setDetailedProductFilter} initialCardNumFilter={detailedCardNumFilter} setDetailedCardNumFilter={setDetailedCardNumFilter} editCustomCardById={editCustomCardById} customEditVer={customEditVer} targetByCardId={targetByCardId} setActiveTab={setActiveTab} setTargetCardFilter={setTargetCardFilter} hidePrices={hidePrices} />
         ) : activeTab === "copies" && isOwner ? (
           <window.CopyInventoryPanel key={copyStorageKey+":"+(copyStateRef.current.ownerId || "signed-out")} initialCardId={copyCardId} cards={ALL_CARDS.filter(function(card) { return trackerMode !== "tb" || !HIDDEN_DUPES.has(card.id); })} statuses={statuses} cardDetails={cardDetails} inventory={copyInventory} publicMedia={publicMedia} onInventoryChange={saveCopyInventory} onRefresh={refreshCopyInventory} isOwner={isOwner} storageReady={copyStorage.ready} loading={copyStorage.loading} readOnlyReason={copyStorage.error} />
         ) : activeTab === "gallery" ? (
           <window.CardGalleryPanel key={copyStorageKey+":"+(copyStateRef.current.ownerId || "public")+":"+browseKey} onTogglePin={trackerMode!=="tb" ? togglePinnedCard : null} cards={browseCards.filter(function(card){return trackerMode !== "tb" || !HIDDEN_DUPES.has(card.id);})} statuses={statuses} cardDetails={cardDetails} inventory={isOwner ? copyInventory : null} publicMedia={publicMedia} isOwner={isOwner} onOpenCopies={isOwner ? openCardCopies : null} loading={mediaStorage.loading || isOwner && copyStorage.loading} loadError={mediaStorage.error} onRefresh={async function(){var results=await Promise.all([refreshPublicMedia(),isOwner ? refreshCopyInventory() : Promise.resolve({ok:true})]);return results.find(function(result){return result && result.ok === false;}) || {ok:true};}} />
-        ) : activeTab === "catalog" ? (
-          <window.CardCatalogPanel key={trackerMode} mode={trackerMode} readOnly={trackerMode==="wnba"} copySummaries={copySummaries} cards={ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id);}).concat(isOwner ? loadCustomCards().filter(function(card){return card.archived;}) : [])} statuses={statuses} isOwner={isOwner} initialEditId={catalogEditId} onClearEdit={function(){setCatalogEditId(null);}} onSave={saveCatalogCard} onArchive={archiveCatalogCard} onRestore={restoreCatalogCard} onOpen={function(card){setDetailedCardId(card.id);setActiveTab("detailed");}} onStatusChange={setCardStatus} revision={customEditVer}/>
+        ) : activeTab === "catalog" || activeTab === "proofs" ? (
+          <window.CardCatalogPanel key={trackerMode+":"+activeTab} proofsOnly={activeTab === "proofs"} mode={trackerMode} readOnly={trackerMode==="wnba"} copySummaries={copySummaries} cards={ALL_CARDS.filter(function(card){return !HIDDEN_DUPES.has(card.id);}).concat(isOwner ? loadCustomCards().filter(function(card){return card.archived;}) : [])} statuses={statuses} isOwner={isOwner} initialEditId={catalogEditId} onClearEdit={function(){setCatalogEditId(null);}} onSave={saveCatalogCard} onArchive={archiveCatalogCard} onRestore={restoreCatalogCard} onOpen={function(card){setDetailedCardId(card.id);setActiveTab("detailed");}} onStatusChange={setCardStatus} revision={customEditVer}/>
         ) : activeTab === "summary" ? (
           <SummaryPanel cards={browseCards} segmentCards={ALL_CARDS} segmentIndex={segmentIndex} browseKey={browseKey} onSelectSegment={key=>chooseBrowse(key,"all",false)} onSelectSubject={key=>chooseBrowse(collectionSegment,key || "all",pinnedOnly)} statuses={summaryStatuses} copySummaries={copySummaries} cardDetails={cardDetails} setActiveTab={setActiveTab} setDetailedStatusFilter={setDetailedStatusFilter} setDetailedSnFilter={setDetailedSnFilter} />
         ) : activeTab === "lookup" ? (
@@ -2547,7 +2584,7 @@ function SummaryPanel({ cards = ALL_CARDS, segmentCards = ALL_CARDS, segmentInde
       // WNBA player filter — only include cards for the selected player when one is chosen
       if (trackerMode === "wnba" && selectedPlayer && !cardHasPlayer(card,selectedPlayer)) return;
       if (!passesFilter(card, minSN, inclBlank, ex1of1, unnumOnly, spOnly)) return;
-      var copyState = collectionCardState(card.id, sts, cardDetails, copySummaries);
+      var copyState = collectionCardState(card.id, sts, cardDetails, copySummaries, card.checklistAliasIds);
       var isOwned = !!copyState.owned, isTransit = !!copyState.inTransit;
       var acq = isOwned || isTransit ? 1 : 0;
       total++; acquired += acq;
@@ -2590,7 +2627,7 @@ function SummaryPanel({ cards = ALL_CARDS, segmentCards = ALL_CARDS, segmentInde
       var memberships = byId[String(card.id)] || ["ungrouped"];
       memberships.forEach(function(id) {
         if (!maps[id]) maps[id] = { owned:0, transit:0, acquired:0, total:0 };
-        var state = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+        var state = collectionCardState(card.id, statuses, cardDetails, copySummaries, card.checklistAliasIds);
         maps[id].total++;
         if (state.owned) maps[id].owned++;
         if (state.inTransit) maps[id].transit++;
@@ -2618,7 +2655,7 @@ function SummaryPanel({ cards = ALL_CARDS, segmentCards = ALL_CARDS, segmentInde
       if (c.product.startsWith("TEST")) return false;
       if (rookieOnly && !panelCardIsRookie(c)) return false;
       if (trackerMode === "wnba" && selectedPlayer && !cardHasPlayer(c, selectedPlayer)) return false;
-      var copyState = collectionCardState(c.id, statuses, cardDetails, copySummaries);
+      var copyState = collectionCardState(c.id, statuses, cardDetails, copySummaries, c.checklistAliasIds);
       if (!copyState.owned && !copyState.inTransit) return false;
       return c.copies && parseInt(c.copies) > 0;
     }).sort(function(a,b) { return parseInt(a.copies) - parseInt(b.copies); }).slice(0,12);
@@ -2627,7 +2664,7 @@ function SummaryPanel({ cards = ALL_CARDS, segmentCards = ALL_CARDS, segmentInde
       if (c.product.startsWith("TEST")) return false;
       if (rookieOnly && !panelCardIsRookie(c)) return false;
       if (trackerMode === "wnba" && selectedPlayer && !cardHasPlayer(c, selectedPlayer)) return false;
-      var copyState = collectionCardState(c.id, statuses, cardDetails, copySummaries);
+      var copyState = collectionCardState(c.id, statuses, cardDetails, copySummaries, c.checklistAliasIds);
       if (!copyState.owned && !copyState.inTransit) return false;
       return SSP_TAGS[c.cardSet] === "SSP" && !c.copies; // unnumbered SSP only
     });
@@ -2664,7 +2701,7 @@ function SummaryPanel({ cards = ALL_CARDS, segmentCards = ALL_CARDS, segmentInde
     return (
       <div className="ml-4 mt-0.5 mb-1 space-y-0">
         {cards.map(function(card) {
-          var copyState = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+          var copyState = collectionCardState(card.id, statuses, cardDetails, copySummaries, card.checklistAliasIds);
           var s = copyState.owned ? "owned" : copyState.inTransit ? "in_transit" : "not_owned";
           var cfg = STATUS_CONFIG[s];
           return (
@@ -2720,12 +2757,12 @@ function SummaryPanel({ cards = ALL_CARDS, segmentCards = ALL_CARDS, segmentInde
       {/* ============ DASHBOARD VIEW ============ */}
       {view === "dashboard" && (
         <div className="space-y-1">
-          {trackerMode === "tb" && <div className="flex flex-wrap items-center justify-between gap-1 mb-1 text-[11px] text-gray-400"><span>Checklist completion</span><button onClick={function(){setActiveTab("catalog");}} className="text-violet-300 hover:text-violet-100">Proofs & other cards · {cards.filter(function(card){return !HIDDEN_DUPES.has(card.id) && !inChecklist(card);}).length} recorded →</button></div>}
+          {trackerMode === "tb" && <div className="flex flex-wrap items-center justify-between gap-1 mb-1 text-[11px] text-gray-400"><span>Checklist completion</span><button onClick={function(){setActiveTab("proofs");}} className="text-violet-300 hover:text-violet-100">Proofs · {cards.filter(function(card){return !HIDDEN_DUPES.has(card.id) && window.CardCatalog.matchesScope(card,"proofs");}).length} recorded →</button></div>}
           {/* TOP ROW: Gauge+stats LEFT, By Year RIGHT */}
           <div className="flex gap-1.5 items-stretch">
             {/* Gauge + legend */}
             <div className="rounded-lg p-2 flex flex-col items-center justify-center flex-shrink-0" style={{background:"#111a2e",minWidth:"155px"}}>
-              <div className="text-[9px] text-gray-400 font-semibold">Acquired / collection</div><Gauge pct={pct} size={95}/>
+              <div className="text-[9px] text-gray-400 font-semibold">Owned + In Transit</div><Gauge pct={pct} size={95}/>
               <div className="grid grid-cols-2 gap-x-3 gap-y-0 mt-0.5" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
                 <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{background:"#22c55e"}}/><span style={{color:"#22c55e"}}>Own</span><span className="text-white font-bold ml-auto">{stats.owned}</span></div>
                 <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{background:"#86efac"}}/><span style={{color:"#86efac"}}>Transit</span><span className="text-white font-bold ml-auto">{stats.transit}</span></div>
@@ -2837,7 +2874,7 @@ function SummaryPanel({ cards = ALL_CARDS, segmentCards = ALL_CARDS, segmentInde
               {rarestOwned.numbered.length > 0 && (
                 <div className="space-y-0">
                   {rarestOwned.numbered.map(function(card) {
-                    var copyState = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+                    var copyState = collectionCardState(card.id, statuses, cardDetails, copySummaries, card.checklistAliasIds);
           var s = copyState.owned ? "owned" : copyState.inTransit ? "in_transit" : "not_owned";
                     var copies = parseInt(card.copies);
                     return (
@@ -2857,7 +2894,7 @@ function SummaryPanel({ cards = ALL_CARDS, segmentCards = ALL_CARDS, segmentInde
                 <div className="mt-0.5 pt-0.5 border-t border-gray-800">
                   <div className="text-[7px] font-bold mb-0" style={{color:"#8ba3c4"}}>UNNUMBERED SSP</div>
                   {rarestOwned.sp.map(function(card) {
-                    var copyState = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+                    var copyState = collectionCardState(card.id, statuses, cardDetails, copySummaries, card.checklistAliasIds);
           var s = copyState.owned ? "owned" : copyState.inTransit ? "in_transit" : "not_owned";
                     return (
                       <div key={card.id} className="flex items-center gap-1.5 px-1 py-0 rounded hover:bg-gray-800/40" style={{fontSize:"clamp(8px,0.9vw,10px)"}}>
@@ -3049,7 +3086,7 @@ function CardLookupPanel({ cards = ALL_CARDS, browseKey = "", onTogglePin, statu
       if (HIDDEN_DUPES.has(c.id) || !matchesCatalogScope(c, lookupScope) || (lookupPlayer !== "all" && !cardHasPlayer(c, lookupPlayer))) return;
       if (!nums[c.cardNumber]) nums[c.cardNumber] = { count: 0, owned: 0, transit: 0, acquired: 0 };
       nums[c.cardNumber].count++;
-      var state = collectionCardState(c.id, statuses, cardDetails, copySummaries);
+      var state = collectionCardState(c.id, statuses, cardDetails, copySummaries, lookupScope === "checklist" && c.checklistAliasIds);
       if (state.owned) nums[c.cardNumber].owned++;
       if (state.inTransit) nums[c.cardNumber].transit++;
       if (state.owned || state.inTransit) nums[c.cardNumber].acquired++;
@@ -3077,7 +3114,7 @@ function CardLookupPanel({ cards = ALL_CARDS, browseKey = "", onTogglePin, statu
       if (!map[key]) map[key] = { cards: [], owned: 0, transit: 0, acquired: 0, total: 0 };
       map[key].cards.push(c);
       map[key].total++;
-      var state = collectionCardState(c.id, statuses, cardDetails, copySummaries);
+      var state = collectionCardState(c.id, statuses, cardDetails, copySummaries, lookupScope === "checklist" && c.checklistAliasIds);
       if (state.owned) map[key].owned++;
       if (state.inTransit) map[key].transit++;
       if (state.owned || state.inTransit) map[key].acquired++;
@@ -3156,7 +3193,7 @@ function CardLookupPanel({ cards = ALL_CARDS, browseKey = "", onTogglePin, statu
   var numStats = selectedNum ? (function() {
     var total = cardsForNum.length, own = 0, tr = 0, acquired = 0;
     cardsForNum.forEach(function(c) {
-      var state = collectionCardState(c.id, statuses, cardDetails, copySummaries);
+      var state = collectionCardState(c.id, statuses, cardDetails, copySummaries, lookupScope === "checklist" && c.checklistAliasIds);
       if (state.owned) own++;
       if (state.inTransit) tr++;
       if (state.owned || state.inTransit) acquired++;
@@ -3218,7 +3255,7 @@ function CardLookupPanel({ cards = ALL_CARDS, browseKey = "", onTogglePin, statu
             var barColor = pct >= 100 ? "bg-green-500" : pct > 0 ? "bg-green-700" : "bg-gray-700";
             // Filter cards by status + variant search
             var visibleCards = info.cards;
-            if (statusOnly !== "all") visibleCards = visibleCards.filter(function(c) { return window.CopyInventory.matchesStatus(collectionCardState(c.id, statuses, cardDetails, copySummaries), statusOnly); });
+            if (statusOnly !== "all") visibleCards = visibleCards.filter(function(c) { return window.CopyInventory.matchesStatus(collectionCardState(c.id, statuses, cardDetails, copySummaries, lookupScope === "checklist" && c.checklistAliasIds), statusOnly); });
             if (varSearch) {
               var vs = varSearch.toLowerCase();
               visibleCards = visibleCards.filter(function(c) { return (panelCardSubject(c) + " " + c.cardSet).toLowerCase().indexOf(vs) !== -1; });
@@ -3257,7 +3294,8 @@ function CardLookupPanel({ cards = ALL_CARDS, browseKey = "", onTogglePin, statu
                 {showOpen && (
                   <div className="ml-2 mt-0.5 border-l border-gray-800 pl-1">
                     {visibleCards.map(function(card, vIdx) {
-                      var cs = statuses[card.id] || "not_owned";
+                      var lookupState = collectionCardState(card.id, statuses, cardDetails, copySummaries, lookupScope === "checklist" && card.checklistAliasIds);
+                      var cs = lookupState.owned ? "owned" : lookupState.inTransit ? "in_transit" : "not_owned";
                       var cfg = STATUS_CONFIG[cs];
                       var isSelected = selectedCard && selectedCard.id === card.id;
                       var pv = parseVariant(card);
@@ -3467,7 +3505,7 @@ function DetailedPanel({ cards = ALL_CARDS, browseKey = "", onTogglePin, statuse
     if (initialCardId) {
       var targetCard = cards.find(function(card){return String(card.id) === String(initialCardId);});
       if (targetCard) {
-        setDScope(inChecklist(targetCard) ? "checklist" : "all");
+        setDScope(inChecklist(targetCard) ? "checklist" : window.CardCatalog.isProof(targetCard) ? "proofs" : "all");
         setDFilter("all"); setDYear(cardYear(targetCard) || "all"); setDPlayer(cardPlayers(targetCard)[0] || "all"); setDSearch(""); setDSnFilter("all");
         setDProduct(targetCard.product);
         setDCardNum(targetCard.cardNumber);
@@ -3500,12 +3538,12 @@ function DetailedPanel({ cards = ALL_CARDS, browseKey = "", onTogglePin, statuse
   var filtered = useMemo(function() {
     var s = dSearch.toLowerCase();
     return cards.filter(function(card) {
-      if (HIDDEN_DUPES.has(card.id) || !matchesCatalogScope(card, dScope) || (dPlayer !== "all" && !cardHasPlayer(card,dPlayer))) return false;
+      if (HIDDEN_DUPES.has(card.id) || (dScope === "checklist" && card.product.startsWith("TEST")) || !matchesCatalogScope(card, dScope) || (dPlayer !== "all" && !cardHasPlayer(card,dPlayer))) return false;
       var cs = statuses[card.id] || "not_owned";
       var cardDetail = cardDetails[card.id] || {};
 
       // Status filter
-      if (!window.CopyInventory.matchesStatus(collectionCardState(card.id, statuses, cardDetails, copySummaries), dFilter)) return false;
+      if (!window.CopyInventory.matchesStatus(collectionCardState(card.id, statuses, cardDetails, copySummaries, dScope === "checklist" && card.checklistAliasIds), dFilter)) return false;
 
       // Year filter
       if (dYear !== "all" && cardYear(card) !== dYear) return false;
@@ -3523,10 +3561,10 @@ function DetailedPanel({ cards = ALL_CARDS, browseKey = "", onTogglePin, statuse
       if (dCardNum && card.cardNumber !== dCardNum) return false;
 
       // SN filter (print run) — extended with range and SP/SSP support
-      if (dSnFilter === "1of1" && card.copies !== "1") return false;
+      if (dSnFilter === "1of1" && String(card.copies) !== "1") return false;
       else if (dSnFilter === "numbered" && !card.copies) return false;
       else if (dSnFilter === "unnumbered" && card.copies) return false;
-      else if (dSnFilter === "not_1of1" && card.copies === "1") return false;
+      else if (dSnFilter === "not_1of1" && String(card.copies) === "1") return false;
       else if (dSnFilter === "missing_sn" && !isMissingSN(card, cardDetails)) return false;
       else if (dSnFilter === "sp_ssp") {
         if (!SSP_TAGS[card.cardSet]) return false;
@@ -3730,7 +3768,7 @@ function DetailedPanel({ cards = ALL_CARDS, browseKey = "", onTogglePin, statuse
           <tbody>
             {pageCards.map(function(card) {
               var s = statuses[card.id] || "not_owned";
-              var copySummary = collectionCardState(card.id, statuses, cardDetails, copySummaries);
+              var copySummary = collectionCardState(card.id, statuses, cardDetails, copySummaries, dScope === "checklist" && card.checklistAliasIds);
               var cfg = STATUS_CONFIG[copySummary.owned ? "owned" : copySummary.inTransit ? "in_transit" : s];
               var d = cardDetails[card.id] || {};
               return (
@@ -3740,7 +3778,7 @@ function DetailedPanel({ cards = ALL_CARDS, browseKey = "", onTogglePin, statuse
                     {copySummary.managed ? <button onClick={function(){openCardCopies(card.id);}} className="rounded border border-cyan-800 px-1 py-0 text-[9px] text-cyan-300" title="Change the location or status of an individual copy">Edit copies</button> : <select value={s} onChange={function(e) { setCardStatus(card.id, e.target.value); }} className={"bg-transparent border border-gray-700 rounded px-0 py-0 " + (s === "owned" ? "text-green-300" : s === "in_transit" ? "text-emerald-300" : s === "for_sale" ? "text-pink-400" : "text-gray-400")} style={{fontSize: "9px", width:"4.5em"}}>
                       {PRIMARY_STATUSES.map(function(k) { return <option key={k} value={k}>{STATUS_CONFIG[k].label}</option>; })}
                     </select>}
-                    {copySummary.managed && <span className="block text-[8px] text-cyan-300">{[copySummary.owned && "Owned", copySummary.inTransit && "In Transit"].filter(Boolean).join(" + ")}</span>}
+                    {(copySummary.managed || dScope === "checklist" && card.checklistAliasIds) && <span className="block text-[8px] text-cyan-300">{[copySummary.owned && "Owned", copySummary.inTransit && "In Transit"].filter(Boolean).join(" + ")}</span>}
                   </td>
                   {trackerMode !== "tb" && <td className="px-1 py-0.5 text-purple-300 font-semibold" style={{maxWidth:"12rem"}}>{onTogglePin && <button type="button" aria-pressed={d.pinned === true} aria-label={(d.pinned === true ? "Unpin focal card: " : "Pin focal card: ") + panelCardSubject(card) + " " + cardYear(card) + " " + card.product + " #" + card.cardNumber + " " + card.cardSet} title={d.pinned === true ? "Unpin focal card" : "Pin focal card"} onClick={function(e){e.stopPropagation();onTogglePin(card.id);}} className={"mr-1 rounded px-0.5 " + (d.pinned === true ? "text-amber-300" : "text-gray-600 hover:text-amber-300")}>{d.pinned === true ? "★" : "☆"}</button>}{panelCardSubject(card)}<span className="block text-[8px] text-gray-500">{cardYear(card)}</span></td>}
                   <td className="px-0.5 py-0.5 text-gray-300 truncate" style={{maxWidth:"clamp(80px,11vw,180px)", fontSize:"9px"}} title={card.product}>{card.product}</td>
@@ -4638,6 +4676,7 @@ function COMCScannerPanel(props) {
       year: p.year || "",
       product: p.product || "",
       variant: p.variant || "Base",
+      suggestedProof: window.MODE === "tb" && window.CardCatalog.getInfo({isCustom:true,product:p.product || p.rawSet,cardSet:[p.rawSet,p.description].filter(Boolean).join(" ")}).issueType,
       cardNo: initialFilter,
       cardNoFilter: cardNoFilter,
       printRun: p.printRun || "",
@@ -4751,6 +4790,12 @@ function COMCScannerPanel(props) {
     setParsed(updatedParsed);
   }
 
+  function scannerCardType(form) {
+    if (form.issueType) return form.issueType;
+    var inferred = window.CardCatalog.getInfo({isCustom:true,product:form.product,cardSet:form.variant}).issueType;
+    return inferred === "unverified" ? form.suggestedProof || inferred : inferred;
+  }
+
   async function handleAddToDb(idx) {
     if (!window.trackerAuth || !window.trackerAuth.isOwner()) return;
     var item = parsed[idx];
@@ -4782,7 +4827,8 @@ function COMCScannerPanel(props) {
       setImportMessage("Card added to this collection’s catalogue.");
       return;
     }
-    var isDupe = custom.some(function(cc) {
+    var proposed = {product:dbProduct,cardNumber:dbCardNo,cardSet:dbVariant,copies:dbPrintRun,isCustom:true,isAuto:f.isAuto ? "Yes" : "",issueType:window.MODE === "tb" ? scannerCardType(f) : undefined};
+    var isDupe = window.MODE === "tb" ? custom.concat(ALL_CARDS).some(c => window.CardCatalog.sameIdentity(c, proposed)) : custom.some(function(cc) {
       return cc.product === dbProduct && cc.cardNumber === dbCardNo && cc.cardSet === dbVariant && (!multiSubject || window.CollectionScanner.subject(cc,scanRoster) === dbSubject);
     }) || ALL_CARDS.some(function(c) {
       return c.product === dbProduct && c.cardNumber === dbCardNo && c.cardSet === dbVariant && (!multiSubject || window.CollectionScanner.subject(c,scanRoster) === dbSubject);
@@ -4791,7 +4837,7 @@ function COMCScannerPanel(props) {
       alert("This card already exists in the database!");
       return;
     }
-    custom.push({
+    var addition = {
       id: window.CardCatalog.nextCustomId(custom),
       product: dbProduct,
       subject: dbSubject, player: dbPlayer,
@@ -4803,14 +4849,18 @@ function COMCScannerPanel(props) {
       isRC: f.isRC ? "Yes" : "",
       addedDate: new Date().toISOString().slice(0, 10),
       updatedAt: new Date().toISOString(),
+      ...(window.MODE === "tb" ? {issueType:proposed.issueType} : {}),
       verification: "unverified"
-    });
+    };
+    separateProofPriceHistory(addition);
+    custom.push(addition);
     var saved = await saveCustomCards(custom);
     if (!saved.localSaved && !saved.cloudSaved) { alert(saved.error || "Could not save card"); return; }
     if (!saved.cloudSaved) alert("Saved on this device; cloud sync is pending. " + (saved.error || "Open Catalogue to retry."));
     mergeCustomCards();
-    // Re-run matching on all parsed items so the newly added card gets matched
-    var updatedParsed = parsed.map(function(r) {
+    // Keep the selected proof or checklist variant on the listing it was added from.
+    var updatedParsed = parsed.map(function(r, ri) {
+      if (ri === idx) return {...r, match:{card:CARD_BY_ID[addition.id] || addition, score:100}};
       var newMatch = matchToCards(r.parsed);
       return { parsed: r.parsed, match: newMatch, raw: r.raw };
     });
@@ -7776,6 +7826,11 @@ function COMCScannerPanel(props) {
                                         <input value={addForm.cardNo||""} onChange={function(e){setAddForm(Object.assign({},addForm,{cardNo:e.target.value}));}} className="w-full bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-gray-200 text-[11px]" />
                                       </div>
                                     </div>
+                                    {window.MODE === "tb" && <label className="flex items-center gap-2 text-gray-400">Card type
+                                      <select aria-label="Scanner card type" value={scannerCardType(addForm)} onChange={e=>setAddForm({...addForm,issueType:e.target.value})} className="rounded border border-gray-600 bg-gray-800 px-1.5 py-0.5 text-xs text-gray-200">
+                                        <option value="unverified">Needs identification</option><option value="standard">Checklist card</option><option value="pre_production_proof">Pre-production proof</option><option value="manufacturer_proof">Other manufacturer proof</option><option value="prototype">Prototype / test issue</option><option value="custom">Custom / unofficial</option>
+                                      </select>
+                                    </label>}
                                     <div className="grid grid-cols-4 gap-2 items-center">
                                       <div>
                                         <label className="text-gray-500 block mb-0.5">Print Run</label>

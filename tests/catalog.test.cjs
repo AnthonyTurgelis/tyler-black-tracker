@@ -108,3 +108,20 @@ test('proof type and signature scopes stay explicit and exclude every proof from
   }
   assert.equal(catalog.isProof(make('Blue',{product:'2021 Leaf Pre-Production Proof'})),true);
 });
+
+test('legacy manual proof labels are classified independently of their evidence status',()=>{
+  for (const [name,type] of [['Pre‑Prod Proof Green','pre_production_proof'],['Proof Silver Wave','manufacturer_proof'],['Prototype','prototype']]) {
+    const card=make(name,{id:10006,isCustom:true,issueType:'unverified',verification:'unverified'});
+    assert.equal(catalog.getInfo(card).issueType,type);
+    assert.equal(catalog.matchesScope(card,'proofs'),true);
+    assert.equal(catalog.matchesScope(card,'review'),true);
+    assert.equal(catalog.isChecklistCard(card),false);
+    assert.equal(card.id,10006);
+  }
+  for (const name of ['Press Proofs Gold','Artist’s Proof Red',"Photographer’s Proof",'Black Printing Plate']) {
+    assert.equal(catalog.isProof(make(name,{isCustom:true,issueType:'unverified'})),false,name);
+  }
+  assert.equal(catalog.isProof(make('Proof Silver',{issueType:'custom'})),false);
+  const released=make('Green',{issueType:'standard',verification:'checklist',copies:'1'});
+  assert.equal(catalog.sameIdentity(released,{...released,issueType:'pre_production_proof'}),false);
+});

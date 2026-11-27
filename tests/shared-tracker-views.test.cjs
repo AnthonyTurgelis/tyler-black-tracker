@@ -46,7 +46,7 @@ test('TCDB list detection holds ambiguous navigation and preserves explicit inbo
 
 test('selected-number lookup counts mixed copies in each status but subtracts acquired cards only once',()=>{
  const cardsForNum=[{id:'tcdb:1'},{id:'tcdb:2'},{id:'tcdb:3'}],statuses={'tcdb:1':'owned','tcdb:2':'in_transit'},cardDetails={'tcdb:1':{qty:2,ownedQty:1,transitQty:1}};
- const ctx=context('racing',{selectedNum:'7',cardsForNum,statuses,cardDetails,copySummaries:null,collectionCardState:(id,s,d,summary)=>summary?.[id]||copies.summarizeCard(null,id,s,d)});
+ const ctx=context('racing',{selectedNum:'7',lookupScope:'checklist',cardsForNum,statuses,cardDetails,copySummaries:null,collectionCardState:(id,s,d,summary)=>summary?.[id]||copies.summarizeCard(null,id,s,d)});
  const start=source.indexOf('  var numStats = selectedNum ?'),end=source.indexOf('\n  return (',start);assert.ok(start>0&&end>start);
  const input=JSON.stringify({cardsForNum,statuses,cardDetails});vm.runInContext(source.slice(start,end),ctx);
  assert.equal(ctx.numStats.owned,1);assert.equal(ctx.numStats.transit,2);assert.equal(ctx.numStats.acquired,2);assert.equal(ctx.numStats.needed,1);assert.equal(ctx.numStats.total,3);assert.equal(JSON.stringify({cardsForNum,statuses,cardDetails}),input);
@@ -67,4 +67,39 @@ test('TCDB explicit filters hold invalid values and conflicting clear headings w
  ]) assert.equal(ctx.parseTcdbCollection(text).status,'unknown',text);
  assert.equal(ctx.parseTcdbCollection('https://www.tcdb.com/Collection.cfm?Filter=G\nCollection Summary\nWant\nHave\nCards | Filters').status,'owned');
  assert.equal(ctx.parseTcdbCollection('https://www.tcdb.com/Collection.cfm?Filter=W\nCollection Summary\nWant\nCards | Filters').status,'not_owned');
+});
+
+test('checklist progress counts linked plate records once and preserves their individual statuses', () => {
+ const catalog = require('../catalog-utils.js');
+ const cards = require('../catalog-corrections.js').apply([
+  {id:1152, product:'2024 Topps Chrome Update', cardSet:'Printing Plates Cyan'},
+  {id:1473, product:'2024 Topps Chrome Update', cardSet:'Printing Plate Cyan 1/1'},
+  {id:90000, product:'2024 Topps Chrome Update', cardSet:'Gold'},
+  {id:90001, product:'2024 Leaf', cardSet:'Pre-production Proof'}
+ ]);
+ const primary = cards[0];
+ const statuses = {1152:'in_transit',1473:'owned',90001:'owned'};
+ const ctx = context('tb');
+ vm.runInContext(source.slice(source.indexOf('function collectionCardState('),source.indexOf('// COLOR_PALETTE')),ctx);
+ const checklist = cards.filter(card=>catalog.matchesScope(card,'checklist'));
+ const states = checklist.map(card=>ctx.collectionCardState(card.id,statuses,{},null,card.checklistAliasIds));
+ assert.deepEqual(checklist.map(card=>card.id),[1152,90000]);
+ assert.deepEqual(copies.countCards(states),{total:2,owned:1,inTransit:1,acquired:1,notOwned:1});
+ for (const filter of ['owned','in_transit','acquired']) {
+  assert.deepEqual(checklist.filter((card,index)=>copies.matchesStatus(states[index],filter)).map(card=>card.id),[1152]);
+ }
+ assert.equal(ctx.collectionCardState(1152,statuses,{},null).owned,false);
+ assert.equal(ctx.collectionCardState(1473,statuses,{},null).inTransit,false);
+ assert.ok(cards.every(card=>catalog.matchesScope(card,'all')));
+ const copySummaries = {1152:copies.summarizeCard(null,1152,{},{}),1473:copies.summarizeCard(null,1473,{1473:'owned'},{})};
+ assert.equal(ctx.collectionCardState(primary.id,statuses,{},copySummaries,primary.checklistAliasIds).inTransit,false);
+ assert.equal(ctx.collectionCardState(primary.id,statuses,{},copySummaries,primary.checklistAliasIds).owned,true);
+ assert.deepEqual(statuses,{1152:'in_transit',1473:'owned',90001:'owned'});
+});
+
+test('header shows the combined numerator and denominator and opens the acquired checklist', () => {
+ const button = source.match(/<button[^>]*data-checklist-acquired[\s\S]*?<\/button>/)[0];
+ assert.match(button,/openChecklistStatus\("acquired"\)/);
+ assert.match(button,/Owned \+ In Transit/);
+ assert.match(button,/\{stats\.acquired\}\/\{stats\.total\}/);
 });

@@ -15,11 +15,12 @@
       .replace(/\s*\(not_on_tcdb\)/g, "").replace(/pre[\s-]*production/g, "preproduction").replace(/\s+/g, " ");
   }
   function inferType(card) {
-    var text = [card.product,card.cardSet].filter(Boolean).join(" ");
-    if (/pre[\s-]*production/i.test(text)) return "pre_production_proof";
+    var text = [card.product,card.cardSet].filter(Boolean).join(" ").replace(/[‐‑‒–—]/g, "-").replace(/[’‘]/g, "'");
+    if (/\bpre[\s-]*prod(?:uction)?\b/i.test(text)) return "pre_production_proof";
     // Artist Proof, Press Proof and Photographer's Proof are regular parallels.
-    if (/\b(?:artist|press|photographer(?:'s|s)?)\s+proof\b/i.test(text)) return card.isCustom ? "unverified" : "standard";
-    if (/unsigned proofs?|slabbed proof|proofs?\s+auto|autographed proof/i.test(text)) return "manufacturer_proof";
+    if (/\b(?:artist(?:'s|s)?|press|photographer(?:'s|s)?)\s+proofs?\b/i.test(text)) return card.isCustom ? "unverified" : "standard";
+    if (/\b(?:signed|unsigned|slabbed|manufacturer(?:'s)?|autographed)\s+proofs?\b|\bproofs?\s+auto/i.test(text)) return "manufacturer_proof";
+    if (/\bleaf\b/i.test(card.product || "") && /\bproofs?\b(?!\s+of\b)/i.test(text)) return "manufacturer_proof";
     if (/\bprototype\b|\btest issue\b/i.test(text)) return "prototype";
     return card.isCustom ? "unverified" : "standard";
   }
@@ -37,7 +38,10 @@
       info[key] = card[key] == null ? "" : card[key];
       if (card.catalogMeta && Object.prototype.hasOwnProperty.call(card.catalogMeta, key)) info[key] = card.catalogMeta[key];
     });
-    if (!labels[info.issueType]) info.issueType = inferType(card);
+    if (!labels[info.issueType] || info.issueType === "unverified") {
+      var inferred = inferType(card);
+      if (!labels[info.issueType] || proofType(inferred)) info.issueType = inferred;
+    }
     if (!["checklist", "observed", "unverified"].includes(info.verification)) {
       info.verification = info.issueType === "standard" && !card.isCustom ? "checklist" : "unverified";
     }
@@ -50,7 +54,7 @@
   }
   function isChecklistCard(card) {
     var info = getInfo(card);
-    return !card.archived && info.issueType === "standard" && info.verification !== "unverified";
+    return !card.archived && !card.checklistAliasOf && info.issueType === "standard" && info.verification !== "unverified";
   }
   function isProof(card) {
     return proofType(getInfo(card).issueType);
@@ -82,6 +86,7 @@
     // Unknown print run / optional proof detail must not bypass duplicate checks.
     if (!["product", "cardNumber", "cardSet"].every(function (key) { return normalize(left[key]) === normalize(right[key]); })) return false;
     var a = getInfo(left), b = getInfo(right);
+    if (a.issueType === "standard" && proofType(b.issueType) || b.issueType === "standard" && proofType(a.issueType)) return false;
     if (left.copies && right.copies && normalize(left.copies) !== normalize(right.copies)) return false;
     if (a.signature !== "unknown" && b.signature !== "unknown" && a.signature !== b.signature) return false;
     return ["proofColor", "proofFinish"].every(function (key) { return !a[key] || !b[key] || normalize(a[key]) === normalize(b[key]); });

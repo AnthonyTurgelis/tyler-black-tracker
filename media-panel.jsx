@@ -184,7 +184,7 @@ function CardGalleryPanel({cards = [], statuses = {}, cardDetails = {}, inventor
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [sourceFilter, setSourceFilter] = React.useState("all");
   const [jerseyFilter, setJerseyFilter] = React.useState("all");
-  const [scope, setScope] = React.useState("all");
+  const [scope, setScope] = React.useState(currentMode === "tb" ? "checklist" : "all");
   const [includeMissing, setIncludeMissing] = React.useState(!!onEditMedia);
   const [limit, setLimit] = React.useState(48);
   const [preview, setPreview] = React.useState(null);

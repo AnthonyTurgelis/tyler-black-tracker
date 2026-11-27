@@ -44,3 +44,13 @@ test('collection labels and sync errors resolve the selected sport rather than T
  assert.equal(R.cardSubject({player:'sykes'}),'Brittney Sykes');assert.equal(R.productLabel(card),'2026 Donruss WNBA');
  assert.equal(R.productLabel({...card,product:'2026 Donruss WNBA'}),'2026 Donruss WNBA');
 });
+
+test('a named proof entered through the regular Tyler card form is saved in Proofs without promoting verification',()=>{
+  const form={...R.makeForm(null,false,'tb'),product:'2021 Leaf Metal Draft',cardNumber:'BA-TB1',cardSet:'Pre‑Production Proof Purple',evidenceNotes:'Manual entry from the Leaf slab.'};
+  const result=R.prepareSubmission(form,null,'tb');
+  assert.equal(result.error,undefined);
+  assert.equal(result.card.issueType,'pre_production_proof');
+  assert.equal(result.card.verification,'unverified');
+  assert.equal(window.CardCatalog.matchesScope(result.card,'proofs'),true);
+  assert.equal(window.CardCatalog.isChecklistCard(result.card),false);
+});
